@@ -1,6 +1,6 @@
 <div align="center">
 
-# DappCard
+# vibecard
 > Your Social Identity Card + Companion Discovery Platform · 你的社交身份名片 + 搭子发现平台
 
 ![Profile Card](./docs/assets/card-profile.png)
@@ -23,11 +23,11 @@
 
 ## Introduction
 
-DappCard is a social app that combines **digital identity cards**, **social icebreaker card games**, and **companion activity discovery**. Whether you want to quickly present yourself at events, break the ice with fun questions, or find like-minded activity partners, DappCard makes it effortless.
+vibecard is a social app that combines **digital identity cards**, **social icebreaker card games**, and **companion activity discovery**. Whether you want to quickly present yourself at events, break the ice with fun questions, or find like-minded activity partners, vibecard makes it effortless.
 
-### Why Choose DappCard?
+### Why Choose vibecard?
 
-| Traditional Way | DappCard |
+| Traditional Way | vibecard |
 |----------------|----------|
 | Scattered info, hard to remember | Beautiful digital card, one-tap share |
 | Awkward social openings, nothing to say | 80+ professional icebreaker cards, natural conversation starters |
@@ -100,7 +100,7 @@ Discover various activity partners around you, from sports and travel to dining 
 
 ## On-Chain Storage (Inspired by mirror.xyz)
 
-DappCard uses a **dual-layer storage architecture** inspired by mirror.xyz:
+vibecard uses a **dual-layer storage architecture** inspired by mirror.xyz:
 
 ### Storage Layers
 | Layer | Technology | Purpose |
@@ -145,8 +145,8 @@ User edits profile → Click "Sync to Chain"
 
 ```bash
 # Clone the repository
-git clone https://github.com/frankfika/DappCard.git
-cd DappCard
+git clone https://github.com/frankfika/vibecard.git
+cd vibecard
 
 # Install dependencies
 npm install
@@ -168,7 +168,7 @@ Build output is located in `packages/web/dist/`.
 ## Architecture
 
 ```
-DappCard/
+vibecard/
 ├── packages/
 │   ├── web/              # Web app (React + Vite + Tailwind CSS)
 │   ├── shared/           # Shared library (card data, tags, type definitions)
@@ -231,15 +231,15 @@ packages/web/src/
 **Domestic**:
 - WeChat Cloud / proprietary servers → localStorage
 
-- `dappcard_profile` — User profile information
-- `dappcard_tab` — Currently selected tab
-- `dappcard_game_session` — Game history and favorites
-- `dappcard_activities` — Activity list
-- `dappcard_profile_sync` — On-chain sync status
+- `vibecard_profile` — User profile information
+- `vibecard_tab` — Currently selected tab
+- `vibecard_game_session` — Game history and favorites
+- `vibecard_activities` — Activity list
+- `vibecard_profile_sync` — On-chain sync status
 
 ## Smart Contract
 
-The `DappCardRegistry` contract is deployed on multiple testnets:
+The `vibecardRegistry` contract is deployed on multiple testnets:
 
 ```solidity
 function publish(string calldata contentType, string calldata ipfsHash, bytes32 contentHash) external;
@@ -247,7 +247,7 @@ function getLatestProfile(address user) external view returns (string memory);
 function getUserEntries(address user) external view returns (ContentEntry[] memory);
 ```
 
-See `packages/contracts/DappCardRegistry.sol` for full implementation.
+See `packages/contracts/vibecardRegistry.sol` for full implementation.
 
 ## Environment Variables
 
@@ -276,6 +276,6 @@ This project is open-sourced under the [MIT](LICENSE) License.
 
 <div align="center">
 
-**Made with 💚 by DappCard Team**
+**Made with 💚 by vibecard Team**
 
 </div>

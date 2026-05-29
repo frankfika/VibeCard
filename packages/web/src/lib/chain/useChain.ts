@@ -44,7 +44,7 @@ export function useChain(): UseChainResult {
   // Cross-tab sync
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'dappcard_chain_v1') setState(getChain());
+      if (e.key === 'vibecard_chain_v1') setState(getChain());
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -74,7 +74,7 @@ export function useChain(): UseChainResult {
       const def = BADGE_BY_ID[id];
       if (!def) continue;
       const updated: ChainState = { ...chain, badges: [...chain.badges, id] };
-      localStorage.setItem('dappcard_chain_v1', JSON.stringify(updated));
+      localStorage.setItem('vibecard_chain_v1', JSON.stringify(updated));
       await emit('badge.earn', { badge: id, name: def.name });
       chain = getChain() ?? updated;
     }

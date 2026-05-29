@@ -70,7 +70,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, { profile: Profile }
             <Zap className="w-8 h-8 text-black" />
           </div>
           <div className="text-left">
-            <div className="text-[20px] font-bold text-white/50 uppercase tracking-widest mb-1">DappCard</div>
+            <div className="text-[20px] font-bold text-white/50 uppercase tracking-widest mb-1">vibecard</div>
             <div className="text-[28px] font-bold text-white">一张卡片，连接无限可能</div>
           </div>
         </div>

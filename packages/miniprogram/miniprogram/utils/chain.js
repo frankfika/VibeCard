@@ -2,8 +2,8 @@
 // Mirrors packages/web/src/lib/chain/chain.ts. Same algorithm, same data shape.
 // Uses a self-contained JS SHA-256 because miniprogram has no crypto.subtle.
 
-const STORAGE_KEY = 'dappcard_chain_v1';
-const ADDR_KEY = 'dappcard_pseudo_addr';
+const STORAGE_KEY = 'vibecard_chain_v1';
+const ADDR_KEY = 'vibecard_pseudo_addr';
 const ZERO_HASH = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 // ───────────────────────── SHA-256 (FIPS 180-4) ─────────────────────────
@@ -139,10 +139,10 @@ function mineBlock(candidate, difficulty, maxIter) {
 function initChain(seed) {
   let state = loadChain();
   if (state) return state;
-  const address = getOrCreateAddress(seed || 'dappcard');
+  const address = getOrCreateAddress(seed || 'vibecard');
   const baseTx = {
     type: 'genesis', from: address,
-    payload: { msg: 'DappCard genesis — your personal chain begins.' },
+    payload: { msg: 'vibecard genesis — your personal chain begins.' },
     timestamp: Date.now(), nonce: 0,
   };
   const genesisTx = Object.assign({ id: hashTx(baseTx) }, baseTx);

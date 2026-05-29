@@ -60,7 +60,7 @@ export default function GamesPage() {
     try {
       const content = {
         version: '1.0',
-        app: 'dappcard',
+        app: 'vibecard',
         type: 'game' as const,
         data: session,
         timestamp: Date.now(),

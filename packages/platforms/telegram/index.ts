@@ -12,7 +12,7 @@ export function initTelegramWebApp() {
   tgInstance.expand();
   tgInstance.enableClosingConfirmation();
 
-  // Set theme colors to match DappCard
+  // Set theme colors to match vibecard
   tgInstance.setHeaderColor('#F7F9F8');
   tgInstance.setBackgroundColor('#F7F9F8');
 

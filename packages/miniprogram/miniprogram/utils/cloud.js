@@ -1,5 +1,5 @@
 /**
- * Cloud API wrapper for couple-cards mini-program
+ * Cloud API wrapper for vibecard mini-program
  * Provides simplified interfaces for cloud functions and storage
  */
 

@@ -30,7 +30,7 @@ export async function uploadToIPFS(content: ChainContent): Promise<string> {
   try {
     const client = getPinataClient();
     const blob = new Blob([JSON.stringify(content)], { type: 'application/json' });
-    const file = new File([blob], `dappcard-${content.type}-${content.timestamp}.json`, {
+    const file = new File([blob], `vibecard-${content.type}-${content.timestamp}.json`, {
       type: 'application/json',
     });
     const result = await client.upload.file(file);

@@ -1,6 +1,6 @@
 /**
  * Companion type categories and subcategories
- * Defines all available companion types for the couple-cards mini-program
+ * Defines all available companion types for the vibecard mini-program
  */
 
 const companionTypes = {

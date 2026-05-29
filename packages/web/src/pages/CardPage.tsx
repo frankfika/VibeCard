@@ -376,7 +376,7 @@ function OnboardingFlow({ onComplete }: { onComplete: (data: Partial<import('../
                 </motion.div>
                 
                 <div className="text-center space-y-3">
-                  <h1 className="text-[32px] font-black text-foreground leading-tight tracking-tight">DappCard</h1>
+                  <h1 className="text-[32px] font-black text-foreground leading-tight tracking-tight">vibecard</h1>
                   <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[260px] mx-auto">
                     你的 Web3 社交名片。一张卡片，连接无限可能。
                   </p>
@@ -895,7 +895,7 @@ function ShareDrawer({ onClose, shareUrl, profile, shareCardRef }: { onClose: ()
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
   const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-  const shareText = `${profile.name || 'TA'} 的 DappCard 名片 — 一张卡片，连接无限可能`;
+  const shareText = `${profile.name || 'TA'} 的 vibecard 名片 — 一张卡片，连接无限可能`;
 
   useEffect(() => {
     setQrError(false);
@@ -947,7 +947,7 @@ function ShareDrawer({ onClose, shareUrl, profile, shareCardRef }: { onClose: ()
         setMode('imagePreview');
       } else {
         const link = document.createElement('a');
-        link.download = `DappCard-${profile.name || 'namecard'}.png`;
+        link.download = `vibecard-${profile.name || 'namecard'}.png`;
         link.href = dataUrl;
         link.click();
       }

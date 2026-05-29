@@ -1,5 +1,5 @@
 {
-  "name": "@dappcard/shared",
+  "name": "@vibecard/shared",
   "version": "1.0.0",
   "type": "module",
   "main": "index.ts",

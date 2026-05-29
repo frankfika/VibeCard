@@ -19,7 +19,7 @@ function MobileHeader({ activeTab, onBack }: { activeTab: string; onBack?: () =>
       case 'card': return '我的名片';
       case 'threads': return '动态';
       case 'more': return '发现与工具';
-      default: return 'DappCard';
+      default: return 'vibecard';
     }
   };
 
@@ -52,14 +52,14 @@ function MobileHeader({ activeTab, onBack }: { activeTab: string; onBack?: () =>
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
-    return (localStorage.getItem('dappcard_tab') as Tab) || 'card';
+    return (localStorage.getItem('vibecard_tab') as Tab) || 'card';
   });
   
   const isSharedView = new URLSearchParams(window.location.search).has('c');
 
   useEffect(() => {
     if (!isSharedView) {
-      localStorage.setItem('dappcard_tab', activeTab);
+      localStorage.setItem('vibecard_tab', activeTab);
     }
   }, [activeTab, isSharedView]);
 
@@ -76,7 +76,7 @@ export default function App() {
               <User className="w-4 h-4 text-background" />
             </div>
             <div>
-              <span className="font-black text-lg tracking-tight block leading-none">DappCard</span>
+              <span className="font-black text-lg tracking-tight block leading-none">vibecard</span>
             </div>
           </div>
 

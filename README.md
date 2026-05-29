@@ -1,6 +1,6 @@
 <div align="center">
 
-# DappCard
+# vibecard
 > 你的社交身份名片 + 搭子发现平台 · Your Social Identity Card + Companion Discovery Platform
 
 ![名片页](./docs/assets/card-profile.png)
@@ -23,11 +23,11 @@ __简体中文__ | [English](./README_EN.md)
 
 ## 项目简介
 
-DappCard 是一个融合了**数字身份名片**、**社交破冰卡牌游戏**和**搭子活动发现**的社交应用。无论是想在活动中快速展示自己、用趣味问答拉近彼此距离，还是寻找志同道合的活动伙伴，DappCard 都能帮你轻松实现。
+vibecard 是一个融合了**数字身份名片**、**社交破冰卡牌游戏**和**搭子活动发现**的社交应用。无论是想在活动中快速展示自己、用趣味问答拉近彼此距离，还是寻找志同道合的活动伙伴，vibecard 都能帮你轻松实现。
 
-### 为什么选择 DappCard？
+### 为什么选择 vibecard？
 
-| 传统方式 | DappCard |
+| 传统方式 | vibecard |
 |---------|----------|
 | 名片信息零散，难以记住 | 精美的数字名片，一键分享 |
 | 社交开场尴尬，无话可说 | 80+ 专业破冰卡牌，自然开启话题 |
@@ -92,8 +92,8 @@ DappCard 是一个融合了**数字身份名片**、**社交破冰卡牌游戏**
 
 ```bash
 # 克隆仓库
-git clone https://github.com/frankfika/DappCard.git
-cd DappCard
+git clone https://github.com/frankfika/vibecard.git
+cd vibecard
 
 # 安装依赖
 npm install
@@ -139,7 +139,7 @@ npm run build
 ## 技术架构
 
 ```
-DappCard/
+vibecard/
 ├── packages/
 │   ├── web/              # Web 端 (React + Vite + Tailwind CSS)
 │   ├── shared/           # 共享库 (卡牌数据、标签、类型定义)
@@ -196,7 +196,7 @@ packages/web/src/
 
 ## 链上存储（参考 mirror.xyz）
 
-DappCard 采用 **双层存储架构**，参考 mirror.xyz 的实现逻辑：
+vibecard 采用 **双层存储架构**，参考 mirror.xyz 的实现逻辑：
 
 ### 存储层
 | 层级 | 技术 | 用途 |
@@ -228,11 +228,11 @@ DappCard 采用 **双层存储架构**，参考 mirror.xyz 的实现逻辑：
 **国内版本**：
 - 微信云开发 / 自有服务器 → localStorage
 
-- `dappcard_profile` — 用户名片信息
-- `dappcard_tab` — 当前选中的标签页
-- `dappcard_game_session` — 游戏历史与收藏
-- `dappcard_activities` — 活动列表
-- `dappcard_profile_sync` — 链上同步状态
+- `vibecard_profile` — 用户名片信息
+- `vibecard_tab` — 当前选中的标签页
+- `vibecard_game_session` — 游戏历史与收藏
+- `vibecard_activities` — 活动列表
+- `vibecard_profile_sync` — 链上同步状态
 
 ## 贡献指南
 
@@ -252,6 +252,6 @@ DappCard 采用 **双层存储架构**，参考 mirror.xyz 的实现逻辑：
 
 <div align="center">
 
-**Made with 💚 by DappCard Team**
+**Made with 💚 by vibecard Team**
 
 </div>

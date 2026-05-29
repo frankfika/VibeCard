@@ -30,8 +30,8 @@ export const chainLogos: Record<number, string> = {
 };
 
 export const wagmiConfig = getDefaultConfig({
-  appName: 'DappCard',
-  projectId: 'dappcard_default_project_id',
+  appName: 'vibecard',
+  projectId: 'vibecard_default_project_id',
   chains: supportedChains as unknown as [typeof sepolia, typeof baseSepolia, typeof arbitrumSepolia, typeof polygonAmoy],
   ssr: false,
 });

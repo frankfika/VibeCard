@@ -7,10 +7,10 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log('Deployer:', deployer.address);
   
-  const DappCardRegistry = await ethers.getContractFactory('DappCardRegistry');
+  const vibecardRegistry = await ethers.getContractFactory('vibecardRegistry');
   console.log('Factory created');
   
-  const registry = await DappCardRegistry.deploy();
+  const registry = await vibecardRegistry.deploy();
   console.log('Deploy tx sent');
   
   await registry.waitForDeployment();

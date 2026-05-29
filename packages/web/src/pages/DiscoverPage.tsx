@@ -141,7 +141,7 @@ function CreateActivityDrawer({ onClose, onSubmit }: { onClose: () => void; onSu
 
   const submit = () => {
     if (!title || !category || !location || !time) return;
-    const profile = JSON.parse(localStorage.getItem('dappcard_profile') || '{}');
+    const profile = JSON.parse(localStorage.getItem('vibecard_profile') || '{}');
     onSubmit({
       title,
       category,

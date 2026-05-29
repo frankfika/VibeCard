@@ -1,5 +1,5 @@
 /**
- * Data migration utility for couple-cards mini-program
+ * Data migration utility for vibecard mini-program
  * Migrates local storage data to cloud database
  */
 

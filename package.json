@@ -1,5 +1,5 @@
 {
-  "name": "dappcard",
+  "name": "vibecard",
   "private": true,
   "workspaces": [
     "packages/web",

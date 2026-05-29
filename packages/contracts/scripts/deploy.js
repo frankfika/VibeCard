@@ -19,18 +19,18 @@ async function main() {
     console.warn('WARNING: Account has zero balance. Deployment may fail without test ETH.');
   }
 
-  const DappCardRegistry = await ethers.getContractFactory('DappCardRegistry');
-  const registry = await DappCardRegistry.deploy();
+  const vibecardRegistry = await ethers.getContractFactory('vibecardRegistry');
+  const registry = await vibecardRegistry.deploy();
   await registry.waitForDeployment();
 
   const address = await registry.getAddress();
   const network = await ethers.provider.getNetwork();
-  console.log('DappCardRegistry deployed to:', address);
+  console.log('vibecardRegistry deployed to:', address);
   console.log('Network:', network.name);
   console.log('Chain ID:', network.chainId.toString());
 
   const deploymentInfo = {
-    contract: 'DappCardRegistry',
+    contract: 'vibecardRegistry',
     address,
     deployer: deployer.address,
     timestamp: new Date().toISOString(),

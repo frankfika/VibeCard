@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 144">
+  <defs>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="50%" style="stop-color:#764ba2"/>
+      <stop offset="100%" style="stop-color:#f093fb"/>
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#667eea;stop-opacity:0.3"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="144" height="144" fill="white"/>
+  <!-- Radiating waves from card -->
+  <ellipse cx="60" cy="72" rx="52" ry="8" fill="none" stroke="#00d4ff" stroke-width="2" opacity="0.3"/>
+  <ellipse cx="60" cy="72" rx="64" ry="12" fill="none" stroke="#667eea" stroke-width="2" opacity="0.2"/>
+  <ellipse cx="60" cy="72" rx="78" ry="18" fill="none" stroke="#f093fb" stroke-width="1.5" opacity="0.15"/>
+  <!-- Card body -->
+  <rect x="22" y="48" width="76" height="48" rx="8" fill="url(#cardGrad)"/>
+  <!-- Card shine -->
+  <rect x="22" y="48" width="76" height="12" rx="8" fill="white" opacity="0.15"/>
+  <!-- Card lines (persona info representation) -->
+  <rect x="30" y="64" width="30" height="4" rx="2" fill="white" opacity="0.9"/>
+  <rect x="30" y="72" width="20" height="3" rx="1.5" fill="white" opacity="0.6"/>
+  <rect x="30" y="80" width="24" height="3" rx="1.5" fill="white" opacity="0.5"/>
+  <!-- Avatar circle on card -->
+  <circle cx="80" cy="66" r="12" fill="white" opacity="0.2"/>
+  <circle cx="80" cy="66" r="8" fill="white" opacity="0.3"/>
+  <!-- Vibrating/wave dots representing "Vibe" -->
+  <circle cx="108" cy="52" r="3" fill="#00d4ff" opacity="0.8"/>
+  <circle cx="118" cy="58" r="2" fill="#667eea" opacity="0.6"/>
+  <circle cx="124" cy="68" r="2.5" fill="#764ba2" opacity="0.5"/>
+  <circle cx="118" cy="80" r="2" fill="#f093fb" opacity="0.7"/>
+  <circle cx="108" cy="88" r="3" fill="#00d4ff" opacity="0.6"/>
+</svg>

@@ -10,7 +10,7 @@ const NETWORKS = [
 ];
 
 async function main() {
-  console.log('=== DappCard Multi-Network Deployment ===\n');
+  console.log('=== vibecard Multi-Network Deployment ===\n');
 
   const allDeployments: Record<string, { address: string; chainId: number; timestamp: string }> = {};
 

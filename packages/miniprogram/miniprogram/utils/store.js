@@ -1,7 +1,7 @@
-const PROFILE_KEY = 'dappcard_profile';
-const THREADS_KEY = 'dappcard_threads';
-const ACTIVITIES_KEY = 'dappcard_activities';
-const GAME_KEY = 'dappcard_game';
+const PROFILE_KEY = 'vibecard_profile';
+const THREADS_KEY = 'vibecard_threads';
+const ACTIVITIES_KEY = 'vibecard_activities';
+const GAME_KEY = 'vibecard_game';
 
 const DEFAULT_PROFILE = {
   name: '', handle: '', avatar: '', bio: '', tags: [],

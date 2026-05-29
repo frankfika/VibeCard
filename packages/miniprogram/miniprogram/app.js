@@ -13,22 +13,22 @@ App({
     }
 
     // 初始化本地存储默认值
-    const profile = wx.getStorageSync('dappcard_profile');
+    const profile = wx.getStorageSync('vibecard_profile');
     if (!profile) {
-      wx.setStorageSync('dappcard_profile', {
+      wx.setStorageSync('vibecard_profile', {
         name: '', handle: '', avatar: '', bio: '', tags: [],
         lookingFor: '', highlights: [],
         verified: { wallet: '', twitter: '', discord: '', wechat: '' },
         event: ''
       });
     }
-    const threads = wx.getStorageSync('dappcard_threads');
-    if (!threads) wx.setStorageSync('dappcard_threads', []);
-    const activities = wx.getStorageSync('dappcard_activities');
-    if (!activities) wx.setStorageSync('dappcard_activities', []);
-    const gameSession = wx.getStorageSync('dappcard_game');
+    const threads = wx.getStorageSync('vibecard_threads');
+    if (!threads) wx.setStorageSync('vibecard_threads', []);
+    const activities = wx.getStorageSync('vibecard_activities');
+    if (!activities) wx.setStorageSync('vibecard_activities', []);
+    const gameSession = wx.getStorageSync('vibecard_game');
     if (!gameSession) {
-      wx.setStorageSync('dappcard_game', { presetId: null, selectedTags: [], history: [], favorites: [] });
+      wx.setStorageSync('vibecard_game', { presetId: null, selectedTags: [], history: [], favorites: [] });
     }
   },
   globalData: {}

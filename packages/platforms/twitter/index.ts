@@ -121,8 +121,8 @@ export function updateTwitterCardForProfile(profile: {
 }): void {
   setTwitterCardMeta({
     card: 'summary_large_image',
-    title: `${profile.name || 'Someone'} on DappCard`,
-    description: profile.bio || 'Check out my DappCard profile!',
+    title: `${profile.name || 'Someone'} on vibecard`,
+    description: profile.bio || 'Check out my vibecard profile!',
     image: profile.avatar,
     creator: profile.handle?.replace('@', ''),
   });

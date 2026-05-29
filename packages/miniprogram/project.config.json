@@ -1,9 +1,9 @@
 {
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
-  "projectname": "couple-cards",
-  "description": "DappCard - Web3 Social Namecard",
-  "appid": "wxbc6567978157b98d",
+  "projectname": "vibecard",
+  "description": "vibecard - Web3 Social Namecard",
+  "appid": "wxa79d41c8255ff90d",
   "setting": {
     "es6": true,
     "postcss": true,

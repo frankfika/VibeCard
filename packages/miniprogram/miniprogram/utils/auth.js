@@ -1,5 +1,5 @@
 /**
- * Authentication utility for couple-cards mini-program
+ * Authentication utility for vibecard mini-program
  * Handles user login, logout, and session management
  */
 

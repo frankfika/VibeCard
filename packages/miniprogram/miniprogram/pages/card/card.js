@@ -270,7 +270,7 @@ Page({
         promise
       };
     } catch (e) {
-      return { title: 'DappCard - Web3 社交名片', path: '/pages/card/card' };
+      return { title: 'vibecard - Web3 社交名片', path: '/pages/card/card' };
     }
   },
 

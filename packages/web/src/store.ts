@@ -88,13 +88,13 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 
 export function useProfile() {
   const [profile, setProfile] = useState<Profile>(() =>
-    loadFromStorage('dappcard_profile', DEFAULT_PROFILE)
+    loadFromStorage('vibecard_profile', DEFAULT_PROFILE)
   );
   const [isSetup, setIsSetup] = useState(() => {
-    return !!loadFromStorage('dappcard_profile', DEFAULT_PROFILE).name;
+    return !!loadFromStorage('vibecard_profile', DEFAULT_PROFILE).name;
   });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
-    loadFromStorage('dappcard_profile_sync', DEFAULT_SYNC_STATUS)
+    loadFromStorage('vibecard_profile_sync', DEFAULT_SYNC_STATUS)
   );
   const initialNameRef = useRef(profile.name);
 
@@ -102,12 +102,12 @@ export function useProfile() {
   const { writeContractAsync } = useWriteContract();
 
   useEffect(() => {
-    localStorage.setItem('dappcard_profile', JSON.stringify(profile));
+    localStorage.setItem('vibecard_profile', JSON.stringify(profile));
     setIsSetup(!!profile.name);
   }, [profile]);
 
   useEffect(() => {
-    localStorage.setItem('dappcard_profile_sync', JSON.stringify(syncStatus));
+    localStorage.setItem('vibecard_profile_sync', JSON.stringify(syncStatus));
   }, [syncStatus]);
 
   const updateProfile = useCallback((updates: Partial<Profile>) => {
@@ -137,7 +137,7 @@ export function useProfile() {
     try {
       const content: ChainContent = {
         version: '1.0',
-        app: 'dappcard',
+        app: 'vibecard',
         type: 'profile',
         data: profile,
         timestamp: Date.now(),
@@ -226,11 +226,11 @@ export function useProfile() {
 
 export function useGameSession() {
   const [session, setSession] = useState<GameSession>(() =>
-    loadFromStorage('dappcard_game', DEFAULT_GAME_SESSION)
+    loadFromStorage('vibecard_game', DEFAULT_GAME_SESSION)
   );
 
   useEffect(() => {
-    localStorage.setItem('dappcard_game', JSON.stringify(session));
+    localStorage.setItem('vibecard_game', JSON.stringify(session));
   }, [session]);
 
   const addToHistory = useCallback((cardId: string) => {
@@ -260,21 +260,21 @@ export function useGameSession() {
 
 export function useActivities() {
   const [activities, setActivities] = useState<Activity[]>(() =>
-    loadFromStorage('dappcard_activities', [])
+    loadFromStorage('vibecard_activities', [])
   );
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
-    loadFromStorage('dappcard_activities_sync', DEFAULT_SYNC_STATUS)
+    loadFromStorage('vibecard_activities_sync', DEFAULT_SYNC_STATUS)
   );
 
   const { address, chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
 
   useEffect(() => {
-    localStorage.setItem('dappcard_activities', JSON.stringify(activities));
+    localStorage.setItem('vibecard_activities', JSON.stringify(activities));
   }, [activities]);
 
   useEffect(() => {
-    localStorage.setItem('dappcard_activities_sync', JSON.stringify(syncStatus));
+    localStorage.setItem('vibecard_activities_sync', JSON.stringify(syncStatus));
   }, [syncStatus]);
 
   const addActivity = useCallback((activity: Omit<Activity, 'id' | 'participants' | 'joined'>) => {
@@ -318,7 +318,7 @@ export function useActivities() {
     try {
       const content: ChainContent = {
         version: '1.0',
-        app: 'dappcard',
+        app: 'vibecard',
         type: 'activity',
         data: activities,
         timestamp: Date.now(),

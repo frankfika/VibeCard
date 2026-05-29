@@ -11,7 +11,7 @@
  * The on-chain anchor stores only the latest blockHash (32 bytes) — gas is minimal.
  */
 
-const STORAGE_KEY = 'dappcard_chain_v1';
+const STORAGE_KEY = 'vibecard_chain_v1';
 
 export type TxType =
   | 'genesis'
@@ -88,19 +88,19 @@ export function shortHash(h: string, head = 6, tail = 4): string {
  * so the UX feels familiar.
  */
 export async function deriveAddress(seed: string): Promise<string> {
-  const stored = localStorage.getItem('dappcard_pseudo_addr');
+  const stored = localStorage.getItem('vibecard_pseudo_addr');
   if (stored) return stored;
   const salt = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
   const h = await sha256(`${seed}:${salt}:${Date.now()}`);
   const addr = '0x' + h.slice(2, 42);
-  localStorage.setItem('dappcard_pseudo_addr', addr);
+  localStorage.setItem('vibecard_pseudo_addr', addr);
   return addr;
 }
 
 export function getStoredAddress(): string | null {
-  return localStorage.getItem('dappcard_pseudo_addr');
+  return localStorage.getItem('vibecard_pseudo_addr');
 }
 
 // ───────────────────────── Block construction ─────────────────────────
@@ -165,7 +165,7 @@ function saveChain(state: ChainState): void {
 
 // ───────────────────────── Public API ─────────────────────────
 
-export async function initChain(seed = 'dappcard'): Promise<ChainState> {
+export async function initChain(seed = 'vibecard'): Promise<ChainState> {
   const existing = loadChain();
   if (existing) return existing;
 
@@ -174,13 +174,13 @@ export async function initChain(seed = 'dappcard'): Promise<ChainState> {
     id: await hashTx({
       type: 'genesis',
       from: address,
-      payload: { msg: 'DappCard genesis — your personal chain begins.' },
+      payload: { msg: 'vibecard genesis — your personal chain begins.' },
       timestamp: Date.now(),
       nonce: 0,
     }),
     type: 'genesis',
     from: address,
-    payload: { msg: 'DappCard genesis — your personal chain begins.' },
+    payload: { msg: 'vibecard genesis — your personal chain begins.' },
     timestamp: Date.now(),
     nonce: 0,
   };
@@ -306,7 +306,7 @@ export async function verify(): Promise<{ ok: boolean; brokenAt?: number }> {
 
 export function resetChain(): void {
   localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem('dappcard_pseudo_addr');
+  localStorage.removeItem('vibecard_pseudo_addr');
 }
 
 export async function ensureBadge(state: ChainState, badge: string): Promise<ChainState> {

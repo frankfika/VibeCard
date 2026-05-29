@@ -39,8 +39,8 @@ async function main() {
   console.log('💰 账户余额:', ethers.formatEther(balance), 'ETH');
 
   console.log('\n📦 部署合约中...');
-  const DappCardRegistry = await ethers.getContractFactory('DappCardRegistry');
-  const registry = await DappCardRegistry.deploy();
+  const vibecardRegistry = await ethers.getContractFactory('vibecardRegistry');
+  const registry = await vibecardRegistry.deploy();
   await registry.waitForDeployment();
 
   const address = await registry.getAddress();
@@ -82,7 +82,7 @@ async function main() {
   console.log('\n📌 导入测试账户到 MetaMask:');
   console.log('   1. MetaMask → 账户 → 导入账户');
   console.log('   2. 粘贴私钥: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
-  console.log('   3. 账户名称: DappCard Deployer');
+  console.log('   3. 账户名称: vibecard Deployer');
 
   console.log('\n📌 本地测试账户列表:');
   TEST_ACCOUNTS.forEach(acc => {

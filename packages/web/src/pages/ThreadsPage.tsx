@@ -31,7 +31,7 @@ const MOCK_THREADS: Thread[] = [
       avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Alex&backgroundColor=transparent',
       handle: '0x1234...5678',
     },
-    content: '刚刚完成了 DappCard 的 2.0 设计系统重构，采用了更现代的毛玻璃风格和物理弹簧动画。感觉整个应用变得更有呼吸感了。',
+    content: '刚刚完成了 vibecard 的 2.0 设计系统重构，采用了更现代的毛玻璃风格和物理弹簧动画。感觉整个应用变得更有呼吸感了。',
     images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'],
     tags: ['Work', 'Web3'],
     likes: 24,

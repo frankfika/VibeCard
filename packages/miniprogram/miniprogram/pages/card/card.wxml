@@ -3,10 +3,10 @@
   <view wx:if="{{showOnboarding}}" class="onboarding">
     <view class="onboarding-content">
       <view wx:if="{{onboardingStep === 0}}">
-        <view class="onboarding-title">欢迎使用 DappCard</view>
+        <view class="onboarding-title">欢迎使用 vibecard</view>
         <view class="onboarding-subtitle">创建你的 Web3 社交名片</view>
         <input class="input" placeholder="你的名字" placeholder-style="color: #bbb;" value="{{onboardingName}}" bindinput="onOnboardingNameInput" />
-        <input class="input" placeholder="DappCard ID" placeholder-style="color: #bbb;" value="{{onboardingHandle}}" bindinput="onOnboardingHandleInput" />
+        <input class="input" placeholder="vibecard ID" placeholder-style="color: #bbb;" value="{{onboardingHandle}}" bindinput="onOnboardingHandleInput" />
       </view>
       <view wx:if="{{onboardingStep === 1}}">
         <view class="onboarding-title">选择标签</view>
@@ -139,7 +139,7 @@
         <!-- Basic Info -->
         <view class="edit-section">
           <input class="edit-input font-bold" placeholder="你的名字" placeholder-style="color: #bbb;" value="{{editName}}" bindinput="onEditNameInput" />
-          <input class="edit-input edit-input-handle" placeholder="DappCard ID" placeholder-style="color: #bbb;" value="{{editHandle}}" bindinput="onEditHandleInput" />
+          <input class="edit-input edit-input-handle" placeholder="vibecard ID" placeholder-style="color: #bbb;" value="{{editHandle}}" bindinput="onEditHandleInput" />
           <textarea class="edit-textarea" placeholder="写一句炫酷的个人简介..." placeholder-style="color: #bbb;" value="{{editBio}}" bindinput="onEditBioInput" />
         </view>
 
