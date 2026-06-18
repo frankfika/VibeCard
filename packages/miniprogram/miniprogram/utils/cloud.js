@@ -4,27 +4,53 @@
  */
 
 /**
- * Call a cloud function with error handling
+ * Call a cloud function with error handling, timeout and retry
  * @param {string} name - Cloud function name
  * @param {Object} data - Data to pass to the function
+ * @param {Object} options - Optional { timeout: ms, retries: count }
  * @returns {Promise<any>} Function result
  */
-async function callFunction(name, data = {}) {
-  try {
-    const res = await wx.cloud.callFunction({
-      name,
-      data
-    });
+async function callFunction(name, data = {}, options = {}) {
+  const { timeout = 15000, retries = 2 } = options;
 
-    if (res.result && res.result.success === false) {
-      throw new Error(res.result.message || '云函数调用失败');
-    }
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
 
-    return res.result;
-  } catch (error) {
-    console.error(`Cloud function ${name} error:`, error);
-    throw error;
-  }
+    const doCall = () => {
+      attempts += 1;
+      const cloudCall = wx.cloud.callFunction({ name, data });
+
+      const timer = setTimeout(() => {
+        const err = new Error(`云函数 ${name} 调用超时`);
+        err.code = 'TIMEOUT';
+        if (attempts <= retries) {
+          console.warn(`[cloud] ${name} timeout, retrying ${attempts}/${retries}`);
+          doCall();
+        } else {
+          reject(err);
+        }
+      }, timeout);
+
+      cloudCall.then((res) => {
+        clearTimeout(timer);
+        if (res.result && res.result.success === false) {
+          reject(new Error(res.result.message || '云函数调用失败'));
+        } else {
+          resolve(res.result);
+        }
+      }).catch((err) => {
+        clearTimeout(timer);
+        console.warn(`[cloud] ${name} failed (attempt ${attempts}/${retries + 1}):`, err);
+        if (attempts <= retries) {
+          doCall();
+        } else {
+          reject(err);
+        }
+      });
+    };
+
+    doCall();
+  });
 }
 
 /**

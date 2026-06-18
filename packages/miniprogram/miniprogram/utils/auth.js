@@ -3,51 +3,114 @@
  * Handles user login, logout, and session management
  */
 
-const app = getApp();
+const app = () => {
+  try {
+    return getApp();
+  } catch (e) {
+    console.warn('[auth] getApp failed:', e);
+    return null;
+  }
+};
+
+/**
+ * Safe wrapper to get app global data
+ */
+function getAppGlobalData() {
+  const a = app();
+  return a ? a.globalData : {};
+}
+
+/**
+ * Safe wrapper to set app global data
+ */
+function setAppGlobalData(key, value) {
+  const a = app();
+  if (a) {
+    a.globalData[key] = value;
+  }
+}
+
+/**
+ * Call a cloud function with timeout and retry
+ */
+function callCloudFunction(name, data, options = {}) {
+  const { timeout = 15000, retries = 2 } = options;
+
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+
+    const doCall = () => {
+      attempts += 1;
+      const cloudCall = wx.cloud.callFunction({ name, data });
+
+      const timer = setTimeout(() => {
+        const err = new Error(`云函数 ${name} 调用超时`);
+        err.code = 'TIMEOUT';
+        if (attempts <= retries) {
+          console.warn(`[cloud] ${name} timeout, retrying ${attempts}/${retries}`);
+          doCall();
+        } else {
+          reject(err);
+        }
+      }, timeout);
+
+      cloudCall.then(res => {
+        clearTimeout(timer);
+        resolve(res);
+      }).catch(err => {
+        clearTimeout(timer);
+        console.warn(`[cloud] ${name} failed (attempt ${attempts}/${retries + 1}):`, err);
+        if (attempts <= retries) {
+          doCall();
+        } else {
+          reject(err);
+        }
+      });
+    };
+
+    doCall();
+  });
+}
 
 /**
  * Login user by calling cloud function
  * @returns {Promise<Object>} User info object
  */
 async function login() {
+  let loadingShown = false;
   try {
     wx.showLoading({
       title: '登录中...',
       mask: true
     });
+    loadingShown = true;
 
-    const res = await wx.cloud.callFunction({
-      name: 'login',
-      data: {}
-    });
+    const res = await callCloudFunction('login', {}, { timeout: 15000, retries: 2 });
 
-    if (res.result.success) {
+    if (res.result && res.result.success) {
       const userInfo = res.result.data;
 
       // Store user info in global data
-      app.globalData.userInfo = userInfo;
+      setAppGlobalData('userInfo', userInfo);
 
       // Store in local storage as cache
       wx.setStorageSync('userInfo', userInfo);
 
-      wx.hideLoading();
       return userInfo;
     } else {
-      wx.hideLoading();
-      wx.showToast({
-        title: res.result.message || '登录失败',
-        icon: 'none'
-      });
-      throw new Error(res.result.message || '登录失败');
+      throw new Error(res.result?.message || '登录失败');
     }
   } catch (error) {
-    wx.hideLoading();
+    console.error('Login error:', error);
     wx.showToast({
-      title: '登录失败，请重试',
+      title: error.message || '登录失败，请重试',
       icon: 'none'
     });
-    console.error('Login error:', error);
     throw error;
+  } finally {
+    if (loadingShown) {
+      wx.hideLoading();
+    }
   }
 }
 
@@ -57,15 +120,16 @@ async function login() {
  */
 function getUserInfo() {
   // First check global data
-  if (app.globalData.userInfo) {
-    return app.globalData.userInfo;
+  const global = getAppGlobalData();
+  if (global.userInfo) {
+    return global.userInfo;
   }
 
   // Then check local storage
   try {
     const userInfo = wx.getStorageSync('userInfo');
     if (userInfo) {
-      app.globalData.userInfo = userInfo;
+      setAppGlobalData('userInfo', userInfo);
       return userInfo;
     }
   } catch (error) {
@@ -81,7 +145,7 @@ function getUserInfo() {
  */
 function isLoggedIn() {
   const userInfo = getUserInfo();
-  return userInfo !== null && userInfo.openid;
+  return !!(userInfo && userInfo.openid);
 }
 
 /**
@@ -124,7 +188,7 @@ function requireLogin(callback) {
 function logout() {
   try {
     // Clear global data
-    app.globalData.userInfo = null;
+    setAppGlobalData('userInfo', null);
 
     // Clear local storage
     wx.removeStorageSync('userInfo');

@@ -12,11 +12,13 @@
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTitleText": "VibeCard",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#fafafa"
+    "backgroundColor": "#ffffff",
+    "navigationStyle": "custom"
   },
   "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#111111",
+    "custom": true,
+    "color": "#737373",
+    "selectedColor": "#0a0a0a",
     "backgroundColor": "#ffffff",
     "borderStyle": "white",
     "position": "bottom",
