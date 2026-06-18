@@ -27,7 +27,8 @@
     "condition": false,
     "swc": false,
     "disableSWC": true,
-    "disableUseStrict": false
+    "disableUseStrict": false,
+    "bigPackageSizeSupport": true
   },
   "compileType": "miniprogram",
   "libVersion": "3.13.1",
