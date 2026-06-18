@@ -39,8 +39,8 @@ async function main() {
   console.log('💰 账户余额:', ethers.formatEther(balance), 'ETH');
 
   console.log('\n📦 部署合约中...');
-  const vibecardRegistry = await ethers.getContractFactory('vibecardRegistry');
-  const registry = await vibecardRegistry.deploy();
+  const DappCardRegistry = await ethers.getContractFactory('DappCardRegistry');
+  const registry = await DappCardRegistry.deploy();
   await registry.waitForDeployment();
 
   const address = await registry.getAddress();

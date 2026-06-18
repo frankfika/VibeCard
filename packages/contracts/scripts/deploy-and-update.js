@@ -41,8 +41,8 @@ async function main() {
   }
 
   console.log('\n📦 部署合约中...');
-  const vibecardRegistry = await ethers.getContractFactory('vibecardRegistry');
-  const registry = await vibecardRegistry.deploy();
+  const DappCardRegistry = await ethers.getContractFactory('DappCardRegistry');
+  const registry = await DappCardRegistry.deploy();
   await registry.waitForDeployment();
 
   const address = await registry.getAddress();
@@ -104,7 +104,7 @@ async function main() {
 
   // 保存部署信息
   const deploymentInfo = {
-    contract: 'vibecardRegistry',
+    contract: 'DappCardRegistry',
     address,
     deployer: deployer.address,
     timestamp: new Date().toISOString(),

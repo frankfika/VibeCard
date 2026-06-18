@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import hre from 'hardhat';
 
-describe('vibecardRegistry', function () {
+describe('DappCardRegistry', function () {
   let registry;
   let owner;
   let addr1;
@@ -12,8 +12,8 @@ describe('vibecardRegistry', function () {
     ethers = connection.ethers;
 
     [owner, addr1] = await ethers.getSigners();
-    const vibecardRegistryFactory = await ethers.getContractFactory('vibecardRegistry');
-    registry = await vibecardRegistryFactory.deploy();
+    const DappCardRegistryFactory = await ethers.getContractFactory('DappCardRegistry');
+    registry = await DappCardRegistryFactory.deploy();
     await registry.waitForDeployment();
   });
 
