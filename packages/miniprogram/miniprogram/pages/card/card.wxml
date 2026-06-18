@@ -1,62 +1,103 @@
 <view class="page">
+  <navbar title="我的名片" />
+
   <!-- Onboarding -->
   <view wx:if="{{showOnboarding}}" class="onboarding">
     <view class="onboarding-content">
-      <view wx:if="{{onboardingStep === 0}}">
-        <view class="onboarding-title">欢迎使用 vibecard</view>
-        <view class="onboarding-subtitle">创建你的 Web3 社交名片</view>
-        <input class="input" placeholder="你的名字" placeholder-style="color: #bbb;" value="{{onboardingName}}" bindinput="onOnboardingNameInput" />
-        <input class="input" placeholder="vibecard ID" placeholder-style="color: #bbb;" value="{{onboardingHandle}}" bindinput="onOnboardingHandleInput" />
+      <!-- Step Indicator -->
+      <view class="step-indicator">
+        <view wx:for="{{[0,1,2]}}" wx:key="*this" class="step-dot {{onboardingStep === item ? 'step-dot-active' : ''}} {{onboardingStep > item ? 'step-dot-completed' : ''}}"></view>
       </view>
-      <view wx:if="{{onboardingStep === 1}}">
-        <view class="onboarding-title">选择标签</view>
-        <view class="onboarding-subtitle">最多选 5 个，也可以自定义</view>
-        <view class="tag-grid">
-          <view wx:for="{{tagOptions}}" wx:key="*this" class="tag-item {{onboardingTags.includes(item) ? 'tag-active' : ''}}" bindtap="onOnboardingTagSelect" data-tag="{{item}}">{{item}}</view>
+      <view class="step-line">
+        <view class="step-line-progress" style="width: {{(onboardingStep / 2) * 100}}%"></view>
+      </view>
+
+      <view class="onboarding-step-wrap">
+        <view class="onboarding-step-title">{{onboardingSteps[onboardingStep].title}}</view>
+        <view class="onboarding-step-subtitle">{{onboardingSteps[onboardingStep].subtitle}}</view>
+        <view class="onboarding-step-hint">{{onboardingSteps[onboardingStep].hint}}</view>
+      </view>
+
+      <view wx:if="{{onboardingStep === 0}}" class="onboarding-step-body">
+        <view class="input-group">
+          <view class="input-label">你的名字 <text class="input-required">*</text></view>
+          <input class="input input-focusable" placeholder="例如：Alex Chen" placeholder-style="color: #a3a3a3;" value="{{onboardingName}}" bindinput="onOnboardingNameInput" />
+        </view>
+        <view class="input-group">
+          <view class="input-label">vibecard ID</view>
+          <input class="input input-focusable" placeholder="你的专属标识" placeholder-style="color: #a3a3a3;" value="{{onboardingHandle}}" bindinput="onOnboardingHandleInput" />
+          <view class="input-tip">ID 会显示在你的名片链接中</view>
+        </view>
+      </view>
+
+      <view wx:if="{{onboardingStep === 1}}" class="onboarding-step-body">
+        <view class="input-group">
+          <view class="input-label">选择标签 <text class="input-count">{{onboardingTags.length}}/5</text></view>
+          <view class="tag-grid">
+            <view wx:for="{{tagOptions}}" wx:key="*this" class="tag-item {{onboardingTags.includes(item) ? 'tag-active' : ''}}" bindtap="onOnboardingTagSelect" data-tag="{{item}}">{{item}}</view>
+          </view>
         </view>
         <view class="custom-tag-row">
-          <input class="custom-tag-input" placeholder="自定义标签..." placeholder-style="color: #bbb;" value="{{onboardingCustomTag}}" bindinput="onOnboardingCustomTagInput" />
+          <input class="custom-tag-input" placeholder="自定义标签..." placeholder-style="color: #a3a3a3;" value="{{onboardingCustomTag}}" bindinput="onOnboardingCustomTagInput" />
           <view class="custom-tag-btn {{onboardingCustomTag ? 'custom-tag-btn-active' : ''}}" bindtap="addOnboardingCustomTag">添加</view>
         </view>
       </view>
-      <view wx:if="{{onboardingStep === 2}}">
-        <view class="onboarding-title">完善资料</view>
-        <textarea class="textarea" placeholder="个人简介" placeholder-style="color: #bbb;" value="{{onboardingBio}}" bindinput="onOnboardingBioInput" />
-        <view class="section-title">Looking for</view>
-        <view class="option-list">
-          <view wx:for="{{lookingForOptions}}" wx:key="*this" class="option-item {{onboardingLookingFor === item ? 'option-active' : ''}}" bindtap="onOnboardingLookingSelect" data-item="{{item}}">{{item}}</view>
+
+      <view wx:if="{{onboardingStep === 2}}" class="onboarding-step-body">
+        <view class="input-group">
+          <view class="input-label">个人简介</view>
+          <textarea class="textarea textarea-focusable" placeholder="一句话介绍自己..." placeholder-style="color: #a3a3a3;" value="{{onboardingBio}}" bindinput="onOnboardingBioInput" />
         </view>
-        <view class="section-title">活动</view>
-        <view class="option-list">
-          <view wx:for="{{eventOptions}}" wx:key="*this" class="option-item {{onboardingEvent === item ? 'option-active' : ''}}" bindtap="onOnboardingEventSelect" data-item="{{item}}">{{item}}</view>
+        <view class="input-group">
+          <view class="input-label">Looking for</view>
+          <view class="option-list">
+            <view wx:for="{{lookingForOptions}}" wx:key="*this" class="option-item {{onboardingLookingFor === item ? 'option-active' : ''}}" bindtap="onOnboardingLookingSelect" data-item="{{item}}">{{item}}</view>
+          </view>
+        </view>
+        <view class="input-group">
+          <view class="input-label">当前活动</view>
+          <view class="option-list">
+            <view wx:for="{{eventOptions}}" wx:key="*this" class="option-item {{onboardingEvent === item ? 'option-active' : ''}}" bindtap="onOnboardingEventSelect" data-item="{{item}}">{{item}}</view>
+          </view>
         </view>
       </view>
-      <button class="btn-primary" bindtap="nextOnboardingStep">{{onboardingStep >= 2 ? '完成' : '下一步'}}</button>
+
+      <view class="onboarding-actions">
+        <button class="btn-primary" bindtap="nextOnboardingStep">{{onboardingStep >= 2 ? '完成' : '下一步'}}</button>
+        <view class="onboarding-secondary">
+          <view wx:if="{{onboardingStep > 0}}" class="btn-text" bindtap="prevOnboardingStep">← 上一步</view>
+          <view class="btn-text btn-skip" bindtap="skipOnboarding">跳过，稍后完善</view>
+        </view>
+      </view>
     </view>
   </view>
 
   <!-- Main Card View -->
   <view wx:if="{{isSetup && !showOnboarding}}" class="card-container">
     <scroll-view scroll-y class="card-scroll">
-      <view class="card-inner">
+      <view class="card-inner {{cardVisible ? 'card-enter' : 'card-hidden'}}">
         <!-- Profile Header -->
         <view class="profile-header">
-          <image wx:if="{{profile.avatar}}" class="avatar" src="{{profile.avatar}}" mode="aspectFill" />
-          <view wx:else class="avatar avatar-placeholder">{{profile.name ? profile.name[0] : '?'}}</view>
+          <view class="avatar-wrap">
+            <image wx:if="{{profile.avatar}}" class="avatar" src="{{profile.avatar}}" mode="aspectFill" />
+            <view wx:else class="avatar avatar-placeholder">{{profile.name ? profile.name[0] : '?'}}</view>
+          </view>
           <view class="profile-name">{{profile.name}}</view>
           <view wx:if="{{profile.handle}}" class="profile-handle">{{profile.handle}}</view>
         </view>
 
         <!-- Tags & Event -->
         <view wx:if="{{profile.event || (profile.tags && profile.tags.length > 0)}}" class="tags-wrap" bindtap="openEdit">
-          <view wx:if="{{profile.event}}" class="profile-tag">📍 {{profile.event}}</view>
+          <view wx:if="{{profile.event}}" class="profile-tag profile-tag-event">📍 {{profile.event}}</view>
           <view wx:for="{{profile.tags}}" wx:key="label" class="profile-tag">{{item.label}}</view>
           <view class="profile-tag profile-tag-add">+ 编辑</view>
         </view>
 
         <!-- Bio -->
         <view wx:if="{{profile.bio}}" class="bio-card">
+          <view class="bio-quote">"</view>
           <text class="bio-text">{{profile.bio}}</text>
+          <view class="bio-quote bio-quote-close">"</view>
         </view>
 
         <!-- Looking For -->
@@ -69,7 +110,7 @@
         </view>
 
         <!-- Verified -->
-        <view wx:if="{{profile.verified && (profile.verified.wallet || profile.verified.twitter || profile.verified.discord)}}" class="verified-card">
+        <view wx:if="{{profile.verified && (profile.verified.wallet || profile.verified.twitter || profile.verified.discord || profile.verified.wechat)}}" class="verified-card">
           <view wx:if="{{profile.verified.wallet}}" class="verified-item">
             <view class="verified-icon">👛</view>
             <view class="verified-label">Wallet</view>
@@ -81,6 +122,10 @@
           <view wx:if="{{profile.verified.discord}}" class="verified-item">
             <view class="verified-icon">💬</view>
             <view class="verified-label">Discord</view>
+          </view>
+          <view wx:if="{{profile.verified.wechat}}" class="verified-item">
+            <view class="verified-icon">💚</view>
+            <view class="verified-label">WeChat</view>
           </view>
         </view>
 
@@ -135,12 +180,43 @@
           <view class="modal-save-btn" bindtap="saveEdit">完成</view>
         </view>
       </view>
-      <scroll-view scroll-y class="modal-body" enhanced show-scrollbar="{{false}}">
+      <scroll-view scroll-y class="modal-body" enhanced show-scrollbar="{{false}}" scroll-into-view="">
+        <!-- Avatar -->
+        <view class="edit-section">
+          <view class="section-title-new">头像</view>
+          <view class="avatar-edit-row">
+            <view class="avatar-preview-wrap" bindtap="chooseAvatar">
+              <image wx:if="{{editAvatar}}" class="avatar-preview-img" src="{{editAvatar}}" mode="aspectFill" />
+              <view wx:else class="avatar-preview-placeholder">{{editName ? editName[0] : '?'}}</view>
+            </view>
+            <view class="avatar-edit-actions">
+              <view class="avatar-mode-pill {{avatarMode === 'generated' ? 'avatar-mode-active' : ''}}" bindtap="setAvatarMode" data-mode="generated">随机生成</view>
+              <view class="avatar-mode-pill {{avatarMode === 'custom' ? 'avatar-mode-active' : ''}}" bindtap="setAvatarMode" data-mode="custom">本地上传</view>
+            </view>
+          </view>
+          <scroll-view wx:if="{{avatarMode === 'generated'}}" scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
+            <view class="h-scroll-inner">
+              <view wx:for="{{avatarSeeds}}" wx:key="*this" class="avatar-seed {{editAvatarSeed === item ? 'avatar-seed-active' : ''}}" bindtap="selectAvatarSeed" data-seed="{{item}}">{{item}}</view>
+            </view>
+          </scroll-view>
+          <view wx:if="{{avatarMode === 'custom'}}" class="field-tip">点击头像从相册或相机选择</view>
+        </view>
+
         <!-- Basic Info -->
         <view class="edit-section">
-          <input class="edit-input font-bold" placeholder="你的名字" placeholder-style="color: #bbb;" value="{{editName}}" bindinput="onEditNameInput" />
-          <input class="edit-input edit-input-handle" placeholder="vibecard ID" placeholder-style="color: #bbb;" value="{{editHandle}}" bindinput="onEditHandleInput" />
-          <textarea class="edit-textarea" placeholder="写一句炫酷的个人简介..." placeholder-style="color: #bbb;" value="{{editBio}}" bindinput="onEditBioInput" />
+          <view class="input-group">
+            <view class="input-label">名字 <text class="input-required">*</text></view>
+            <input class="edit-input font-bold" placeholder="你的名字" placeholder-style="color: #a3a3a3;" value="{{editName}}" bindinput="onEditNameInput" />
+          </view>
+          <view class="input-group">
+            <view class="input-label">vibecard ID</view>
+            <input class="edit-input edit-input-handle" placeholder="vibecard ID" placeholder-style="color: #a3a3a3;" value="{{editHandle}}" bindinput="onEditHandleInput" />
+          </view>
+          <view class="input-group">
+            <view class="input-label">个人简介</view>
+            <textarea class="edit-textarea" placeholder="写一句炫酷的个人简介..." placeholder-style="color: #a3a3a3;" value="{{editBio}}" bindinput="onEditBioInput" />
+            <view class="field-tip">简介会展示在名片正文中</view>
+          </view>
         </view>
 
         <!-- Tags -->
@@ -155,7 +231,7 @@
             </view>
           </scroll-view>
           <view class="custom-tag-row">
-            <input class="custom-tag-input" placeholder="输入自定义标签..." placeholder-style="color: #bbb;" value="{{editCustomTag}}" bindinput="onEditCustomTagInput" />
+            <input class="custom-tag-input" placeholder="输入自定义标签..." placeholder-style="color: #a3a3a3;" value="{{editCustomTag}}" bindinput="onEditCustomTagInput" />
             <view class="custom-tag-btn {{editCustomTag ? 'custom-tag-btn-active' : ''}}" bindtap="addEditCustomTag">添加</view>
           </view>
         </view>
@@ -178,6 +254,42 @@
               <view wx:for="{{eventOptions}}" wx:key="*this" class="pill-card {{editEvent === item ? 'pill-card-active' : ''}}" bindtap="onEditEventSelect" data-item="{{item}}">{{item}}</view>
             </view>
           </scroll-view>
+        </view>
+
+        <!-- Verified Accounts -->
+        <view class="edit-section">
+          <view class="section-title-new">已验证账号（选填）</view>
+          <view class="field-tip">添加你的社交账号，展示在名片上</view>
+          <view class="verified-input-row">
+            <view class="verified-icon-wrap">💼</view>
+            <input class="verified-input" placeholder="钱包地址 0x..." value="{{editWallet}}" bindinput="onEditWalletInput" />
+          </view>
+          <view class="verified-input-row">
+            <view class="verified-icon-wrap">🐦</view>
+            <input class="verified-input" placeholder="Twitter @handle" value="{{editTwitter}}" bindinput="onEditTwitterInput" />
+          </view>
+          <view class="verified-input-row">
+            <view class="verified-icon-wrap">💬</view>
+            <input class="verified-input" placeholder="Discord username" value="{{editDiscord}}" bindinput="onEditDiscordInput" />
+          </view>
+          <view class="verified-input-row">
+            <view class="verified-icon-wrap">💚</view>
+            <input class="verified-input" placeholder="微信 ID" value="{{editWechat}}" bindinput="onEditWechatInput" />
+          </view>
+        </view>
+
+        <!-- Highlights -->
+        <view class="edit-section">
+          <view class="section-header">
+            <text class="section-title-new">高光时刻</text>
+            <text class="section-subtitle-new" bindtap="addHighlight">+ 添加</text>
+          </view>
+          <view wx:for="{{editHighlights}}" wx:key="id" class="highlight-edit-row">
+            <input class="highlight-edit-icon" value="{{item.icon}}" placeholder="✨" maxlength="2" bindinput="onHighlightIconInput" data-id="{{item.id}}" />
+            <input class="highlight-edit-title" value="{{item.title}}" placeholder="一句话描述..." bindinput="onHighlightTitleInput" data-id="{{item.id}}" />
+            <view class="highlight-edit-delete" bindtap="removeHighlight" data-id="{{item.id}}">✕</view>
+          </view>
+          <view wx:if="{{editHighlights.length === 0}}" class="field-tip">点击"+ 添加"记录你的高光时刻</view>
         </view>
 
         <view class="bottom-space-sm" />

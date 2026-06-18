@@ -1,4 +1,4 @@
-const { allCards, getCardsByTags, shuffleArray, presets, tags } = require('../../utils/cards-data.js');
+const { allCards, getCardsByTags, shuffleArray, presets, tags, tagCategories } = require('../../utils/cards-data.js');
 const store = require('../../utils/store.js');
 
 Page({
@@ -9,6 +9,7 @@ Page({
     showFilters: false,
     showHistory: false,
     tags: tags,
+    tagCategories: tagCategories,
     presets: presets,
     history: [],
     historyCards: [],
@@ -16,6 +17,8 @@ Page({
     totalPlayed: 0,
     filteredCount: 0,
     isCurrentFav: false,
+    isDrawing: false,
+    cardAnimClass: '',
   },
 
   onLoad() {
@@ -53,25 +56,45 @@ Page({
   },
 
   drawCard() {
+    if (this.data.isDrawing) return;
+
     const cards = this.getFilteredCards();
     if (cards.length === 0) {
       wx.showToast({ title: '所有卡片已抽完', icon: 'none' });
       return;
     }
-    const shuffled = shuffleArray(cards);
-    const card = shuffled[0];
-    store.addToHistory(card.id);
-    const nextHistory = [...this.data.history, card.id];
+
+    // 开始洗牌动画
     this.setData({
-      currentCard: card,
-      history: nextHistory,
-      historyCards: allCards.filter(c => nextHistory.includes(c.id)),
-      totalPlayed: this.data.totalPlayed + 1,
-    }, () => this.updateComputed());
+      isDrawing: true,
+      cardAnimClass: 'card-shuffling',
+    });
+
+    // 模拟洗牌后抽卡
+    setTimeout(() => {
+      const shuffled = shuffleArray(cards);
+      const card = shuffled[0];
+      store.addToHistory(card.id);
+      const nextHistory = [...this.data.history, card.id];
+
+      this.setData({
+        isDrawing: false,
+        cardAnimClass: 'card-enter',
+        currentCard: card,
+        history: nextHistory,
+        historyCards: allCards.filter(c => nextHistory.includes(c.id)),
+        totalPlayed: this.data.totalPlayed + 1,
+      }, () => this.updateComputed());
+
+      // 清除进入动画类
+      setTimeout(() => {
+        this.setData({ cardAnimClass: '' });
+      }, 700);
+    }, 600);
   },
 
   toggleFavorite() {
-    if (!this.data.currentCard) return;
+    if (!this.data.currentCard || this.data.isDrawing) return;
     const session = store.toggleFavorite(this.data.currentCard.id);
     this.setData({ favorites: session.favorites }, () => this.updateComputed());
   },
@@ -106,7 +129,14 @@ Page({
 
   resetAll() {
     store.resetHistory();
-    this.setData({ history: [], historyCards: [], totalPlayed: 0, currentCard: null }, () => this.updateComputed());
+    this.setData({
+      history: [],
+      historyCards: [],
+      totalPlayed: 0,
+      currentCard: null,
+      isDrawing: false,
+      cardAnimClass: '',
+    }, () => this.updateComputed());
     wx.showToast({ title: '已重置', icon: 'success' });
   },
 

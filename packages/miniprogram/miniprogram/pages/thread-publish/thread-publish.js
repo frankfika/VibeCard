@@ -1,4 +1,5 @@
 const store = require('../../utils/store.js');
+const nav = require('../../utils/nav.js');
 
 const TAGS = ['Work', 'Life', 'Web3', 'Thoughts'];
 
@@ -9,6 +10,8 @@ Page({
     tags: TAGS,
     imagePreviews: [],
     authorAvatar: '',
+    isPublishing: false,
+    showEmptyTip: false,
   },
 
   onLoad() {
@@ -19,7 +22,7 @@ Page({
   },
 
   onContentInput(e) {
-    this.setData({ content: e.detail.value });
+    this.setData({ content: e.detail.value, showEmptyTip: false });
   },
 
   selectTag(e) {
@@ -41,6 +44,11 @@ Page({
           imagePreviews: [...this.data.imagePreviews, ...paths],
         });
       },
+      fail: (err) => {
+        const msg = String(err && err.errMsg);
+        if (msg.includes('cancel') || msg.includes('fail auth')) return;
+        console.warn('[chooseMedia] fail:', err);
+      },
     });
   },
 
@@ -51,14 +59,22 @@ Page({
   },
 
   goBack() {
-    wx.navigateBack();
+    nav.navigateBack();
   },
 
   handlePublish() {
+    // 内容验证
     if (!this.data.content.trim() && this.data.imagePreviews.length === 0) {
-      wx.showToast({ title: '请输入内容', icon: 'none' });
+      this.setData({ showEmptyTip: true });
+      wx.showToast({ title: '请输入内容或添加图片', icon: 'none' });
       return;
     }
+
+    // 防止重复提交
+    if (this.data.isPublishing) return;
+
+    this.setData({ isPublishing: true });
+
     const profile = store.getProfile();
     const thread = {
       id: Date.now().toString(),
@@ -74,8 +90,15 @@ Page({
       timestamp: '刚刚',
       isLiked: false,
     };
-    store.addThread(thread);
-    wx.showToast({ title: '发布成功', icon: 'success' });
-    setTimeout(() => wx.navigateBack(), 600);
+
+    // 模拟发布延迟，增强反馈感
+    setTimeout(() => {
+      store.addThread(thread);
+      wx.showToast({ title: '发布成功', icon: 'success' });
+      setTimeout(() => {
+        this.setData({ isPublishing: false });
+        nav.navigateBack();
+      }, 600);
+    }, 400);
   },
 });

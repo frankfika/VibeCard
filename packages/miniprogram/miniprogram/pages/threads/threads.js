@@ -1,4 +1,5 @@
 const store = require('../../utils/store.js');
+const nav = require('../../utils/nav.js');
 
 const TAGS = ['All', 'Work', 'Life', 'Web3', 'Thoughts'];
 
@@ -29,7 +30,10 @@ Page({
     tags: TAGS,
     activeTag: 'All',
     threads: [],
+    filteredThreads: [],
     showPublish: false,
+    animatingLikeId: null,
+    cardAnimated: false,
   },
 
   onLoad() {
@@ -37,7 +41,17 @@ Page({
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 1 });
+    }
     this.loadThreads();
+  },
+
+  onReady() {
+    // 触发卡片进入动画
+    setTimeout(() => {
+      this.setData({ cardAnimated: true });
+    }, 100);
   },
 
   loadThreads() {
@@ -46,27 +60,44 @@ Page({
       threads = MOCK_THREADS;
       wx.setStorageSync('vibecard_threads', threads);
     }
-    this.setData({ threads });
+    const filteredThreads = this.computeFilteredThreads(threads, this.data.activeTag);
+    this.setData({ threads, filteredThreads, cardAnimated: false });
+    // 重新触发动画
+    setTimeout(() => {
+      this.setData({ cardAnimated: true });
+    }, 50);
   },
 
   selectTag(e) {
-    this.setData({ activeTag: e.currentTarget.dataset.tag });
+    const activeTag = e.currentTarget.dataset.tag;
+    const filteredThreads = this.computeFilteredThreads(this.data.threads, activeTag);
+    this.setData({ activeTag, filteredThreads, cardAnimated: false });
+    // 切换标签时重新触发动画
+    setTimeout(() => {
+      this.setData({ cardAnimated: true });
+    }, 50);
   },
 
-  getFilteredThreads() {
-    const { threads, activeTag } = this.data;
+  computeFilteredThreads(threads, activeTag) {
     if (activeTag === 'All') return threads;
     return threads.filter(t => t.tags.includes(activeTag));
   },
 
   handleLike(e) {
     const id = e.currentTarget.dataset.id;
+    // 设置点赞动画状态
+    this.setData({ animatingLikeId: id });
     const threads = store.toggleLikeThread(id);
-    this.setData({ threads });
+    const filteredThreads = this.computeFilteredThreads(threads, this.data.activeTag);
+    this.setData({ threads, filteredThreads });
+    // 清除动画状态
+    setTimeout(() => {
+      this.setData({ animatingLikeId: null });
+    }, 400);
   },
 
   openPublish() {
-    wx.navigateTo({ url: '/pages/thread-publish/thread-publish' });
+    nav.navigateTo('/pages/thread-publish/thread-publish');
   },
 
   previewImage(e) {

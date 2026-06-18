@@ -9,35 +9,35 @@ view, scroll-view, text, image, button, input, textarea, navigator {
 }
 
 page {
-  /* 背景 */
-  --color-bg: #fafafa;
+  /* 背景 - 对齐 Web 端 */
+  --color-bg: #ffffff;
   --color-bg-elevated: #ffffff;
   --color-bg-card: #ffffff;
   --color-surface: #f5f5f5;
-  --color-border: #f0f0f0;
+  --color-border: #e8e8e8;
   --color-border-light: #f5f5f5;
 
-  /* 文本 */
-  --color-text: #111111;
-  --color-text-secondary: #666666;
-  --color-text-tertiary: #999999;
+  /* 文本 - 对齐 Web 端 */
+  --color-text: #0a0a0a;
+  --color-text-secondary: #737373;
+  --color-text-tertiary: #a3a3a3;
 
-  /* 主色 */
-  --color-primary: #111111;
+  /* 主色 - 对齐 Web 端 */
+  --color-primary: #0a0a0a;
   --color-primary-dark: #000000;
   --color-primary-light: #e5e5e5;
   --color-primary-soft: #f5f5f5;
 
-  /* 强调色 - 年轻活力蓝 */
-  --color-accent: #2563eb;
-  --color-accent-dark: #1d4ed8;
-  --color-accent-soft: rgba(37, 99, 235, 0.08);
+  /* 强调色 - 与主色统一，去掉蓝色 */
+  --color-accent: #0a0a0a;
+  --color-accent-dark: #000000;
+  --color-accent-soft: rgba(0, 0, 0, 0.04);
 
-  /* 圆角 */
-  --radius-sm: 12rpx;
-  --radius-md: 20rpx;
-  --radius-lg: 28rpx;
-  --radius-xl: 36rpx;
+  /* 圆角 - 增大以匹配 Web 端 */
+  --radius-sm: 16rpx;
+  --radius-md: 24rpx;
+  --radius-lg: 32rpx;
+  --radius-xl: 40rpx;
   --radius-full: 100rpx;
 
   /* 间距 */
@@ -47,11 +47,11 @@ page {
   --space-lg: 32rpx;
   --space-xl: 48rpx;
 
-  /* 阴影 - 极柔和的灰色 */
+  /* 阴影 - 更柔和，对齐 Web 端 */
   --shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 8rpx 32rpx rgba(0, 0, 0, 0.08);
-  --shadow-glow: 0 4rpx 20rpx rgba(37, 99, 235, 0.12);
+  --shadow-md: 0 4rpx 24rpx rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8rpx 32rpx rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 4rpx 20rpx rgba(0, 0, 0, 0.08);
 
   background: var(--color-bg);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
@@ -129,10 +129,10 @@ page {
 }
 
 .card-accent {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(37, 99, 235, 0.01) 100%);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.03) 0%, rgba(0, 0, 0, 0.01) 100%);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-glow);
-  border: 1rpx solid rgba(37, 99, 235, 0.1);
+  border: 1rpx solid rgba(0, 0, 0, 0.06);
 }
 
 /* ==================== 按钮系统 ==================== */
@@ -148,7 +148,7 @@ page {
 .btn-primary {
   height: 100rpx;
   padding: 0 48rpx;
-  background: #111;
+  background: #0a0a0a;
   color: #fff;
   font-size: 30rpx;
   font-weight: 600;
@@ -163,9 +163,9 @@ page {
   height: 88rpx;
   padding: 0 40rpx;
   background: #fff;
-  color: #111;
+  color: #0a0a0a;
   font-size: 28rpx;
-  border: 1rpx solid #e5e5e5;
+  border: 1rpx solid #e8e8e8;
   border-radius: var(--radius-full);
 }
 
@@ -186,9 +186,9 @@ page {
 }
 
 .tag-active {
-  background: #111;
+  background: #0a0a0a;
   color: #fff;
-  border-color: #111;
+  border-color: #0a0a0a;
 }
 
 /* ==================== 动画 ==================== */
@@ -266,21 +266,21 @@ page {
 .privacy-title {
   font-size: 34rpx;
   font-weight: 600;
-  color: #111;
+  color: #0a0a0a;
   text-align: center;
   margin-bottom: 24rpx;
 }
 
 .privacy-content {
   font-size: 28rpx;
-  color: #666;
+  color: #737373;
   line-height: 1.8;
   text-align: center;
   margin-bottom: 40rpx;
 }
 
 .privacy-link {
-  color: #2563eb;
+  color: #0a0a0a;
   font-weight: 500;
 }
 
@@ -310,10 +310,10 @@ page {
 
 .privacy-btn.reject {
   background: #f5f5f5;
-  color: #666;
+  color: #737373;
 }
 
 .privacy-btn.agree {
-  background: #111;
+  background: #0a0a0a;
   color: #fff;
 }

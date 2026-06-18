@@ -1,17 +1,31 @@
 <view class="page">
+  <navbar title="动态" />
+
   <!-- Header Tags -->
   <view class="tag-bar">
-    <scroll-view scroll-x class="tag-scroll" show-scrollbar="{{false}}">
+    <scroll-view scroll-x class="tag-scroll" show-scrollbar="{{false}}" scroll-with-animation>
       <view class="tag-list">
-        <view wx:for="{{tags}}" wx:key="*this" class="filter-tag {{activeTag === item ? 'filter-tag-active' : ''}}" bindtap="selectTag" data-tag="{{item}}">{{item}}</view>
+        <view wx:for="{{tags}}" wx:key="*this" class="filter-tag {{activeTag === item ? 'filter-tag-active' : ''}}" bindtap="selectTag" data-tag="{{item}}">
+          {{item}}
+          <view wx:if="{{activeTag === item}}" class="tag-indicator"></view>
+        </view>
       </view>
     </scroll-view>
   </view>
 
   <!-- Threads Feed -->
   <scroll-view scroll-y class="feed-scroll">
-    <view class="thread-list">
-      <view wx:for="{{threads}}" wx:key="id" wx:for-item="thread" class="thread-card {{activeTag === 'All' || thread.tags.includes(activeTag) ? '' : 'hidden'}}">
+    <!-- Empty State -->
+    <view wx:if="{{filteredThreads.length === 0}}" class="empty-state">
+      <view class="empty-icon">✨</view>
+      <view class="empty-title">还没有动态</view>
+      <view class="empty-desc">成为第一个分享想法的人吧</view>
+      <view class="empty-btn" bindtap="openPublish">发布动态</view>
+    </view>
+
+    <!-- Thread List -->
+    <view wx:else class="thread-list">
+      <view wx:for="{{filteredThreads}}" wx:key="id" wx:for-item="thread" class="thread-card {{cardAnimated ? 'card-animate' : ''}}" style="animation-delay: {{index * 80}}ms;">
         <!-- Author -->
         <view class="thread-header">
           <view class="author-info">
@@ -29,7 +43,7 @@
 
         <!-- Images -->
         <view wx:if="{{thread.images && thread.images.length > 0}}" class="thread-images {{thread.images.length === 1 ? 'images-1' : thread.images.length === 2 ? 'images-2' : 'images-3'}}">
-          <image wx:for="{{thread.images}}" wx:for-item="img" wx:key="*this" class="thread-img" src="{{img}}" mode="aspectFill" bindtap="previewImage" data-url="{{img}}" data-urls="{{thread.images}}" />
+          <image wx:for="{{thread.images}}" wx:for-item="img" wx:key="*this" class="thread-img" src="{{img}}" mode="aspectFill" bindtap="previewImage" data-url="{{img}}" data-urls="{{thread.images}}" lazy-load />
         </view>
 
         <!-- Tags -->
@@ -39,9 +53,9 @@
 
         <!-- Actions -->
         <view class="thread-actions">
-          <view class="action-btn {{thread.isLiked ? 'action-active' : ''}}" bindtap="handleLike" data-id="{{thread.id}}">
+          <view class="action-btn {{thread.isLiked ? 'action-active' : ''}} {{animatingLikeId === thread.id ? 'action-like-anim' : ''}}" bindtap="handleLike" data-id="{{thread.id}}">
             <text class="action-icon">{{thread.isLiked ? '👍' : '👆'}}</text>
-            <text class="action-text">{{thread.likes > 0 ? thread.likes : 'Like'}}</text>
+            <text class="action-text {{animatingLikeId === thread.id ? 'action-text-anim' : ''}}">{{thread.likes > 0 ? thread.likes : 'Like'}}</text>
           </view>
           <view class="action-btn">
             <text class="action-icon">↗️</text>
@@ -54,7 +68,10 @@
   </scroll-view>
 
   <!-- FAB -->
-  <view class="fab" bindtap="openPublish">
-    <text class="fab-icon">+</text>
+  <view class="fab-wrapper">
+    <view class="fab-pulse"></view>
+    <view class="fab" bindtap="openPublish">
+      <text class="fab-icon">+</text>
+    </view>
   </view>
 </view>

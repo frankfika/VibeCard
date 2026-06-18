@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "发现搭子",
-  "usingComponents": {}
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "navbar": "/components/navbar/navbar"
+  }
 }

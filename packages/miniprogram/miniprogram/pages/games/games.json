@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "互动卡片",
-  "usingComponents": {}
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "navbar": "/components/navbar/navbar"
+  }
 }

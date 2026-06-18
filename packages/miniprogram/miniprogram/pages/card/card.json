@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "我的名片",
-  "usingComponents": {}
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "navbar": "/components/navbar/navbar"
+  }
 }

@@ -1,23 +1,57 @@
 <view class="page">
-  <view class="publish-header">
-    <view class="header-cancel" bindtap="goBack">取消</view>
-    <view class="header-title">新动态</view>
-    <view class="header-submit {{content || imagePreviews.length > 0 ? 'header-submit-active' : ''}}" bindtap="handlePublish">发布</view>
+  <navbar title="发布动态" showBack />
+
+  <!-- Action bar -->
+  <view class="publish-action-bar">
+    <view class="publish-action-cancel" bindtap="goBack">取消</view>
+    <view class="publish-action-submit {{content || imagePreviews.length > 0 ? 'publish-action-submit-active' : ''}} {{isPublishing ? 'publish-action-submit-loading' : ''}}" bindtap="handlePublish">
+      <text wx:if="{{!isPublishing}}">发布</text>
+      <view wx:else class="submit-loading">
+        <view class="loading-dot"></view>
+        <view class="loading-dot"></view>
+        <view class="loading-dot"></view>
+      </view>
+    </view>
   </view>
 
   <view class="publish-body">
     <view class="content-area">
       <image wx:if="{{authorAvatar}}" class="author-avatar" src="{{authorAvatar}}" mode="aspectFill" />
       <view wx:else class="author-avatar author-avatar-placeholder"></view>
-      <textarea class="content-input" placeholder="分享点什么..." placeholder-style="color: #bbb;" value="{{content}}" bindinput="onContentInput" maxlength="500" />
+      <view class="textarea-wrapper">
+        <textarea
+          class="content-input {{showEmptyTip ? 'content-input-empty' : ''}}"
+          placeholder="分享点什么..."
+          placeholder-style="color: #a3a3a3;"
+          value="{{content}}"
+          bindinput="onContentInput"
+          maxlength="500"
+          adjust-position
+          hold-keyboard
+          show-confirm-bar="{{false}}"
+        />
+        <view class="char-count">{{content.length}}/500</view>
+      </view>
+    </view>
+
+    <!-- Empty Tip -->
+    <view wx:if="{{showEmptyTip}}" class="empty-tip">
+      <text class="empty-tip-text">请输入内容或添加图片后再发布</text>
     </view>
 
     <!-- Image Previews -->
-    <view wx:if="{{imagePreviews.length > 0}}" class="image-preview-list">
-      <view wx:for="{{imagePreviews}}" wx:key="*this" class="image-preview-item">
-        <image class="preview-img" src="{{item}}" mode="aspectFill" />
-        <view class="remove-img" bindtap="removeImage" data-index="{{index}}">✕</view>
+    <view wx:if="{{imagePreviews.length > 0}}" class="image-preview-section">
+      <view class="image-preview-list">
+        <view wx:for="{{imagePreviews}}" wx:key="*this" class="image-preview-item">
+          <image class="preview-img" src="{{item}}" mode="aspectFill" />
+          <view class="remove-img" bindtap="removeImage" data-index="{{index}}">✕</view>
+        </view>
+        <!-- Add more image slot -->
+        <view wx:if="{{imagePreviews.length < 3}}" class="image-preview-item image-preview-add" bindtap="chooseImage">
+          <text class="add-icon">+</text>
+        </view>
       </view>
+      <view class="image-count-hint">{{imagePreviews.length}}/3</view>
     </view>
 
     <!-- Tag Selector -->
@@ -29,9 +63,10 @@
     </view>
 
     <!-- Add Image -->
-    <view class="add-image-btn" bindtap="chooseImage">
+    <view wx:if="{{imagePreviews.length === 0}}" class="add-image-btn" bindtap="chooseImage">
       <text class="add-image-icon">📷</text>
       <text class="add-image-text">添加图片</text>
+      <text class="add-image-hint">（最多3张）</text>
     </view>
   </view>
 </view>

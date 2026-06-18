@@ -1,23 +1,52 @@
 <view class="page">
-  <view class="page-header">
-    <view class="page-title">Explore</view>
-  </view>
+  <navbar title="发现与工具" />
 
   <scroll-view scroll-y class="page-body">
     <!-- Chain Identity -->
     <view class="section">
       <view class="identity-card">
-        <view class="identity-header">
-          <view class="identity-icon">🔗</view>
-          <view class="identity-info">
-            <view class="identity-title">链上身份</view>
-            <view class="identity-desc">本地微链已记录 {{profileComplete ? '完整' : '部分'}} 资料</view>
+        <view class="identity-bg" />
+        <view class="identity-content">
+          <view class="identity-header">
+            <view class="identity-icon-wrap">
+              <view class="identity-icon">🔗</view>
+            </view>
+            <view class="identity-info">
+              <view class="identity-title">链上身份</view>
+              <view class="identity-desc">本地微链已记录 {{profileComplete ? '完整' : '部分'}} 资料</view>
+            </view>
+          </view>
+          <view class="identity-right">
+            <view class="identity-progress-ring">
+              <view class="progress-text">{{profileCompletePercent}}%</view>
+              <view class="progress-label">完整度</view>
+            </view>
+            <view class="status-badge {{profileComplete ? 'status-complete' : ''}}">
+              {{profileComplete ? '已就绪' : '待完善'}}
+            </view>
           </view>
         </view>
-        <view class="identity-status">
-          <view class="status-badge {{profileComplete ? 'status-complete' : ''}}">
-            {{profileComplete ? '已就绪' : '待完善'}}
-          </view>
+      </view>
+    </view>
+
+    <!-- Stats -->
+    <view class="section">
+      <view class="section-label">
+        <text class="label-icon">📊</text>
+        <text>Statistics</text>
+      </view>
+      <view class="stats-grid">
+        <view class="stat-card">
+          <view class="stat-value">{{stats.threads}}</view>
+          <view class="stat-label">动态</view>
+        </view>
+        <view class="stat-card">
+          <view class="stat-value">{{stats.activities}}</view>
+          <view class="stat-label">活动</view>
+        </view>
+        <view class="stat-card">
+          <view class="stat-value">{{stats.cardsDrawn}}</view>
+          <view class="stat-label">抽卡</view>
         </view>
       </view>
     </view>
@@ -30,7 +59,9 @@
       </view>
       <view class="entry-card" bindtap="goDiscover">
         <view class="entry-main">
-          <view class="entry-icon entry-icon-primary">🧭</view>
+          <view class="entry-icon" style="background: linear-gradient(135deg, #0a0a0a 0%, #333333 100%);">
+            <text style="color: #fff;">🧭</text>
+          </view>
           <view class="entry-text">
             <view class="entry-title">发现搭子</view>
             <view class="entry-desc">探索并连接志同道合的朋友</view>
@@ -48,16 +79,80 @@
       </view>
       <view class="grid-2">
         <view class="grid-card" bindtap="goGames">
-          <view class="grid-icon">🎮</view>
+          <view class="grid-icon" style="background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);">
+            <text>🎮</text>
+          </view>
           <view class="grid-title">互动卡片</view>
           <view class="grid-desc">破冰与深入交流的小游戏</view>
         </view>
-        <view class="grid-card grid-card-disabled">
-          <view class="grid-icon">⚙️</view>
-          <view class="grid-title">设置</view>
-          <view class="grid-desc">应用偏好与账户管理，敬请期待</view>
+        <view class="grid-card" bindtap="goCard">
+          <view class="grid-icon" style="background: linear-gradient(135deg, #0a0a0a 0%, #333333 100%);">
+            <text style="color: #fff;">🪪</text>
+          </view>
+          <view class="grid-title">我的名片</view>
+          <view class="grid-desc">查看和编辑你的社交名片</view>
         </view>
       </view>
     </view>
+
+    <!-- Settings -->
+    <view class="section">
+      <view class="section-label">
+        <text class="label-icon">⚙️</text>
+        <text>Settings</text>
+      </view>
+      <view class="settings-list">
+        <view class="settings-item" bindtap="showAboutModal">
+          <view class="settings-main">
+            <view class="settings-icon" style="background: #f5f5f5;">ℹ️</view>
+            <view class="settings-text">
+              <view class="settings-title">关于 vibecard</view>
+              <view class="settings-desc">版本与项目信息</view>
+            </view>
+          </view>
+          <view class="settings-arrow">›</view>
+        </view>
+        <view class="settings-item settings-item-danger" bindtap="clearLocalData">
+          <view class="settings-main">
+            <view class="settings-icon" style="background: rgba(239,68,68,0.08);">🗑️</view>
+            <view class="settings-text">
+              <view class="settings-title" style="color: #ef4444;">清除本地数据</view>
+              <view class="settings-desc">重置所有本地存储的数据</view>
+            </view>
+          </view>
+          <view class="settings-arrow">›</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- Version -->
+    <view class="version-footer">
+      <text class="version-text">vibecard v1.0.0</text>
+      <text class="version-sub">Web3 社交名片平台</text>
+    </view>
+
+    <view class="bottom-space" />
   </scroll-view>
+
+  <!-- About Modal -->
+  <view wx:if="{{showAbout}}" class="about-overlay" bindtap="closeAboutModal">
+    <view class="about-sheet" catchtap="noop">
+      <view class="about-header">
+        <view class="about-title">关于 vibecard</view>
+        <view class="about-close" bindtap="closeAboutModal">✕</view>
+      </view>
+      <view class="about-body">
+        <view class="about-logo">✨</view>
+        <view class="about-name">vibecard</view>
+        <view class="about-version">版本 1.0.0</view>
+        <view class="about-desc">vibecard 是一个 Web3 社交名片平台，帮助你在加密世界中建立真实的人际连接。</view>
+        <view class="about-features">
+          <view class="about-feature">🪪 个性化社交名片</view>
+          <view class="about-feature">🧭 发现志同道合的朋友</view>
+          <view class="about-feature">🎮 互动破冰卡片</view>
+          <view class="about-feature">🔗 链上身份验证</view>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>

@@ -1,10 +1,9 @@
 <view class="page">
-  <view class="page-header">
-    <view class="page-title">发现搭子</view>
-    <view class="header-actions">
-      <view class="icon-btn" bindtap="openCreate">
-        <text class="icon-btn-text">+</text>
-      </view>
+  <navbar title="发现搭子" showBack />
+
+  <view class="header-actions" style="padding: 24rpx 40rpx 16rpx; display: flex; justify-content: flex-end;">
+    <view class="icon-btn" bindtap="openCreate">
+      <text class="icon-btn-text">+</text>
     </view>
   </view>
 
@@ -12,34 +11,66 @@
     <!-- Category Pills -->
     <scroll-view scroll-x class="category-scroll" show-scrollbar="{{false}}">
       <view class="category-list">
-        <view class="category-pill {{selectedCategory === null ? 'category-pill-active' : ''}}" bindtap="selectCategory" data-cat="">全部</view>
-        <view wx:for="{{companionTypes}}" wx:key="id" class="category-pill {{selectedCategory === item.id ? 'category-pill-active' : ''}}" bindtap="selectCategory" data-cat="{{item.id}}" style="{{selectedCategory === item.id ? 'background:' + item.color + ';color:#fff;' : ''}}">{{item.icon}} {{item.name}}</view>
+        <view class="category-pill {{selectedCategory === null ? 'category-pill-active' : ''}}" bindtap="selectCategory" data-cat="">
+          <text>全部</text>
+        </view>
+        <view wx:for="{{companionTypes}}" wx:key="id" class="category-pill {{selectedCategory === item.id ? 'category-pill-active' : ''}}" bindtap="selectCategory" data-cat="{{item.id}}" style="{{selectedCategory === item.id ? 'background:' + item.color + ';color:#fff;border-color:' + item.color + ';' : ''}}">
+          <text class="pill-icon">{{item.icon}}</text>
+          <text>{{item.name}}</text>
+        </view>
       </view>
     </scroll-view>
 
+    <!-- Empty State -->
+    <view wx:if="{{filteredActivities.length === 0}}" class="empty-state">
+      <view class="empty-illustration">🎯</view>
+      <view class="empty-title">还没有活动</view>
+      <view class="empty-desc">成为第一个发起活动的人，找到志同道合的搭子</view>
+      <view class="empty-btn" bindtap="openCreate">创建活动</view>
+    </view>
+
     <!-- Activity Cards -->
-    <view class="activity-list">
-      <view wx:for="{{activities}}" wx:key="id" wx:for-item="activity" class="activity-card {{!selectedCategory || activity.category === selectedCategory ? '' : 'hidden'}}">
+    <view wx:else class="activity-list">
+      <view wx:for="{{filteredActivities}}" wx:key="id" wx:for-item="activity" wx:for-index="idx" class="activity-card" style="animation-delay: {{idx * 80}}ms;">
         <view class="activity-main">
-          <image wx:if="{{activity.avatar}}" class="activity-avatar" src="{{activity.avatar}}" mode="aspectFill" />
-          <view wx:else class="activity-avatar activity-avatar-placeholder"></view>
+          <view class="activity-avatar-wrap">
+            <image wx:if="{{activity.avatar}}" class="activity-avatar" src="{{activity.avatar}}" mode="aspectFill" />
+            <view wx:else class="activity-avatar activity-avatar-placeholder">
+              <text class="avatar-initial">{{activity._creatorInitial}}</text>
+            </view>
+          </view>
           <view class="activity-info">
             <view class="activity-meta">
-              <view class="activity-badge" style="background: {{activity._categoryColor}}">{{activity._categoryIcon}} {{activity._categoryName}}</view>
+              <view class="activity-badge" style="background: {{activity._categoryColor}}">
+                <text class="badge-icon">{{activity._categoryIcon}}</text>
+                <text>{{activity._categoryName}}</text>
+              </view>
               <text class="activity-creator">{{activity.creator}}</text>
             </view>
             <view class="activity-title">{{activity.title}}</view>
             <view wx:if="{{activity.description}}" class="activity-desc">{{activity.description}}</view>
             <view class="activity-details">
-              <text class="detail-item">📍 {{activity.location}}</text>
-              <text class="detail-item">⏰ {{activity.time}}</text>
-              <text class="detail-item">👥 {{activity.participants}}/{{activity.maxParticipants}}</text>
+              <view class="detail-item">
+                <text class="detail-icon">📍</text>
+                <text class="detail-text">{{activity.location}}</text>
+              </view>
+              <view class="detail-item">
+                <text class="detail-icon">⏰</text>
+                <text class="detail-text">{{activity.time}}</text>
+              </view>
+              <view class="detail-item">
+                <text class="detail-icon">👥</text>
+                <text class="detail-text">{{activity.participants}}/{{activity.maxParticipants}}</text>
+              </view>
             </view>
           </view>
         </view>
         <view class="activity-action">
           <button wx:if="{{!activity.joined}}" class="join-btn" bindtap="joinActivity" data-id="{{activity.id}}">加入</button>
-          <button wx:else class="leave-btn" bindtap="leaveActivity" data-id="{{activity.id}}">已加入</button>
+          <button wx:else class="leave-btn" bindtap="leaveActivity" data-id="{{activity.id}}">
+            <text class="leave-check">✓</text>
+            <text>已加入</text>
+          </button>
         </view>
       </view>
     </view>
@@ -52,17 +83,45 @@
       <view class="modal-header">
         <view class="modal-close" bindtap="closeCreate">✕</view>
         <view class="modal-title">创建活动</view>
-        <view class="modal-save" bindtap="submitCreate">发布</view>
+        <view class="modal-save {{isSubmitting ? 'modal-save-disabled' : ''}}" bindtap="submitCreate">
+          <text wx:if="{{!isSubmitting}}">发布</text>
+          <view wx:else class="save-spinner"></view>
+        </view>
       </view>
       <scroll-view scroll-y class="modal-body">
-        <input class="input" placeholder="活动标题" placeholder-style="color: #bbb;" value="{{createTitle}}" bindinput="onCreateTitle" />
-        <textarea class="textarea" placeholder="活动描述" placeholder-style="color: #bbb;" value="{{createDesc}}" bindinput="onCreateDesc" />
-        <input class="input" placeholder="地点" placeholder-style="color: #bbb;" value="{{createLocation}}" bindinput="onCreateLocation" />
-        <input class="input" placeholder="时间" placeholder-style="color: #bbb;" value="{{createTime}}" bindinput="onCreateTime" />
-        <input class="input" placeholder="人数上限" placeholder-style="color: #bbb;" type="number" value="{{createMaxParticipants}}" bindinput="onCreateMax" />
-        <view class="section-title">分类</view>
-        <view class="category-grid">
-          <view wx:for="{{companionTypes}}" wx:key="id" class="category-select {{createCategory === item.id ? 'category-select-active' : ''}}" bindtap="onCreateCategory" data-cat="{{item.id}}" style="{{createCategory === item.id ? 'background:' + item.color + ';color:#fff;' : ''}}">{{item.icon}} {{item.name}}</view>
+        <view class="field-group {{formErrors.title ? 'field-group-error' : ''}}">
+          <input class="input" placeholder="活动标题 *" placeholder-style="color: #a3a3a3;" value="{{createTitle}}" bindinput="onCreateTitle" />
+          <text wx:if="{{formErrors.title}}" class="field-error">{{formErrors.title}}</text>
+        </view>
+        <textarea class="textarea" placeholder="活动描述（可选）" placeholder-style="color: #a3a3a3;" value="{{createDesc}}" bindinput="onCreateDesc" />
+        <view class="field-group {{formErrors.location ? 'field-group-error' : ''}}">
+          <input class="input" placeholder="地点 *" placeholder-style="color: #a3a3a3;" value="{{createLocation}}" bindinput="onCreateLocation" />
+          <text wx:if="{{formErrors.location}}" class="field-error">{{formErrors.location}}</text>
+        </view>
+        <view class="field-group {{formErrors.time ? 'field-group-error' : ''}}">
+          <input class="input" placeholder="时间 *" placeholder-style="color: #a3a3a3;" value="{{createTime}}" bindinput="onCreateTime" />
+          <text wx:if="{{formErrors.time}}" class="field-error">{{formErrors.time}}</text>
+        </view>
+        <input class="input" placeholder="人数上限" placeholder-style="color: #a3a3a3;" type="number" value="{{createMaxParticipants}}" bindinput="onCreateMax" />
+
+        <view class="field-group {{formErrors.category ? 'field-group-error' : ''}}">
+          <view class="section-title">分类 *</view>
+          <view class="category-grid">
+            <view wx:for="{{companionTypes}}" wx:key="id" class="category-select {{createCategory === item.id ? 'category-select-active' : ''}}" bindtap="onCreateCategory" data-cat="{{item.id}}" style="{{createCategory === item.id ? 'background:' + item.color + ';color:#fff;border-color:' + item.color + ';' : ''}}">
+              <text class="cat-select-icon">{{item.icon}}</text>
+              <text>{{item.name}}</text>
+            </view>
+          </view>
+          <text wx:if="{{formErrors.category}}" class="field-error">{{formErrors.category}}</text>
+        </view>
+
+        <view wx:if="{{createCategory}}" class="subcategory-section">
+          <view class="section-title">子分类</view>
+          <view class="category-grid">
+            <view wx:for="{{companionTypes}}" wx:for-item="type" wx:key="id" wx:if="{{type.id === createCategory}}">
+              <view wx:for="{{type.subcategories}}" wx:for-item="sub" wx:key="id" class="category-select {{createSubcategory === sub.id ? 'category-select-active' : ''}}" bindtap="onCreateSubcategory" data-sub="{{sub.id}}">{{sub.name}}</view>
+            </view>
+          </view>
         </view>
       </scroll-view>
     </view>

@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "发布动态",
-  "usingComponents": {}
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "navbar": "/components/navbar/navbar"
+  }
 }
