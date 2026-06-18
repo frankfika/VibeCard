@@ -104,6 +104,8 @@ npm run dev
 
 应用将在 http://localhost:3000 启动。
 
+> 要体验完整的 Web3 链上同步功能，请先启动本地 Hardhat 节点并部署合约，详见 [本地 Web3 开发指南](./docs/LOCAL_DEV.md)。
+
 ### 构建生产版本
 
 ```bash
