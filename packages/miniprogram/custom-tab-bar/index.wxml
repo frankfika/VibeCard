@@ -1,0 +1,21 @@
+<cover-view class="tab-bar-wrapper">
+  <!-- Gradient fade above tab bar -->
+  <cover-view class="tab-bar-fade" />
+
+  <cover-view class="tab-bar">
+    <cover-view class="tab-bar-inner">
+      <cover-view
+        wx:for="{{list}}"
+        wx:key="index"
+        class="tab-item {{selected === index ? 'tab-item-active' : ''}}"
+        data-index="{{index}}"
+        data-path="{{item.pagePath}}"
+        bindtap="switchTab"
+      >
+        <cover-view class="tab-item-bg" wx:if="{{selected === index}}" />
+        <cover-view class="tab-icon">{{item.icon}}</cover-view>
+        <cover-view class="tab-label">{{item.text}}</cover-view>
+      </cover-view>
+    </cover-view>
+  </cover-view>
+</cover-view>

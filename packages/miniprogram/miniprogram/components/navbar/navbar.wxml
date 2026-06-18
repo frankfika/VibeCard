@@ -1,0 +1,30 @@
+<!-- Spacer to reserve space for fixed navbar -->
+<view style="height: {{statusBarHeight + navBarHeight}}px;"
+></view>
+
+<view
+  class="navbar-wrapper"
+  style="padding-top: {{statusBarHeight}}px; height: {{statusBarHeight + navBarHeight}}px; background: {{background}}; backdrop-filter: blur({{blur}}); -webkit-backdrop-filter: blur({{blur}});"
+>
+  <view class="navbar-inner" style="height: {{navBarHeight}}px;"
+  >
+    <!-- Left: back button -->
+    <view class="navbar-side"
+    >
+      <view
+        wx:if="{{showBack}}"
+        class="navbar-back"
+        bindtap="onBack"
+      >
+        <text class="navbar-back-icon">‹</text>
+      </view>
+    </view>
+
+    <!-- Center: title -->
+    <view class="navbar-title">{{title}}</view>
+
+    <!-- Right: placeholder for balance -->
+    <view class="navbar-side"
+    ></view>
+  </view>
+</view>
