@@ -3,11 +3,14 @@ import {
   Share, MapPin, Sparkles, MessageCircle, Wallet, Twitter,
   Check, User, Zap, Plus, Trash2,
   CheckCircle2, Link2, ExternalLink, Edit3, Send, SmilePlus,
-  Download, QrCode, X,
+  Download, QrCode, X, CloudUpload, CloudDownload, RefreshCw,
+  Code,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../store';
 import { useChain } from '../lib/chain/useChain';
+import { useAccount, useSignMessage } from 'wagmi';
+import { verifyMessage } from 'viem';
 import ProofPill from '../components/chain/ProofPill';
 import { tierGradient } from '../lib/chain/reputation';
 import { toPng } from 'html-to-image';
@@ -74,8 +77,10 @@ export default function CardPage() {
   const sharedDataParam = searchParams.get('c');
   const isSharedView = !!sharedDataParam;
 
-  const { profile: myProfile, updateProfile, isSetup } = useProfile();
+  const { profile: myProfile, updateProfile, isSetup, syncStatus, syncToChain, loadFromChain } = useProfile();
   const { state: chainState, reputation } = useChain();
+  const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [sharedProfile, setSharedProfile] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showShareDiv, setShowShareDiv] = useState(false);
@@ -89,6 +94,21 @@ export default function CardPage() {
       return window.location.href;
     }
   }, [myProfile]);
+
+  const verifyWallet = async () => {
+    if (!address) return;
+    const timestamp = Date.now();
+    const message = `Verify my vibecard wallet\nAddress: ${address}\nTimestamp: ${timestamp}`;
+    try {
+      const signature = await signMessageAsync({ account: address, message });
+      const recovered = await verifyMessage({ address, message, signature });
+      if (recovered) {
+        updateProfile({ verified: { ...myProfile.verified, wallet: address } });
+      }
+    } catch {
+      // user rejected or verification failed
+    }
+  };
 
   useEffect(() => {
     if (sharedDataParam) {
@@ -154,18 +174,25 @@ export default function CardPage() {
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.22 }}
-                className="mt-3 flex items-center gap-2 flex-wrap justify-center"
+                className="mt-3 flex flex-col items-center gap-2"
               >
-                <ProofPill
-                  hash={chainState.blocks[chainState.blocks.length - 1].hash}
-                  label="On-Chain"
-                  variant="glow"
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  <ProofPill
+                    hash={chainState.blocks[chainState.blocks.length - 1].hash}
+                    label="On-Chain"
+                    variant="glow"
+                  />
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-gradient-to-r ${tierGradient(reputation.tier)} bg-clip-text text-transparent border border-border/60`}>
+                    <span className="text-foreground">Lv.{reputation.level}</span>
+                    <span className="opacity-60 text-foreground">·</span>
+                    <span>{reputation.tier}</span>
+                  </span>
+                </div>
+                <SyncActionBar
+                  syncStatus={syncStatus}
+                  onSync={syncToChain}
+                  onRestore={loadFromChain}
                 />
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-gradient-to-r ${tierGradient(reputation.tier)} bg-clip-text text-transparent border border-border/60`}>
-                  <span className="text-foreground">Lv.{reputation.level}</span>
-                  <span className="opacity-60 text-foreground">·</span>
-                  <span>{reputation.tier}</span>
-                </span>
               </motion.div>
             )}
           </div>
@@ -202,26 +229,58 @@ export default function CardPage() {
           )}
 
           {/* Verified Accounts */}
-          {(profile.verified?.wallet || profile.verified?.twitter || profile.verified?.discord) && (
-            <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] p-6 flex justify-around mb-8">
-              {profile.verified?.wallet && (
-                <div className="flex flex-col items-center gap-2.5">
-                  <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><Wallet className="w-5 h-5 text-foreground" /></div>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Wallet</span>
-                </div>
-              )}
-              {profile.verified?.twitter && (
-                <div className="flex flex-col items-center gap-2.5">
-                  <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><Twitter className="w-5 h-5 text-foreground" /></div>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">X</span>
-                </div>
-              )}
-              {profile.verified?.discord && (
-                <div className="flex flex-col items-center gap-2.5">
-                  <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><MessageCircle className="w-5 h-5 text-foreground" /></div>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Discord</span>
-                </div>
-              )}
+          {isMe && (
+            <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] p-6 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">Verified</h3>
+                {!profile.verified?.wallet && address && (
+                  <button
+                    onClick={verifyWallet}
+                    className="text-[11px] font-bold text-foreground bg-secondary px-3 py-1.5 rounded-full hover:bg-foreground hover:text-background transition-colors"
+                  >
+                    验证钱包
+                  </button>
+                )}
+              </div>
+              <div className="flex justify-around">
+                {profile.verified?.wallet ? (
+                  <div className="flex flex-col items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-[16px] bg-emerald-100 flex items-center justify-center shadow-sm">
+                      <Check className="w-5 h-5 text-emerald-700" />
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Wallet</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2.5 opacity-40">
+                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm">
+                      <Wallet className="w-5 h-5 text-foreground" />
+                    </div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Wallet</span>
+                  </div>
+                )}
+                {profile.verified?.twitter ? (
+                  <div className="flex flex-col items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><Twitter className="w-5 h-5 text-foreground" /></div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">X</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2.5 opacity-40">
+                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><Twitter className="w-5 h-5 text-foreground" /></div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">X</span>
+                  </div>
+                )}
+                {profile.verified?.discord ? (
+                  <div className="flex flex-col items-center gap-2.5">
+                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><MessageCircle className="w-5 h-5 text-foreground" /></div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Discord</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2.5 opacity-40">
+                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><MessageCircle className="w-5 h-5 text-foreground" /></div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Discord</span>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
@@ -890,6 +949,7 @@ function ShareDrawer({ onClose, shareUrl, profile, shareCardRef }: { onClose: ()
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [qrError, setQrError] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isEmbedCopied, setIsEmbedCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
@@ -924,6 +984,29 @@ function ShareDrawer({ onClose, shareUrl, profile, shareCardRef }: { onClose: ()
       } catch {
         /* ignore */
       }
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const embedCode = `<iframe\n  src="${shareUrl}"\n  width="100%"\n  height="640"\n  style="border:0;border-radius:24px;max-width:420px;"\n  title="vibecard"\n></iframe>`;
+
+  const copyEmbedCode = async () => {
+    try {
+      await navigator.clipboard.writeText(embedCode);
+      setIsEmbedCopied(true);
+      setTimeout(() => setIsEmbedCopied(false), 1500);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = embedCode;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        setIsEmbedCopied(true);
+        setTimeout(() => setIsEmbedCopied(false), 1500);
+      } catch {}
       document.body.removeChild(textarea);
     }
   };
@@ -1115,7 +1198,78 @@ function ShareDrawer({ onClose, shareUrl, profile, shareCardRef }: { onClose: ()
           {isCopied ? <CheckCircle2 className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
           {isCopied ? '已复制链接' : '复制名片链接'}
         </button>
+
+        {/* Embed */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">嵌入网站</p>
+          <button onClick={copyEmbedCode} className="w-full flex items-center justify-center gap-2 py-3.5 bg-secondary rounded-xl font-semibold text-[14px] text-foreground hover:bg-foreground hover:text-background active:scale-[0.98] transition-all">
+            {isEmbedCopied ? <CheckCircle2 className="w-4 h-4" /> : <Code className="w-4 h-4" />}
+            {isEmbedCopied ? '已复制嵌入代码' : '复制 iframe 嵌入代码'}
+          </button>
+        </div>
       </motion.div>
     </>
+  );
+}
+
+function SyncActionBar({
+  syncStatus,
+  onSync,
+  onRestore,
+}: {
+  syncStatus: { isSynced: boolean; lastSyncAt: number | null; ipfsHash: string | null; txHash: string | null; chainId: number | null };
+  onSync: () => Promise<boolean>;
+  onRestore: () => Promise<boolean>;
+}) {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    await onSync();
+    setIsSyncing(false);
+  };
+
+  const handleRestore = async () => {
+    setIsRestoring(true);
+    await onRestore();
+    setIsRestoring(false);
+  };
+
+  const statusText = syncStatus.isSynced
+    ? `已同步 · ${syncStatus.ipfsHash ? syncStatus.ipfsHash.slice(0, 8) + '…' : ''}`
+    : '尚未同步到链上';
+
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border ${
+        syncStatus.isSynced
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-secondary border-border text-muted-foreground'
+      }`}>
+        {syncStatus.isSynced ? <Check className="w-3 h-3 inline mr-1" /> : null}
+        {statusText}
+      </span>
+
+      <button
+        onClick={handleSync}
+        disabled={isSyncing || isRestoring}
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-background text-[10px] font-bold text-foreground hover:bg-secondary disabled:opacity-50 transition-colors"
+        title="将名片同步到链上"
+      >
+        {isSyncing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
+        同步
+      </button>
+
+      <button
+        onClick={handleRestore}
+        disabled={isSyncing || isRestoring}
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border bg-background text-[10px] font-bold text-foreground hover:bg-secondary disabled:opacity-50 transition-colors"
+        title="从链上恢复名片"
+      >
+        {isRestoring ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CloudDownload className="w-3 h-3" />}
+        恢复
+      </button>
+    </div>
   );
 }

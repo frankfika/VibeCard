@@ -1,9 +1,15 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { User, Layers, Menu, ChevronLeft } from 'lucide-react';
 import CardPage from './pages/CardPage';
 import ThreadsPage from './pages/ThreadsPage';
 import MorePage from './pages/MorePage';
+import EmbedCardPage from './pages/EmbedCardPage';
 import IMBrowserNotice from './components/IMBrowserNotice';
+
+const E2EChainSyncPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/E2EChainSyncPage'))
+  : null;
 
 type Tab = 'card' | 'threads' | 'more';
 
@@ -13,7 +19,7 @@ const TAB_CONFIG: { id: Tab; icon: ReactNode; label: string }[] = [
   { id: 'more', icon: <Menu className="w-5 h-5" />, label: '更多' },
 ];
 
-function MobileHeader({ activeTab, onBack }: { activeTab: string; onBack?: () => void }) {
+function MobileHeader({ activeTab, onBack, hidden }: { activeTab: string; onBack?: () => void; hidden?: boolean }) {
   const getTitle = () => {
     switch (activeTab) {
       case 'card': return '我的名片';
@@ -22,6 +28,8 @@ function MobileHeader({ activeTab, onBack }: { activeTab: string; onBack?: () =>
       default: return 'vibecard';
     }
   };
+
+  if (hidden) return null;
 
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-50 pointer-events-auto">
@@ -54,87 +62,119 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     return (localStorage.getItem('vibecard_tab') as Tab) || 'card';
   });
-  
-  const isSharedView = new URLSearchParams(window.location.search).has('c');
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const isSharedView = searchParams.has('c');
+  const isEmbedView = searchParams.has('address') || searchParams.has('cid');
+  const isE2EChainSync = window.location.pathname === '/e2e/chain-sync';
 
   useEffect(() => {
-    if (!isSharedView) {
+    if (!isSharedView && !isEmbedView && !isE2EChainSync) {
       localStorage.setItem('vibecard_tab', activeTab);
     }
-  }, [activeTab, isSharedView]);
+  }, [activeTab, isSharedView, isEmbedView, isE2EChainSync]);
+
+  if (isE2EChainSync && E2EChainSyncPage) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background" />}>
+        <E2EChainSyncPage />
+      </Suspense>
+    );
+  }
+
+  if (isEmbedView) {
+    return <EmbedCardPage />;
+  }
 
   return (
     <>
       <IMBrowserNotice />
       <div className="min-h-dvh bg-background text-foreground flex md:flex-row flex-col">
-        <MobileHeader activeTab={activeTab} />
+        <MobileHeader activeTab={activeTab} hidden={isSharedView} />
 
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col w-56 border-r border-border bg-sidebar shrink-0">
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
-              <User className="w-4 h-4 text-background" />
+        {!isSharedView && (
+          <aside className="hidden md:flex flex-col w-56 border-r border-border bg-sidebar shrink-0">
+            <div className="p-6 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
+                <User className="w-4 h-4 text-background" />
+              </div>
+              <div>
+                <span className="font-black text-lg tracking-tight block leading-none">vibecard</span>
+              </div>
             </div>
-            <div>
-              <span className="font-black text-lg tracking-tight block leading-none">vibecard</span>
-            </div>
-          </div>
 
-          <nav className="flex-1 px-3 py-2 space-y-0.5">
-            {TAB_CONFIG.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-foreground text-background'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </aside>
+            <nav className="flex-1 px-3 py-2 space-y-0.5" role="tablist" aria-label="主导航">
+              {TAB_CONFIG.map(tab => (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col h-dvh md:h-auto relative overflow-hidden">
           <div
-            className="flex-1 flex flex-col overflow-hidden relative md:pt-0 md:pb-0"
+            className="flex-1 flex flex-col overflow-hidden relative"
             style={{
-              paddingTop: 'calc(48px + env(safe-area-inset-top))',
-              paddingBottom: 'calc(64px + env(safe-area-inset-bottom))',
+              paddingTop: isSharedView ? 0 : 'calc(48px + env(safe-area-inset-top))',
+              paddingBottom: isSharedView ? 0 : 'calc(64px + env(safe-area-inset-bottom))',
             }}
           >
-            {activeTab === 'card' && <CardPage />}
-            {activeTab === 'threads' && <ThreadsPage />}
-            {activeTab === 'more' && <MorePage />}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="flex-1 flex flex-col overflow-hidden"
+              >
+                {activeTab === 'card' && <CardPage />}
+                {activeTab === 'threads' && <ThreadsPage />}
+                {activeTab === 'more' && <MorePage />}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Mobile Bottom Tab Bar */}
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-            <div className="h-6 bg-gradient-to-t from-background/80 to-transparent" />
-            <nav
-              role="tablist"
-              aria-label="主导航"
-              className="bg-background/90 backdrop-blur-2xl px-2 pt-2 pointer-events-auto border-t border-border/50 shadow-[0_-8px_30px_rgba(0,0,0,0.04)]"
-              style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
-            >
-              <div className="flex items-stretch justify-between max-w-md mx-auto">
-                {TAB_CONFIG.map(tab => (
-                  <div key={tab.id} className="flex-1 flex justify-center">
-                    <TabBtn
-                      icon={tab.icon}
-                      label={tab.label}
-                      active={activeTab === tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </nav>
-          </div>
+          {!isSharedView && (
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+              <div className="h-6 bg-gradient-to-t from-background/80 to-transparent" />
+              <nav
+                role="tablist"
+                aria-label="主导航"
+                className="bg-background/90 backdrop-blur-2xl px-2 pt-2 pointer-events-auto border-t border-border/50 shadow-[0_-8px_30px_rgba(0,0,0,0.04)]"
+                style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
+              >
+                <div className="flex items-stretch justify-between max-w-md mx-auto">
+                  {TAB_CONFIG.map(tab => (
+                    <div key={tab.id} className="flex-1 flex justify-center">
+                      <TabBtn
+                        icon={tab.icon}
+                        label={tab.label}
+                        active={activeTab === tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </nav>
+            </div>
+          )}
         </main>
       </div>
     </>

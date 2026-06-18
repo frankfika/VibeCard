@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ThumbsUp, Share2, Plus, X, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
+import { useState, useRef, type ChangeEvent } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ThumbsUp, Share2, Plus, X, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react';
 import { useProfile } from '../store';
 import { emit as chainEmit } from '../lib/chain/chain';
 import ProofPill from '../components/chain/ProofPill';
@@ -57,6 +57,7 @@ export default function ThreadsPage() {
   const [activeTag, setActiveTag] = useState('All');
   const [threads, setThreads] = useState(MOCK_THREADS);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const isSharedView = new URLSearchParams(window.location.search).has('c');
 
   const filteredThreads = activeTag === 'All' 
@@ -74,6 +75,15 @@ export default function ThreadsPage() {
       }
       return t;
     }));
+  };
+
+  const handleShare = async (thread: Thread) => {
+    const url = `${window.location.origin}?t=${thread.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // fallback: do nothing
+    }
   };
 
   return (
@@ -99,85 +109,104 @@ export default function ThreadsPage() {
 
       {/* Threads Feed */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {filteredThreads.map((thread, i) => (
+        {filteredThreads.length === 0 ? (
           <motion.div
-            key={thread.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="bg-card/40 backdrop-blur-xl border border-border rounded-3xl p-5 shadow-sm"
+            className="flex flex-col items-center justify-center py-20 text-center"
           >
-            {/* Author Info */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <img src={thread.author.avatar} alt={thread.author.name} className="w-10 h-10 rounded-full bg-secondary" />
-                <div>
-                  <h3 className="text-[15px] font-bold text-foreground leading-tight">{thread.author.name}</h3>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[12px] text-muted-foreground">{thread.author.handle}</span>
-                    <span className="text-[12px] text-muted-foreground">·</span>
-                    <span className="text-[12px] text-muted-foreground">{thread.timestamp}</span>
+            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+              <MessageCircle className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-[16px] font-bold text-foreground mb-1">暂无动态</h3>
+            <p className="text-[13px] text-muted-foreground max-w-[200px]">
+              {activeTag === 'All' ? '成为第一个发布动态的人吧！' : `该标签下还没有内容，换个标签试试`}
+            </p>
+          </motion.div>
+        ) : (
+          filteredThreads.map((thread, i) => (
+            <motion.div
+              key={thread.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-card/40 backdrop-blur-xl border border-border rounded-3xl p-5 shadow-sm"
+            >
+              {/* Author Info */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <img src={thread.author.avatar} alt={thread.author.name} className="w-10 h-10 rounded-full bg-secondary" />
+                  <div>
+                    <h3 className="text-[15px] font-bold text-foreground leading-tight">{thread.author.name}</h3>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[12px] text-muted-foreground">{thread.author.handle}</span>
+                      <span className="text-[12px] text-muted-foreground">·</span>
+                      <span className="text-[12px] text-muted-foreground">{thread.timestamp}</span>
+                    </div>
                   </div>
                 </div>
+                <button className="text-muted-foreground hover:text-foreground p-2 -mr-2">
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
               </div>
-              <button className="text-muted-foreground hover:text-foreground p-2 -mr-2">
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* Content */}
-            <p className="text-[15px] text-foreground leading-relaxed mb-4">
-              {thread.content}
-            </p>
+              {/* Content */}
+              <p className="text-[15px] text-foreground leading-relaxed mb-4">
+                {thread.content}
+              </p>
 
-            {/* Optional Images */}
-            {thread.images && thread.images.length > 0 && (
-              <div className={`grid gap-2 mb-4 ${
-                thread.images.length === 1 ? 'grid-cols-1' : 
-                thread.images.length === 2 ? 'grid-cols-2' : 
-                'grid-cols-3'
-              }`}>
-                {thread.images.map((img, idx) => (
-                  <div key={idx} className={`w-full rounded-2xl overflow-hidden bg-secondary ${
-                    thread.images!.length === 1 ? 'aspect-video' : 'aspect-square'
-                  }`}>
-                    <img src={img} alt={`Thread media ${idx}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2 mb-4 items-center">
-              {thread.tags.map(tag => (
-                <span key={tag} className="text-[12px] font-semibold text-muted-foreground bg-secondary px-2 py-1 rounded-md">
-                  #{tag}
-                </span>
-              ))}
-              {thread.proofId && (
-                <ProofPill hash={thread.proofId} variant="subtle" label="" />
+              {/* Optional Images */}
+              {thread.images && thread.images.length > 0 && (
+                <div className={`grid gap-2 mb-4 ${
+                  thread.images.length === 1 ? 'grid-cols-1' : 
+                  thread.images.length === 2 ? 'grid-cols-2' : 
+                  'grid-cols-3'
+                }`}>
+                  {thread.images.map((img, idx) => (
+                    <div key={idx} className={`w-full rounded-2xl overflow-hidden bg-secondary ${
+                      thread.images!.length === 1 ? 'aspect-video' : 'aspect-square'
+                    }`}>
+                      <img src={img} alt={`Thread media ${idx}`} className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(img)} />
+                    </div>
+                  ))}
+                </div>
               )}
-            </div>
 
-            {/* Interactions - No Comments */}
-            {!isSharedView && (
-              <div className="flex items-center gap-6 border-t border-border pt-3">
-                <button 
-                  onClick={() => handleLike(thread.id)}
-                  className={`flex items-center gap-1.5 transition-colors ${thread.isLiked ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  <ThumbsUp className={`w-5 h-5 ${thread.isLiked ? 'fill-current' : ''}`} />
-                  <span className="text-[13px] font-medium">{thread.likes > 0 ? thread.likes : 'Like'}</span>
-                </button>
-                
-                <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                  <Share2 className="w-5 h-5" />
-                  <span className="text-[13px] font-medium">Share</span>
-                </button>
+              {/* Tags */}
+              <div className="flex flex-wrap gap-2 mb-4 items-center">
+                {thread.tags.map(tag => (
+                  <span key={tag} className="text-[12px] font-semibold text-muted-foreground bg-secondary px-2 py-1 rounded-md">
+                    #{tag}
+                  </span>
+                ))}
+                {thread.proofId && (
+                  <ProofPill hash={thread.proofId} variant="subtle" label="" />
+                )}
               </div>
-            )}
-          </motion.div>
-        ))}
+
+              {/* Interactions - No Comments */}
+              {!isSharedView && (
+                <div className="flex items-center gap-6 border-t border-border pt-3">
+                  <button 
+                    onClick={() => handleLike(thread.id)}
+                    className={`flex items-center gap-1.5 transition-colors ${thread.isLiked ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    <ThumbsUp className={`w-5 h-5 ${thread.isLiked ? 'fill-current' : ''}`} />
+                    <span className="text-[13px] font-medium">{thread.likes > 0 ? thread.likes : 'Like'}</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleShare(thread)}
+                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Share2 className="w-5 h-5" />
+                    <span className="text-[13px] font-medium">Share</span>
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ))
+        )}
         
         {/* Bottom padding for tab bar */}
         <div className="h-20" />
@@ -209,6 +238,11 @@ export default function ThreadsPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Image Preview Lightbox */}
+      {previewImage && (
+        <ImagePreview src={previewImage} onClose={() => setPreviewImage(null)} />
+      )}
     </div>
   );
 }
@@ -248,17 +282,23 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
     });
   };
 
-  // Mock image upload for demo
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleImageUpload = () => {
     if (imagePreviews.length >= 3) return;
-    
-    const mockImages = [
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2000&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=2000&auto=format&fit=crop'
-    ];
-    
-    setImagePreviews([...imagePreviews, mockImages[imagePreviews.length % 3]]);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (result) setImagePreviews([...imagePreviews, result]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const removeImage = (indexToRemove: number) => {
@@ -326,7 +366,14 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
 
         <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button 
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <button
               onClick={handleImageUpload}
               disabled={imagePreviews.length >= 3}
               className="p-2 rounded-full hover:bg-secondary text-foreground transition-colors disabled:opacity-30"
@@ -350,5 +397,16 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
         </div>
       </motion.div>
     </>
+  );
+}
+
+function ImagePreview({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <button onClick={onClose} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white">
+        <X className="w-6 h-6" />
+      </button>
+      <img src={src} alt="Preview" className="max-w-full max-h-full object-contain" onClick={e => e.stopPropagation()} />
+    </div>
   );
 }

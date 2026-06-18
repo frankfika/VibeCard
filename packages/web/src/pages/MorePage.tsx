@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Compass, Gamepad2, Settings, ChevronRight, Sparkles, Box } from 'lucide-react';
+import {
+  Compass, Gamepad2, ChevronRight, Sparkles, Box, Sun, Moon,
+} from 'lucide-react';
 import DiscoverPage from './DiscoverPage';
 import GamesPage from './GamesPage';
 import WalletConnect from '../components/WalletConnect';
 import ChainIdentityCard from '../components/chain/ChainIdentityCard';
 import { useProfile } from '../store';
+import { useTheme } from '../components/ThemeProvider';
 
 export default function MorePage() {
   const [activeView, setActiveView] = useState<'index' | 'discover' | 'games'>('index');
   const { profile } = useProfile();
+  const { theme, resolved, toggle } = useTheme();
   const profileComplete = !!(
     profile.name && profile.bio && profile.tags?.length >= 3 &&
     (profile.verified?.wallet || profile.verified?.twitter || profile.verified?.discord)
@@ -132,15 +136,22 @@ export default function MorePage() {
               </div>
             </motion.button>
 
-            <div className="text-left p-5 rounded-[20px] bg-card border border-border/50 shadow-sm flex flex-col gap-3 opacity-70">
-              <div className="w-10 h-10 rounded-[12px] bg-secondary flex items-center justify-center">
-                <Settings className="w-5 h-5 text-muted-foreground" />
+            <button
+              onClick={toggle}
+              className="text-left p-5 rounded-[20px] bg-card border border-border/50 shadow-sm flex flex-col gap-3 group hover:bg-secondary/40 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-[12px] bg-secondary flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors">
+                {resolved === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
               </div>
               <div>
-                <h4 className="text-[15px] font-bold text-foreground leading-tight">设置</h4>
-                <p className="text-[11px] font-medium text-muted-foreground mt-1">应用偏好与账户管理，敬请期待</p>
+                <h4 className="text-[15px] font-bold text-foreground leading-tight">
+                  {theme === 'system' ? '跟随系统' : theme === 'dark' ? '深色模式' : '浅色模式'}
+                </h4>
+                <p className="text-[11px] font-medium text-muted-foreground mt-1">
+                  点击切换主题：系统 / 浅色 / 深色
+                </p>
               </div>
-            </div>
+            </button>
           </div>
         </section>
       </main>
