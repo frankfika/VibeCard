@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAccount, useWriteContract, useReadContract } from 'wagmi';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from './lib/web3/config';
+import { useAccount, useWriteContract } from 'wagmi';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, chainNames } from './lib/web3/config';
 import { uploadToIPFS, fetchFromIPFS, computeContentHash, type ChainContent } from './lib/web3/ipfs';
 import { emit as chainEmit } from './lib/chain/chain';
+import { useToast } from './components/ui/ToastProvider';
 
 export interface Profile {
   name: string;
@@ -100,6 +101,7 @@ export function useProfile() {
 
   const { address, chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const toast = useToast();
 
   useEffect(() => {
     localStorage.setItem('vibecard_profile', JSON.stringify(profile));
@@ -127,10 +129,17 @@ export function useProfile() {
   }, []);
 
   const syncToChain = useCallback(async (): Promise<boolean> => {
-    if (!address || !chainId) return false;
+    if (!address || !chainId) {
+      toast.show({ title: '未连接钱包', message: '请先连接钱包后再同步到链上。', type: 'error' });
+      return false;
+    }
     const contractAddr = CONTRACT_ADDRESS[chainId];
-    if (!contractAddr || contractAddr === '0x0000000000000000000000000000000000000000') {
-      console.warn('Contract not deployed on chain', chainId);
+    if (!isChainConfigured(chainId, contractAddr)) {
+      toast.show({
+        title: '网络未部署',
+        message: `${chainNames[chainId] ?? '当前网络'} 尚未部署合约，请切换到已部署的测试网。`,
+        type: 'error',
+      });
       return false;
     }
 
@@ -149,12 +158,19 @@ export function useProfile() {
         computeContentHash(contentJson),
       ]);
 
-      const txHash = await writeContractAsync({
-        address: contractAddr,
-        abi: CONTRACT_ABI as any,
-        functionName: 'publish',
-        args: ['profile', ipfsHash, contentHash],
-      } as any);
+      const txHash = await toast.promise(
+        writeContractAsync({
+          address: contractAddr,
+          abi: CONTRACT_ABI as any,
+          functionName: 'publish',
+          args: ['profile', ipfsHash, contentHash],
+        } as any),
+        {
+          loading: '正在将名片数据上传到 IPFS 并提交链上交易...',
+          success: '名片已成功同步到链上！',
+          error: (err) => `同步失败：${(err as Error)?.message ?? '未知错误'}`,
+        }
+      );
 
       setSyncStatus({
         isSynced: true,
@@ -169,17 +185,33 @@ export function useProfile() {
       console.error('Failed to sync profile to chain:', error);
       return false;
     }
-  }, [address, chainId, profile, writeContractAsync]);
+  }, [address, chainId, profile, writeContractAsync, toast]);
 
   const loadFromChain = useCallback(async (): Promise<boolean> => {
-    if (!address || !chainId) return false;
+    if (!address || !chainId) {
+      toast.show({ title: '未连接钱包', message: '请先连接钱包以读取链上名片。', type: 'error' });
+      return false;
+    }
     const contractAddr = CONTRACT_ADDRESS[chainId];
-    if (!contractAddr || contractAddr === '0x0000000000000000000000000000000000000000') {
+    if (!isChainConfigured(chainId, contractAddr)) {
+      toast.show({
+        title: '网络未部署',
+        message: `${chainNames[chainId] ?? '当前网络'} 尚未部署合约。`,
+        type: 'error',
+      });
       return false;
     }
 
+    const rpcUrl = getRpcUrl(chainId);
+    if (!rpcUrl) {
+      toast.show({ title: 'RPC 不可用', message: '当前网络没有可用的 RPC 节点。', type: 'error' });
+      return false;
+    }
+
+    const toastId = toast.show({ message: '正在从链上读取名片...', type: 'loading', duration: 0 });
+
     try {
-      const response = await fetch(`${getRpcUrl(chainId)}`, {
+      const response = await fetch(rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,7 +228,15 @@ export function useProfile() {
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`RPC HTTP error: ${response.status}`);
+      }
+
       const result = await response.json();
+      if (result.error) {
+        throw new Error(`RPC error: ${result.error.message || JSON.stringify(result.error)}`);
+      }
+
       if (result.result && result.result !== '0x') {
         const ipfsHash = decodeStringResult(result.result);
         if (ipfsHash) {
@@ -210,16 +250,26 @@ export function useProfile() {
               txHash: null,
               chainId,
             });
+            toast.update(toastId, { message: '链上名片已恢复', type: 'success', duration: 3000 });
+            setTimeout(() => toast.dismiss(toastId), 3000);
             return true;
           }
         }
       }
+      toast.update(toastId, { message: '链上暂无名片数据', type: 'info', duration: 3000 });
+      setTimeout(() => toast.dismiss(toastId), 3000);
       return false;
     } catch (error) {
       console.error('Failed to load profile from chain:', error);
+      toast.update(toastId, {
+        message: `读取失败：${(error as Error)?.message ?? '未知错误'}`,
+        type: 'error',
+        duration: 5000,
+      });
+      setTimeout(() => toast.dismiss(toastId), 5000);
       return false;
     }
-  }, [address, chainId]);
+  }, [address, chainId, toast]);
 
   return { profile, updateProfile, isSetup, syncStatus, syncToChain, loadFromChain };
 }
@@ -268,6 +318,7 @@ export function useActivities() {
 
   const { address, chainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const toast = useToast();
 
   useEffect(() => {
     localStorage.setItem('vibecard_activities', JSON.stringify(activities));
@@ -309,9 +360,17 @@ export function useActivities() {
   }, []);
 
   const syncToChain = useCallback(async (): Promise<boolean> => {
-    if (!address || !chainId) return false;
+    if (!address || !chainId) {
+      toast.show({ title: '未连接钱包', message: '请先连接钱包后再同步到链上。', type: 'error' });
+      return false;
+    }
     const contractAddr = CONTRACT_ADDRESS[chainId];
-    if (!contractAddr || contractAddr === '0x0000000000000000000000000000000000000000') {
+    if (!isChainConfigured(chainId, contractAddr)) {
+      toast.show({
+        title: '网络未部署',
+        message: `${chainNames[chainId] ?? '当前网络'} 尚未部署合约，请切换到已部署的测试网。`,
+        type: 'error',
+      });
       return false;
     }
 
@@ -330,12 +389,19 @@ export function useActivities() {
         computeContentHash(contentJson),
       ]);
 
-      const txHash = await writeContractAsync({
-        address: contractAddr,
-        abi: CONTRACT_ABI as any,
-        functionName: 'publish',
-        args: ['activity', ipfsHash, contentHash],
-      } as any);
+      const txHash = await toast.promise(
+        writeContractAsync({
+          address: contractAddr,
+          abi: CONTRACT_ABI as any,
+          functionName: 'publish',
+          args: ['activity', ipfsHash, contentHash],
+        } as any),
+        {
+          loading: '正在将活动数据上传到 IPFS 并提交链上交易...',
+          success: '活动列表已成功同步到链上！',
+          error: (err) => `同步失败：${(err as Error)?.message ?? '未知错误'}`,
+        }
+      );
 
       setSyncStatus({
         isSynced: true,
@@ -350,19 +416,35 @@ export function useActivities() {
       console.error('Failed to sync activities to chain:', error);
       return false;
     }
-  }, [address, chainId, activities, writeContractAsync]);
+  }, [address, chainId, activities, writeContractAsync, toast]);
 
   return { activities, addActivity, joinActivity, leaveActivity, syncStatus, syncToChain };
 }
 
 function getRpcUrl(chainId: number): string {
+  const alchemyKey = import.meta.env?.VITE_ALCHEMY_KEY as string | undefined;
   const urls: Record<number, string> = {
-    11155111: 'https://rpc.sepolia.org',
-    84532: 'https://sepolia.base.org',
-    421614: 'https://sepolia-rollup.arbitrum.io/rpc',
-    80002: 'https://rpc-amoy.polygon.technology',
+    11155111: alchemyKey
+      ? `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://rpc.sepolia.org',
+    84532: alchemyKey
+      ? `https://base-sepolia.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://sepolia.base.org',
+    421614: alchemyKey
+      ? `https://arb-sepolia.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://sepolia-rollup.arbitrum.io/rpc',
+    80002: alchemyKey
+      ? `https://polygon-amoy.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://rpc-amoy.polygon.technology',
+    31337: 'http://127.0.0.1:8545',
   };
   return urls[chainId] || '';
+}
+
+function isChainConfigured(chainId: number, contractAddr?: string): boolean {
+  if (!contractAddr) return false;
+  if (contractAddr === '0x0000000000000000000000000000000000000000') return false;
+  return !!getRpcUrl(chainId);
 }
 
 function encodeGetLatestProfile(address: string): string {
@@ -374,10 +456,12 @@ function encodeGetLatestProfile(address: string): string {
 function decodeStringResult(hex: string): string | null {
   try {
     if (hex === '0x' || hex.length < 130) return null;
-    const offset = parseInt(hex.slice(2, 66), 16) * 2;
-    const length = parseInt(hex.slice(66, 130), 16) * 2;
-    if (offset + 64 + length > hex.length * 2) return null;
-    const strHex = hex.slice(130 + offset, 130 + offset + length);
+    const offsetBytes = parseInt(hex.slice(2, 66), 16);
+    const lengthBytes = parseInt(hex.slice(66, 130), 16);
+    const dataStartHex = 2 + (offsetBytes + 32) * 2;
+    const dataLengthHex = lengthBytes * 2;
+    if (dataStartHex + dataLengthHex > hex.length) return null;
+    const strHex = hex.slice(dataStartHex, dataStartHex + dataLengthHex);
     if (!strHex) return null;
     const bytes = [];
     for (let i = 0; i < strHex.length; i += 2) {

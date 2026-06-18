@@ -1,14 +1,17 @@
 import { PinataSDK } from 'pinata-web3';
 
-const PINATA_JWT = (import.meta as any).env?.VITE_PINATA_JWT || '';
-const PINATA_GATEWAY = (import.meta as any).env?.VITE_PINATA_GATEWAY || 'gateway.pinata.cloud';
+const PINATA_JWT = import.meta.env?.VITE_PINATA_JWT || '';
+const PINATA_GATEWAY = import.meta.env?.VITE_PINATA_GATEWAY || 'gateway.pinata.cloud';
+const MOCK_IPFS = import.meta.env?.VITE_MOCK_IPFS === 'true';
+
+const MOCK_STORAGE_KEY = 'vibecard_mock_ipfs';
 
 let pinataClient: PinataSDK | null = null;
 
 function getPinataClient(): PinataSDK {
   if (!pinataClient) {
-    if (!PINATA_JWT) {
-      throw new Error('Pinata JWT not configured. Set VITE_PINATA_JWT in .env');
+    if (!PINATA_JWT || PINATA_JWT === 'your_pinata_jwt_here') {
+      throw new Error('Pinata JWT 未配置。请在 .env 中设置 VITE_PINATA_JWT，或设置 VITE_MOCK_IPFS=true 使用本地 Mock 模式。');
     }
     pinataClient = new PinataSDK({
       pinataJwt: PINATA_JWT,
@@ -16,6 +19,24 @@ function getPinataClient(): PinataSDK {
     });
   }
   return pinataClient;
+}
+
+function getMockStorage(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(MOCK_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function setMockStorage(store: Record<string, string>) {
+  localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(store));
+}
+
+async function mockCid(content: ChainContent): Promise<string> {
+  const json = JSON.stringify(content);
+  const hash = await computeContentHash(json);
+  return `mock-${hash.slice(2, 24)}`;
 }
 
 export interface ChainContent {
@@ -27,46 +48,70 @@ export interface ChainContent {
 }
 
 export async function uploadToIPFS(content: ChainContent): Promise<string> {
-  try {
-    const client = getPinataClient();
-    const blob = new Blob([JSON.stringify(content)], { type: 'application/json' });
-    const file = new File([blob], `vibecard-${content.type}-${content.timestamp}.json`, {
-      type: 'application/json',
-    });
-    const result = await client.upload.file(file);
-    return result.IpfsHash;
-  } catch (error) {
-    console.warn('Pinata upload failed, using mock IPFS hash for development:', error);
-    return `QmMock${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  if (MOCK_IPFS) {
+    const cid = await mockCid(content);
+    const store = getMockStorage();
+    store[cid] = JSON.stringify(content);
+    setMockStorage(store);
+    return cid;
   }
+
+  const client = getPinataClient();
+  const blob = new Blob([JSON.stringify(content)], { type: 'application/json' });
+  const file = new File([blob], `vibecard-${content.type}-${content.timestamp}.json`, {
+    type: 'application/json',
+  });
+  const result = await client.upload.file(file);
+  if (!result.IpfsHash) {
+    throw new Error('Pinata 上传未返回 IPFS 哈希');
+  }
+  return result.IpfsHash;
 }
 
 export async function fetchFromIPFS(ipfsHash: string): Promise<ChainContent | null> {
-  try {
-    const gateways = [
-      `https://${PINATA_GATEWAY}/ipfs/${ipfsHash}`,
-      `https://ipfs.io/ipfs/${ipfsHash}`,
-      `https://gateway.ipfs.io/ipfs/${ipfsHash}`,
-    ];
-
-    for (const url of gateways) {
+  if (MOCK_IPFS || ipfsHash.startsWith('mock-')) {
+    const store = getMockStorage();
+    const raw = store[ipfsHash];
+    if (raw) {
       try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (response.ok) {
-          const data = await response.json();
-          return data as ChainContent;
-        }
+        return JSON.parse(raw) as ChainContent;
       } catch {
-        continue;
+        return null;
       }
     }
-    return null;
-  } catch {
-    return null;
+    if (ipfsHash.startsWith('mock-')) {
+      return null;
+    }
   }
+
+  const gateways = [
+    `https://${PINATA_GATEWAY}/ipfs/${ipfsHash}`,
+    `https://ipfs.io/ipfs/${ipfsHash}`,
+    `https://gateway.ipfs.io/ipfs/${ipfsHash}`,
+  ];
+
+  for (const url of gateways) {
+    try {
+      const signal =
+        typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(8000)
+          : undefined;
+      const response = await fetch(url, { signal });
+      if (response.ok) {
+        const data = await response.json();
+        return data as ChainContent;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 export function getIPFSUrl(ipfsHash: string): string {
+  if (ipfsHash.startsWith('mock-')) {
+    return '#';
+  }
   return `https://${PINATA_GATEWAY}/ipfs/${ipfsHash}`;
 }
 

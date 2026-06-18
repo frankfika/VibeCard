@@ -4,9 +4,11 @@ import {
   baseSepolia,
   arbitrumSepolia,
   polygonAmoy,
+  hardhat,
 } from 'wagmi/chains';
 
 export const supportedChains = [
+  hardhat,
   sepolia,
   baseSepolia,
   arbitrumSepolia,
@@ -29,19 +31,35 @@ export const chainLogos: Record<number, string> = {
   31337: 'https://cryptologos.cc/logos/ethereum-eth-logo.svg',
 };
 
+export const walletConnectProjectId = (() => {
+  const envId = import.meta.env?.VITE_WALLETCONNECT_PROJECT_ID as string | undefined;
+  const id = envId?.trim();
+  if (!id || id === 'your_walletconnect_project_id_here' || id === 'vibecard_default_project_id') {
+    console.warn(
+      '[vibecard] VITE_WALLETCONNECT_PROJECT_ID is missing or invalid. ' +
+        'WalletConnect (including email/social login) will not work reliably. ' +
+        'Get a free Project ID at https://cloud.walletconnect.com/'
+    );
+    return '';
+  }
+  return id;
+})();
+
+export const isWalletConnectReady = !!walletConnectProjectId;
+
 export const wagmiConfig = getDefaultConfig({
   appName: 'vibecard',
-  projectId: 'vibecard_default_project_id',
-  chains: supportedChains as unknown as [typeof sepolia, typeof baseSepolia, typeof arbitrumSepolia, typeof polygonAmoy],
+  projectId: walletConnectProjectId || 'vibecard_default_project_id',
+  chains: supportedChains as unknown as [typeof hardhat, typeof sepolia, typeof baseSepolia, typeof arbitrumSepolia, typeof polygonAmoy],
   ssr: false,
 });
 
 export const CONTRACT_ADDRESS: Record<number, `0x${string}`> = {
+  [hardhat.id]: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
   [sepolia.id]: '0x0000000000000000000000000000000000000000',
   [baseSepolia.id]: '0x0000000000000000000000000000000000000000',
   [arbitrumSepolia.id]: '0x0000000000000000000000000000000000000000',
   [polygonAmoy.id]: '0x0000000000000000000000000000000000000000',
-  31337: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
 };
 
 export const CONTRACT_ABI = [

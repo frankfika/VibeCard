@@ -7,6 +7,8 @@ import '@rainbow-me/rainbowkit/styles.css';
 import App from './App.tsx';
 import './index.css';
 import { wagmiConfig } from './lib/web3/config.ts';
+import { ToastProvider } from './components/ui/ToastProvider.tsx';
+import { ThemeProvider } from './components/ThemeProvider.tsx';
 
 const queryClient = new QueryClient();
 
@@ -15,7 +17,11 @@ createRoot(document.getElementById('root')!).render(
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <App />
+          <ThemeProvider>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </ThemeProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

@@ -5,14 +5,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAccount } from 'wagmi';
 import {
   Shield, ChevronRight, Copy, Check, Sparkles, Layers, Activity, Flame,
-  Lock, Trophy,
+  Lock, Trophy, Wallet,
 } from 'lucide-react';
 import { useChain } from '../../lib/chain/useChain';
 import { BADGES, BADGE_BY_ID, rarityColor, rarityRing, type BadgeDef } from '../../lib/chain/badges';
 import { tierGradient } from '../../lib/chain/reputation';
 import { shortHash } from '../../lib/chain/chain';
+import { useENSIdentity } from '../../lib/web3/identity';
 import ChainExplorer from './ChainExplorer';
 
 interface Props {
@@ -22,7 +24,10 @@ interface Props {
 
 export default function ChainIdentityCard({ profileComplete }: Props) {
   const { state, reputation, evaluate, ready } = useChain();
+  const { address: walletAddress, isConnected } = useAccount();
+  const walletIdentity = useENSIdentity(walletAddress);
   const [copied, setCopied] = useState(false);
+  const [copiedWallet, setCopiedWallet] = useState(false);
   const [openBadge, setOpenBadge] = useState<BadgeDef | null>(null);
   const [openExplorer, setOpenExplorer] = useState(false);
   const [newBadges, setNewBadges] = useState<string[]>([]);
@@ -62,6 +67,13 @@ export default function ChainIdentityCard({ profileComplete }: Props) {
     setTimeout(() => setCopied(false), 1400);
   };
 
+  const copyWallet = () => {
+    if (!walletAddress) return;
+    navigator.clipboard.writeText(walletAddress);
+    setCopiedWallet(true);
+    setTimeout(() => setCopiedWallet(false), 1400);
+  };
+
   return (
     <>
       <motion.div
@@ -87,13 +99,32 @@ export default function ChainIdentityCard({ profileComplete }: Props) {
           {/* Address */}
           <button
             onClick={copyAddress}
-            className="group flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-all w-fit max-w-full"
+            className="group flex items-center gap-2 mb-3 px-3 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-all w-fit max-w-full"
           >
             <code className="font-mono text-[12px] font-semibold text-foreground truncate">
               {shortHash(state.address, 8, 6)}
             </code>
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
           </button>
+
+          {/* Linked Wallet */}
+          {isConnected && walletAddress ? (
+            <button
+              onClick={copyWallet}
+              className="group flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-all w-fit max-w-full"
+            >
+              <Wallet className="w-3.5 h-3.5 text-muted-foreground" />
+              <code className="font-mono text-[12px] font-semibold text-foreground truncate">
+                {walletIdentity.ensName ?? shortHash(walletAddress, 8, 6)}
+              </code>
+              {walletIdentity.ensName && (
+                <span className="text-[10px] font-bold text-muted-foreground hidden sm:inline">
+                  {shortHash(walletAddress, 4, 4)}
+                </span>
+              )}
+              {copiedWallet ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
+            </button>
+          ) : null}
 
           {/* Reputation Bar */}
           <div className="mb-5">
