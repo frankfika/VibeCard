@@ -9,7 +9,7 @@ import { fetchLatestProfileHashFromChain } from '../lib/web3/chain';
 import { shortAddress } from '../lib/web3/identity';
 import type { Profile } from '../store';
 
-const SUPPORTED_EMBED_CHAIN_IDS = [11155111, 84532, 421614, 80002, 31337];
+const SUPPORTED_EMBED_CHAIN_IDS = [1, 8453, 42161, 137, 11155111, 84532, 421614, 80002, 31337];
 
 function updateMeta(profile: Profile, address: string | null, cid: string | null) {
   const title = profile.name ? `${profile.name} · vibecard` : 'vibecard · 去中心化社交名片';
@@ -164,7 +164,7 @@ function EmbedProfileCard({
         <div className="relative h-32 bg-gradient-to-br from-foreground to-foreground/80">
           <div className="absolute -bottom-12 left-1/2 -translate-x-1/2">
             <div className="w-24 h-24 rounded-[28px] border-4 border-background bg-secondary overflow-hidden shadow-lg">
-              <img src={avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+              <img src={avatarUrl} loading="lazy" decoding="async" alt={profile.name} className="w-full h-full object-cover" />
             </div>
           </div>
         </div>

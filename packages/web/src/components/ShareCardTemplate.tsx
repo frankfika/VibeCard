@@ -1,84 +1,454 @@
 import { forwardRef } from 'react';
-import { MapPin, Zap, Check } from 'lucide-react';
+import {
+  Check, Hexagon, Zap, MapPin, Twitter, MessageCircle, Wallet, Github,
+} from 'lucide-react';
 import { type Profile } from '../store';
 
-export const ShareCardTemplate = forwardRef<HTMLDivElement, { profile: Profile }>(({ profile }, ref) => {
+export type CardTheme = 'dark' | 'light' | 'neon' | 'retro' | 'chill';
+export type CardLayout = 'center' | 'left';
+export type CardOrientation = 'portrait' | 'landscape';
+
+export interface CardVisibleFields {
+  avatar: boolean;
+  name: boolean;
+  handle: boolean;
+  event: boolean;
+  tags: boolean;
+  bio: boolean;
+  lookingFor: boolean;
+  verified: boolean;
+  highlights: boolean;
+  qr: boolean;
+}
+
+export interface ShareCardProps {
+  profile: Profile;
+  qrDataUrl?: string;
+  theme?: CardTheme;
+  layout?: CardLayout;
+  orientation?: CardOrientation;
+  visible?: Partial<CardVisibleFields>;
+}
+
+const DEFAULT_VISIBLE: CardVisibleFields = {
+  avatar: true,
+  name: true,
+  handle: true,
+  event: true,
+  tags: true,
+  bio: true,
+  lookingFor: true,
+  verified: true,
+  highlights: true,
+  qr: true,
+};
+
+export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
+  profile,
+  qrDataUrl,
+  theme = 'dark',
+  layout = 'center',
+  orientation = 'portrait',
+  visible,
+}, ref) => {
+  const show = { ...DEFAULT_VISIBLE, ...visible };
   const avatarUrl = profile.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name}&backgroundColor=transparent`;
+  const tags = profile.tags?.slice(0, 8) ?? [];
+  const highlights = profile.highlights?.filter(h => h.title).slice(0, 4) ?? [];
+
+  const isPortrait = orientation === 'portrait';
+  const isCenter = layout === 'center' && isPortrait;
+
+  const cardWidth = isPortrait ? 800 : 1100;
+  const cardHeight = isPortrait ? 1100 : 800;
+
+  const tokens = {
+    dark: {
+      pageBg: '#09090b',
+      cardBg: '#18181b',
+      cardBorder: 'rgba(255,255,255,0.09)',
+      primary: '#fafafa',
+      secondary: '#a1a1aa',
+      muted: '#71717a',
+      tagBg: 'rgba(255,255,255,0.08)',
+      pillBg: 'rgba(255,255,255,0.05)',
+      avatarBg: '#1a1a1a',
+      qrBg: '#ffffff',
+    },
+    light: {
+      pageBg: '#f4f4f5',
+      cardBg: '#ffffff',
+      cardBorder: 'rgba(0,0,0,0.08)',
+      primary: '#18181b',
+      secondary: '#52525b',
+      muted: '#a1a1aa',
+      tagBg: '#f4f4f5',
+      pillBg: '#f4f4f5',
+      avatarBg: '#ffffff',
+      qrBg: '#ffffff',
+    },
+    neon: {
+      pageBg: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+      cardBg: 'rgba(255,255,255,0.07)',
+      cardBorder: 'rgba(255,255,255,0.12)',
+      primary: '#ffffff',
+      secondary: 'rgba(255,255,255,0.72)',
+      muted: 'rgba(255,255,255,0.52)',
+      tagBg: 'rgba(255,255,255,0.10)',
+      pillBg: 'rgba(255,255,255,0.08)',
+      avatarBg: '#1a1a1a',
+      qrBg: '#ffffff',
+    },
+    retro: {
+      pageBg: '#EAE0D5',
+      cardBg: '#F5F0E8',
+      cardBorder: 'rgba(62,54,46,0.14)',
+      primary: '#3E362E',
+      secondary: '#5C5346',
+      muted: '#8C7E6D',
+      tagBg: '#EAE0D5',
+      pillBg: '#EAE0D5',
+      avatarBg: '#ffffff',
+      qrBg: '#ffffff',
+    },
+    chill: {
+      pageBg: '#E1EFE6',
+      cardBg: '#F4FAF6',
+      cardBorder: 'rgba(45,71,57,0.14)',
+      primary: '#2D4739',
+      secondary: '#4A6B58',
+      muted: '#6B8E7D',
+      tagBg: '#E1EFE6',
+      pillBg: '#E1EFE6',
+      avatarBg: '#ffffff',
+      qrBg: '#ffffff',
+    },
+  }[theme];
+
+  const socialItems = [
+    { key: 'wallet', show: !!profile.verified?.wallet, icon: Wallet, label: 'Wallet', value: profile.verified?.wallet ? `${profile.verified.wallet.slice(0, 6)}...${profile.verified.wallet.slice(-4)}` : '' },
+    { key: 'twitter', show: !!profile.verified?.twitter, icon: Twitter, label: 'X', value: 'Verified' },
+    { key: 'discord', show: !!profile.verified?.discord, icon: MessageCircle, label: 'Discord', value: 'Verified' },
+  ].filter(s => s.show);
+
+  const fallbackSocial = (!profile.verified?.twitter && !profile.verified?.discord)
+    ? { icon: Github, label: 'Github', value: 'Connected' }
+    : null;
+
+  const visibleCount = [
+    show.avatar,
+    show.name && profile.name,
+    show.handle && profile.handle,
+    show.event && profile.event,
+    show.tags && tags.length > 0,
+    show.bio && profile.bio,
+    show.lookingFor && profile.lookingFor,
+    show.verified && (socialItems.length > 0 || !!fallbackSocial),
+    show.highlights && highlights.length > 0,
+    show.qr,
+  ].filter(Boolean).length;
+  const isSparse = visibleCount <= 5;
+
+  const renderSocials = () => {
+    if (!show.verified) return null;
+    return (
+      <div className={`flex flex-wrap ${isCenter ? 'justify-center' : 'justify-start'} gap-2.5`}>
+        {socialItems.map(s => (
+          <div
+            key={s.key}
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl border"
+            style={{ background: tokens.pillBg, borderColor: tokens.cardBorder }}
+          >
+            <s.icon className="w-4 h-4" style={{ color: tokens.secondary }} />
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: tokens.muted }}>{s.label}</span>
+              <span className="text-[12px] font-bold leading-tight" style={{ color: tokens.primary }}>{s.value}</span>
+            </div>
+            {s.key === 'wallet' && <Check className="w-3.5 h-3.5 text-emerald-500 ml-0.5" />}
+          </div>
+        ))}
+        {fallbackSocial && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl border"
+            style={{ background: tokens.pillBg, borderColor: tokens.cardBorder }}
+          >
+            <fallbackSocial.icon className="w-4 h-4" style={{ color: tokens.secondary }} />
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: tokens.muted }}>{fallbackSocial.label}</span>
+              <span className="text-[12px] font-bold leading-tight" style={{ color: tokens.primary }}>{fallbackSocial.value}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderTags = () => {
+    if (!show.tags) return null;
+    return tags.length > 0 ? (
+      <div className={`flex flex-wrap ${isCenter ? 'justify-center' : 'justify-start'} gap-2`}>
+        {tags.map(tag => (
+          <span
+            key={tag.label}
+            className="px-3 py-1.5 rounded-xl text-[13px] font-bold border"
+            style={{ background: tokens.tagBg, color: tokens.primary, borderColor: tokens.cardBorder }}
+          >
+            {tag.label}
+          </span>
+        ))}
+      </div>
+    ) : null;
+  };
+
+  const renderBio = () => {
+    if (!show.bio || !profile.bio) return null;
+    return (
+      <div
+        className={`rounded-2xl p-4 text-[16px] leading-relaxed font-medium italic ${isCenter ? 'text-center' : 'text-left'}`}
+        style={{ background: tokens.pillBg, color: tokens.secondary }}
+      >
+        "{profile.bio}"
+      </div>
+    );
+  };
+
+  const renderLookingFor = () => {
+    if (!show.lookingFor || !profile.lookingFor) return null;
+    return (
+      <div
+        className="rounded-2xl p-4 flex items-center gap-3 border"
+        style={{ background: tokens.pillBg, borderColor: tokens.cardBorder }}
+      >
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: tokens.tagBg }}
+        >
+          <Hexagon className="w-5 h-5" style={{ color: tokens.primary }} />
+        </div>
+        <div className="min-w-0 flex-1 text-left">
+          <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: tokens.muted }}>Looking for</div>
+          <div className="text-[16px] font-bold truncate" style={{ color: tokens.primary }}>{profile.lookingFor}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderHighlights = () => {
+    if (!show.highlights) return null;
+    return highlights.length > 0 ? (
+      <div className="space-y-2">
+        {highlights.map(item => (
+          <div
+            key={item.id}
+            className="flex items-center gap-3 rounded-2xl p-3 border"
+            style={{ background: tokens.pillBg, borderColor: tokens.cardBorder }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] shrink-0"
+              style={{ background: tokens.tagBg }}
+            >
+              {item.icon}
+            </div>
+            <div className="text-[14px] font-semibold truncate" style={{ color: tokens.primary }}>{item.title}</div>
+          </div>
+        ))}
+      </div>
+    ) : null;
+  };
+
+  const renderQR = (size = 88) => {
+    if (!show.qr) return null;
+    return (
+      <div
+        className="rounded-2xl p-1.5 shrink-0 shadow-xl"
+        style={{ background: tokens.qrBg, width: size, height: size }}
+      >
+        {qrDataUrl ? (
+          <img src={qrDataUrl} alt="QR" className="w-full h-full object-contain rounded-xl" />
+        ) : (
+          <div className="w-full h-full rounded-xl flex items-center justify-center text-center text-[10px] font-bold text-black/50">
+            QR<br/>Code
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div 
-      ref={ref} 
-      className="absolute top-[-9999px] left-[-9999px] w-[750px] h-[1000px] bg-[#0a0a0a] overflow-hidden flex flex-col justify-between"
+    <div
+      ref={ref}
+      className="relative overflow-hidden flex items-center justify-center font-sans"
       style={{
-        backgroundImage: 'radial-gradient(circle at 50% 0%, #1a1a1a 0%, #0a0a0a 70%)'
+        width: cardWidth,
+        height: cardHeight,
+        backgroundColor: theme === 'neon' ? undefined : tokens.pageBg,
+        backgroundImage: theme === 'neon' ? tokens.pageBg : undefined,
       }}
     >
-      <div className="p-16 flex flex-col items-center flex-1 text-center">
-        <div className="w-[180px] h-[180px] rounded-[48px] mb-8 relative shadow-2xl bg-[#1a1a1a]">
-          <img src={avatarUrl} className="w-full h-full rounded-[48px] object-cover border-4 border-white/10" alt="avatar" />
-          {profile.verified?.wallet && (
-            <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white rounded-full border-4 border-[#0a0a0a] flex items-center justify-center">
-              <Check className="w-6 h-6 text-black stroke-[3]" />
+      {theme === 'neon' && (
+        <>
+          <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-600/30 rounded-full mix-blend-screen filter blur-[100px] opacity-70 pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-blue-600/30 rounded-full mix-blend-screen filter blur-[120px] opacity-70 pointer-events-none" />
+        </>
+      )}
+
+      {isPortrait ? (
+        <div
+          className={`w-[calc(100%-64px)] h-[calc(100%-64px)] rounded-[40px] p-8 flex flex-col shadow-2xl ${isSparse ? 'justify-center' : 'justify-start'}`}
+          style={{ background: tokens.cardBg, border: `1px solid ${tokens.cardBorder}` }}
+        >
+          {isSparse ? (
+            <div className={`flex flex-col gap-6 overflow-hidden ${isCenter ? 'items-center text-center' : 'items-start text-left'}`}>
+              {show.avatar && (
+                <img
+                  src={avatarUrl}
+                  crossOrigin="anonymous"
+                  className="w-28 h-28 rounded-[28px] object-cover shadow-lg"
+                  style={{ background: tokens.avatarBg }}
+                  alt="avatar"
+                />
+              )}
+              {show.name && (
+                <h1 className="text-[44px] font-black leading-none" style={{ color: tokens.primary }}>
+                  {profile.name || 'Anonymous'}
+                </h1>
+              )}
+              {show.handle && profile.handle && (
+                <div className="text-[22px] font-medium" style={{ color: tokens.secondary }}>
+                  {profile.handle}
+                </div>
+              )}
+              {show.event && profile.event && (
+                <div
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold border"
+                  style={{ background: tokens.tagBg, color: tokens.secondary, borderColor: tokens.cardBorder }}
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  {profile.event}
+                </div>
+              )}
+              {renderTags()}
+              {renderBio()}
+              {renderLookingFor()}
+              {renderSocials()}
+              {renderHighlights()}
+              {show.qr && (
+                <div className="flex flex-col items-center gap-2 mt-2">
+                  {renderQR(96)}
+                  <div className="text-[15px] font-bold" style={{ color: tokens.secondary }}>扫码查看更多</div>
+                </div>
+              )}
             </div>
+          ) : (
+            <>
+              {/* Identity Header */}
+              <div className={`flex flex-col ${isCenter ? 'items-center text-center' : 'items-start text-left'} shrink-0 mb-5`}>
+                {show.avatar && (
+                  <img
+                    src={avatarUrl}
+                    crossOrigin="anonymous"
+                    className="w-28 h-28 rounded-[28px] object-cover mb-4 shadow-lg"
+                    style={{ background: tokens.avatarBg }}
+                    alt="avatar"
+                  />
+                )}
+                {show.name && (
+                  <h1 className="text-[44px] font-black leading-none mb-2" style={{ color: tokens.primary }}>
+                    {profile.name || 'Anonymous'}
+                  </h1>
+                )}
+                {show.handle && profile.handle && (
+                  <div className="text-[22px] font-medium mb-3" style={{ color: tokens.secondary }}>
+                    {profile.handle}
+                  </div>
+                )}
+                {show.event && profile.event && (
+                  <div
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold border"
+                    style={{ background: tokens.tagBg, color: tokens.secondary, borderColor: tokens.cardBorder }}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    {profile.event}
+                  </div>
+                )}
+              </div>
+
+              {/* Main Content */}
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-4">
+                {renderTags()}
+                {renderBio()}
+                {renderLookingFor()}
+                {renderSocials()}
+                {renderHighlights()}
+              </div>
+
+              {/* Footer */}
+              {show.qr && (
+                <div
+                  className="mt-5 pt-5 shrink-0 flex items-center justify-between border-t"
+                  style={{ borderColor: tokens.cardBorder }}
+                >
+                  <div>
+                    <div className="text-[22px] font-black" style={{ color: tokens.primary }}>Let's Connect</div>
+                    <div className="text-[13px] font-medium" style={{ color: tokens.secondary }}>扫码查看完整主页与动态</div>
+                  </div>
+                  {renderQR(88)}
+                </div>
+              )}
+            </>
           )}
         </div>
-        
-        <h1 className="text-[64px] font-black tracking-tight text-white mb-3 leading-none">{profile.name}</h1>
-        {profile.handle && <div className="text-[28px] font-bold text-white/60 mb-6">{profile.handle}</div>}
-        
-        {profile.event && (
-          <div className="px-6 py-3 rounded-full bg-white/10 flex items-center gap-2.5 text-[24px] font-bold text-white/80 mb-8 backdrop-blur-md">
-            <MapPin className="w-6 h-6" />
-            {profile.event}
+      ) : (
+        <div
+          className="w-[calc(100%-64px)] h-[calc(100%-64px)] rounded-[36px] p-8 flex flex-row gap-8 shadow-2xl"
+          style={{ background: tokens.cardBg, border: `1px solid ${tokens.cardBorder}` }}
+        >
+          {/* Left Column */}
+          <div
+            className="w-[320px] shrink-0 flex flex-col items-center text-center justify-center border-r pr-8"
+            style={{ borderColor: tokens.cardBorder }}
+          >
+            {show.avatar && (
+              <img
+                src={avatarUrl}
+                crossOrigin="anonymous"
+                className="w-36 h-36 rounded-[32px] object-cover mb-5 shadow-xl"
+                style={{ background: tokens.avatarBg }}
+                alt="avatar"
+              />
+            )}
+            {show.name && (
+              <h1 className="text-[40px] font-black leading-none mb-2" style={{ color: tokens.primary }}>
+                {profile.name || 'Anonymous'}
+              </h1>
+            )}
+            {show.handle && profile.handle && (
+              <div className="text-[20px] font-medium mb-4" style={{ color: tokens.secondary }}>
+                {profile.handle}
+              </div>
+            )}
+            {show.event && profile.event && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold border mb-4"
+                style={{ background: tokens.tagBg, color: tokens.secondary, borderColor: tokens.cardBorder }}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                {profile.event}
+              </div>
+            )}
+            {renderTags()}
+            {show.qr && <div className="mt-6">{renderQR(96)}</div>}
           </div>
-        )}
 
-        {profile.tags?.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-3 mb-10">
-            {profile.tags.slice(0, 5).map((tag: any) => (
-              <span key={tag.label} className="px-6 py-3 rounded-full text-[24px] font-bold bg-white/5 border border-white/10 text-white backdrop-blur-md">
-                {tag.label}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {profile.bio && (
-          <p className="text-[28px] leading-relaxed font-medium text-white/80 text-center line-clamp-3 px-8">
-            {profile.bio}
-          </p>
-        )}
-
-        {/* 动态预览 */}
-        <div className="w-full mt-10 bg-white/5 border border-white/10 rounded-[32px] p-8 text-left backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-white/20" />
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-              <span className="text-[20px]">✨</span>
-            </div>
-            <span className="text-[22px] font-bold text-white/60">最新动态</span>
-          </div>
-          <p className="text-[26px] font-medium text-white leading-relaxed line-clamp-2">
-            "刚刚更新了我的 Web3 社交名片，快来看看吧！"
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white/5 backdrop-blur-3xl border-t border-white/10 p-12 flex justify-between items-center">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center">
-            <Zap className="w-8 h-8 text-black" />
-          </div>
-          <div className="text-left">
-            <div className="text-[20px] font-bold text-white/50 uppercase tracking-widest mb-1">vibecard</div>
-            <div className="text-[28px] font-bold text-white">一张卡片，连接无限可能</div>
+          {/* Right Column */}
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-4 overflow-hidden">
+            {renderBio()}
+            {renderLookingFor()}
+            {renderSocials()}
+            {renderHighlights()}
           </div>
         </div>
-        
-        <div className="w-32 h-32 bg-white rounded-2xl p-2 flex items-center justify-center shadow-xl">
-           <div className="text-[20px] font-bold text-black text-center leading-tight">长按<br/>扫码</div>
-        </div>
-      </div>
+      )}
     </div>
   );
 });

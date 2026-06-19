@@ -86,7 +86,7 @@ export default function DiscoverPage() {
               return (
                 <motion.div key={activity.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} className={CARD_STYLE + ' p-4'}>
                   <div className="flex items-start gap-3">
-                    <img src={activity.avatar} alt="" className="w-10 h-10 rounded-full bg-primary border border-border shrink-0 " />
+                    <img src={activity.avatar} alt="" onError={(e) => { (e.target as HTMLImageElement).src = '/icon-192.png'; }} className="w-10 h-10 rounded-full bg-primary border border-border shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {cat && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: cat.color }}>{cat.icon} {cat.name}</span>}

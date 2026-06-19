@@ -2,10 +2,12 @@ import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Layers, Menu, ChevronLeft } from 'lucide-react';
 import CardPage from './pages/CardPage';
-import ThreadsPage from './pages/ThreadsPage';
-import MorePage from './pages/MorePage';
 import EmbedCardPage from './pages/EmbedCardPage';
+import PublicCardPage from './pages/PublicCardPage';
 import IMBrowserNotice from './components/IMBrowserNotice';
+
+const ThreadsPage = lazy(() => import('./pages/ThreadsPage'));
+const MorePage = lazy(() => import('./pages/MorePage'));
 
 const E2EChainSyncPage = import.meta.env.DEV
   ? lazy(() => import('./pages/E2EChainSyncPage'))
@@ -34,7 +36,7 @@ function MobileHeader({ activeTab, onBack, hidden }: { activeTab: string; onBack
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 z-50 pointer-events-auto">
       <div className="bg-background/85 backdrop-blur-2xl pt-safe border-b border-border/50 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-        <div className="h-12 flex items-center justify-between px-4 max-w-md mx-auto relative">
+        <div className="h-12 flex items-center justify-between px-4 w-full relative">
           <div className="w-10 flex items-center justify-start">
             {onBack && (
               <button
@@ -82,6 +84,10 @@ export default function App() {
     );
   }
 
+  if (isSharedView) {
+    return <PublicCardPage />;
+  }
+
   if (isEmbedView) {
     return <EmbedCardPage />;
   }
@@ -94,7 +100,7 @@ export default function App() {
 
         {/* Desktop Sidebar */}
         {!isSharedView && (
-          <aside className="hidden md:flex flex-col w-56 border-r border-border bg-sidebar shrink-0">
+          <aside className="hidden md:flex flex-col w-56 lg:w-64 border-r border-border bg-sidebar shrink-0">
             <div className="p-6 flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center">
                 <User className="w-4 h-4 text-background" />
@@ -144,8 +150,16 @@ export default function App() {
                 className="flex-1 flex flex-col overflow-hidden"
               >
                 {activeTab === 'card' && <CardPage />}
-                {activeTab === 'threads' && <ThreadsPage />}
-                {activeTab === 'more' && <MorePage />}
+                {activeTab === 'threads' && (
+                  <Suspense fallback={<PageSkeleton />}>
+                    <ThreadsPage />
+                  </Suspense>
+                )}
+                {activeTab === 'more' && (
+                  <Suspense fallback={<PageSkeleton />}>
+                    <MorePage />
+                  </Suspense>
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -160,7 +174,7 @@ export default function App() {
                 className="bg-background/90 backdrop-blur-2xl px-2 pt-2 pointer-events-auto border-t border-border/50 shadow-[0_-8px_30px_rgba(0,0,0,0.04)]"
                 style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
               >
-                <div className="flex items-stretch justify-between max-w-md mx-auto">
+                <div className="flex items-stretch justify-between w-full">
                   {TAB_CONFIG.map(tab => (
                     <div key={tab.id} className="flex-1 flex justify-center">
                       <TabBtn
@@ -178,6 +192,14 @@ export default function App() {
         </main>
       </div>
     </>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden p-6">
+      <div className="flex-1 rounded-[28px] bg-secondary/30 animate-pulse" />
+    </div>
   );
 }
 

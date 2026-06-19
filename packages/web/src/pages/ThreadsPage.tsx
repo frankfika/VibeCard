@@ -1,80 +1,54 @@
-import { useState, useRef, type ChangeEvent } from 'react';
+import { useState, useRef, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ThumbsUp, Share2, Plus, X, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react';
-import { useProfile } from '../store';
+import { useProfile, type Thread } from '../store';
 import { emit as chainEmit } from '../lib/chain/chain';
+import { award as awardPoints } from '../lib/web3/points';
+import { useToast } from '../components/ui/ToastProvider';
 import ProofPill from '../components/chain/ProofPill';
 
-const TAGS = ['All', 'Work', 'Life', 'Web3', 'Thoughts'];
+const DEFAULT_TAGS = ['Work', 'Life', 'Web3', 'Thoughts'];
 
-interface Thread {
-  id: string;
-  author: {
-    name: string;
-    avatar: string;
-    handle: string;
-  };
-  content: string;
-  images?: string[];
-  tags: string[];
-  likes: number;
-  timestamp: string;
-  isLiked: boolean;
-  proofId?: string;
+function getAllTags(threads: Thread[]) {
+  const tags = new Set<string>();
+  threads.forEach(t => t.tags.forEach(tag => tags.add(tag)));
+  return ['All', ...Array.from(tags)];
 }
 
-const MOCK_THREADS: Thread[] = [
-  {
-    id: '1',
-    author: {
-      name: 'Alex Chen',
-      avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Alex&backgroundColor=transparent',
-      handle: '0x1234...5678',
-    },
-    content: '刚刚完成了 vibecard 的 2.0 设计系统重构，采用了更现代的毛玻璃风格和物理弹簧动画。感觉整个应用变得更有呼吸感了。',
-    images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop'],
-    tags: ['Work', 'Web3'],
-    likes: 24,
-    timestamp: '2 hours ago',
-    isLiked: false,
-  },
-  {
-    id: '2',
-    author: {
-      name: 'Sarah Wang',
-      avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=Sarah&backgroundColor=transparent',
-      handle: 'sarah.eth',
-    },
-    content: '今天在咖啡馆里遇到了两个同样在做独立开发的 Builder。Web3 的圈子真小，但是大家都好有热情！',
-    tags: ['Life', 'Thoughts'],
-    likes: 12,
-    timestamp: '5 hours ago',
-    isLiked: true,
-  },
-];
+function formatTime(ts: number) {
+  const diff = Date.now() - ts;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+  if (hours < 24) return `${hours} 小时前`;
+  if (days < 7) return `${days} 天前`;
+  return new Date(ts).toLocaleDateString('zh-CN');
+}
 
 export default function ThreadsPage() {
+  const { profile, updateProfile } = useProfile();
+  const toast = useToast();
   const [activeTag, setActiveTag] = useState('All');
-  const [threads, setThreads] = useState(MOCK_THREADS);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const isSharedView = new URLSearchParams(window.location.search).has('c');
 
-  const filteredThreads = activeTag === 'All' 
-    ? threads 
+  const threads = profile.threads || [];
+  const allTags = useMemo(() => getAllTags(threads), [threads]);
+
+  const filteredThreads = activeTag === 'All'
+    ? threads
     : threads.filter(t => t.tags.includes(activeTag));
 
   const handleLike = (id: string) => {
-    setThreads(threads.map(t => {
-      if (t.id === id) {
-        return {
-          ...t,
-          likes: t.isLiked ? t.likes - 1 : t.likes + 1,
-          isLiked: !t.isLiked
-        };
-      }
-      return t;
-    }));
+    const next = threads.map(t => {
+      if (t.id !== id) return t;
+      const liked = !t.isLiked;
+      return { ...t, likes: (t.likes || 0) + (liked ? 1 : -1), isLiked: liked };
+    });
+    updateProfile({ threads: next });
   };
 
   const handleShare = async (thread: Thread) => {
@@ -86,12 +60,21 @@ export default function ThreadsPage() {
     }
   };
 
+  const handlePublish = (newThread: Thread) => {
+    updateProfile({ threads: [newThread, ...threads] });
+    chainEmit('thread.publish', { id: newThread.id }).catch(() => {});
+    const res = awardPoints('thread_publish');
+    if (res.ok) {
+      toast.show({ message: `发布成功，+${res.awarded} 积分`, type: 'success', duration: 2500 });
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative">
       {/* Header Tags - Horizontal Scroll */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar">
-          {TAGS.map(tag => (
+          {allTags.map(tag => (
             <button
               key={tag}
               onClick={() => setActiveTag(tag)}
@@ -135,13 +118,13 @@ export default function ThreadsPage() {
               {/* Author Info */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <img src={thread.author.avatar} alt={thread.author.name} className="w-10 h-10 rounded-full bg-secondary" />
+                  <img src={profile.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name}&backgroundColor=transparent`} alt={profile.name} className="w-10 h-10 rounded-full bg-secondary" />
                   <div>
-                    <h3 className="text-[15px] font-bold text-foreground leading-tight">{thread.author.name}</h3>
+                    <h3 className="text-[15px] font-bold text-foreground leading-tight">{profile.name || 'Anonymous'}</h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[12px] text-muted-foreground">{thread.author.handle}</span>
+                      <span className="text-[12px] text-muted-foreground">{profile.handle || '0x...'}</span>
                       <span className="text-[12px] text-muted-foreground">·</span>
-                      <span className="text-[12px] text-muted-foreground">{thread.timestamp}</span>
+                      <span className="text-[12px] text-muted-foreground">{formatTime(thread.timestamp)}</span>
                     </div>
                   </div>
                 </div>
@@ -158,8 +141,8 @@ export default function ThreadsPage() {
               {/* Optional Images */}
               {thread.images && thread.images.length > 0 && (
                 <div className={`grid gap-2 mb-4 ${
-                  thread.images.length === 1 ? 'grid-cols-1' : 
-                  thread.images.length === 2 ? 'grid-cols-2' : 
+                  thread.images.length === 1 ? 'grid-cols-1' :
+                  thread.images.length === 2 ? 'grid-cols-2' :
                   'grid-cols-3'
                 }`}>
                   {thread.images.map((img, idx) => (
@@ -187,15 +170,15 @@ export default function ThreadsPage() {
               {/* Interactions - No Comments */}
               {!isSharedView && (
                 <div className="flex items-center gap-6 border-t border-border pt-3">
-                  <button 
+                  <button
                     onClick={() => handleLike(thread.id)}
                     className={`flex items-center gap-1.5 transition-colors ${thread.isLiked ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     <ThumbsUp className={`w-5 h-5 ${thread.isLiked ? 'fill-current' : ''}`} />
                     <span className="text-[13px] font-medium">{thread.likes > 0 ? thread.likes : 'Like'}</span>
                   </button>
-                  
-                  <button 
+
+                  <button
                     onClick={() => handleShare(thread)}
                     className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
                   >
@@ -207,7 +190,7 @@ export default function ThreadsPage() {
             </motion.div>
           ))
         )}
-        
+
         {/* Bottom padding for tab bar */}
         <div className="h-20" />
       </div>
@@ -229,12 +212,9 @@ export default function ThreadsPage() {
       {/* Publish Modal/Drawer */}
       <AnimatePresence>
         {isPublishing && (
-          <PublishModal 
-            onClose={() => setIsPublishing(false)} 
-            onPublish={(newThread) => {
-              setThreads([newThread, ...threads]);
-              setIsPublishing(false);
-            }} 
+          <PublishModal
+            onClose={() => setIsPublishing(false)}
+            onPublish={handlePublish}
           />
         )}
       </AnimatePresence>
@@ -250,8 +230,29 @@ export default function ThreadsPage() {
 function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: (t: Thread) => void }) {
   const { profile } = useProfile();
   const [content, setContent] = useState('');
-  const [selectedTag, setSelectedTag] = useState(TAGS[1]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  const addTag = (raw: string) => {
+    const tag = raw.trim().replace(/^#/, '').replace(/[,，]/g, '');
+    if (!tag || tags.includes(tag)) return;
+    setTags([...tags, tag]);
+  };
+
+  const removeTag = (tag: string) => {
+    setTags(tags.filter(t => t !== tag));
+  };
+
+  const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+      e.preventDefault();
+      addTag(tagInput);
+      setTagInput('');
+    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+      setTags(tags.slice(0, -1));
+    }
+  };
 
   const handlePublish = async () => {
     if (!content.trim() && imagePreviews.length === 0) return;
@@ -260,26 +261,26 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
     let proofId: string | undefined;
     try {
       const tx = await chainEmit('thread.publish', {
-        id, len: content.length, images: imagePreviews.length, tag: selectedTag,
+        id, len: content.length, images: imagePreviews.length, tags,
       });
       proofId = tx.tx.id;
-    } catch {}
+    } catch (err) {
+      console.warn('chainEmit failed:', err);
+    }
 
     onPublish({
       id,
-      author: {
-        name: profile.name || 'Anonymous',
-        avatar: profile.avatar || 'https://api.dicebear.com/7.x/notionists/svg?seed=fallback&backgroundColor=transparent',
-        handle: profile.handle || '0x...'
-      },
       content,
       images: imagePreviews.length > 0 ? imagePreviews : undefined,
-      tags: [selectedTag],
-      likes: 0,
-      timestamp: 'Just now',
-      isLiked: false,
-      proofId,
+      tags,
+      timestamp: Date.now(),
+      ...(proofId ? { proofId } : {}),
     });
+    setContent('');
+    setImagePreviews([]);
+    setTags([]);
+    setTagInput('');
+    onClose();
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -308,11 +309,11 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50" onClick={onClose} />
-      <motion.div 
-        initial={{ y: "100%" }} 
-        animate={{ y: 0 }} 
-        exit={{ y: "100%" }} 
-        transition={{ type: "spring", damping: 25, stiffness: 200 }} 
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className="fixed inset-x-0 bottom-0 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-background rounded-t-3xl md:rounded-3xl p-5 z-50 border border-border shadow-xl h-[90vh] md:h-auto flex flex-col"
       >
         <div className="flex items-center justify-between mb-4">
@@ -320,7 +321,7 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
             <X className="w-5 h-5 text-foreground" />
           </button>
           <span className="font-bold text-[16px]">新动态</span>
-          <button 
+          <button
             onClick={handlePublish}
             disabled={!content.trim() && imagePreviews.length === 0}
             className="px-4 py-1.5 bg-foreground text-background rounded-full text-[14px] font-bold disabled:opacity-50"
@@ -332,10 +333,10 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
         <div className="flex-1 overflow-y-auto no-scrollbar">
           <div className="flex gap-3 mb-4">
             <img src={profile.avatar || 'https://api.dicebear.com/7.x/notionists/svg?seed=fallback&backgroundColor=transparent'} className="w-10 h-10 rounded-full bg-secondary shrink-0" alt="avatar" />
-            <textarea 
+            <textarea
               value={content}
               onChange={e => setContent(e.target.value)}
-              placeholder="分享点什么..." 
+              placeholder="分享点什么..."
               className="w-full bg-transparent text-[16px] leading-relaxed resize-none outline-none min-h-[120px] placeholder:text-muted-foreground"
               autoFocus
             />
@@ -343,8 +344,8 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
 
           {imagePreviews.length > 0 && (
             <div className={`grid gap-2 mb-4 ml-13 ${
-              imagePreviews.length === 1 ? 'grid-cols-1' : 
-              imagePreviews.length === 2 ? 'grid-cols-2' : 
+              imagePreviews.length === 1 ? 'grid-cols-1' :
+              imagePreviews.length === 2 ? 'grid-cols-2' :
               'grid-cols-3'
             }`}>
               {imagePreviews.map((img, idx) => (
@@ -352,7 +353,7 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
                   imagePreviews.length === 1 ? 'aspect-video' : 'aspect-square'
                 }`}>
                   <img src={img} className="w-full h-full object-cover" alt={`preview ${idx}`} />
-                  <button 
+                  <button
                     onClick={() => removeImage(idx)}
                     className="absolute top-2 right-2 p-1.5 bg-black/50 backdrop-blur-md rounded-full text-white hover:bg-black/70"
                   >
@@ -364,36 +365,67 @@ function PublishModal({ onClose, onPublish }: { onClose: () => void, onPublish: 
           )}
         </div>
 
-        <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            <button
-              onClick={handleImageUpload}
-              disabled={imagePreviews.length >= 3}
-              className="p-2 rounded-full hover:bg-secondary text-foreground transition-colors disabled:opacity-30"
-            >
-              <ImageIcon className="w-5 h-5" />
-            </button>
-            <span className="text-[12px] font-semibold text-muted-foreground">
-              {imagePreviews.length}/3
-            </span>
-          </div>
-          
-          <select 
-            value={selectedTag}
-            onChange={e => setSelectedTag(e.target.value)}
-            className="bg-secondary text-foreground text-[13px] font-semibold px-3 py-1.5 rounded-lg outline-none appearance-none cursor-pointer"
-          >
-            {TAGS.slice(1).map(tag => (
-              <option key={tag} value={tag}>{tag}</option>
+        <div className="mt-auto pt-4 border-t border-border">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {tags.map(tag => (
+              <span
+                key={tag}
+                className="flex items-center gap-1 text-[12px] font-semibold text-foreground bg-secondary pl-2.5 pr-1.5 py-1 rounded-full"
+              >
+                #{tag}
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="p-0.5 rounded-full hover:bg-foreground/10"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
             ))}
-          </select>
+            <input
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              onBlur={() => { addTag(tagInput); setTagInput(''); }}
+              placeholder={tags.length ? '' : '添加标签，按回车确认'}
+              className="bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground min-w-[120px] flex-1"
+            />
+          </div>
+
+          {DEFAULT_TAGS.filter(t => !tags.includes(t)).length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {DEFAULT_TAGS.filter(t => !tags.includes(t)).map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => addTag(tag)}
+                  className="text-[12px] font-medium text-muted-foreground bg-secondary/60 hover:bg-secondary px-2.5 py-1 rounded-full transition-colors"
+                >
+                  + {tag}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <button
+                onClick={handleImageUpload}
+                disabled={imagePreviews.length >= 3}
+                className="p-2 rounded-full hover:bg-secondary text-foreground transition-colors disabled:opacity-30"
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+              <span className="text-[12px] font-semibold text-muted-foreground">
+                {imagePreviews.length}/3
+              </span>
+            </div>
+          </div>
         </div>
       </motion.div>
     </>

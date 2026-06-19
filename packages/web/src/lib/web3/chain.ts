@@ -3,6 +3,18 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI, chainNames } from './config';
 function getRpcUrl(chainId: number): string {
   const alchemyKey = import.meta.env?.VITE_ALCHEMY_KEY as string | undefined;
   const urls: Record<number, string> = {
+    1: alchemyKey
+      ? `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://ethereum.publicnode.com',
+    8453: alchemyKey
+      ? `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://mainnet.base.org',
+    42161: alchemyKey
+      ? `https://arb-mainnet.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://arb1.arbitrum.io/rpc',
+    137: alchemyKey
+      ? `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`
+      : 'https://polygon-rpc.com',
     11155111: alchemyKey
       ? `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`
       : 'https://rpc.sepolia.org',

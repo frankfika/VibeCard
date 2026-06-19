@@ -7,6 +7,7 @@ import DiscoverPage from './DiscoverPage';
 import GamesPage from './GamesPage';
 import WalletConnect from '../components/WalletConnect';
 import ChainIdentityCard from '../components/chain/ChainIdentityCard';
+import PointsCard from '../components/chain/PointsCard';
 import { useProfile } from '../store';
 import { useTheme } from '../components/ThemeProvider';
 
@@ -58,6 +59,11 @@ export default function MorePage() {
       </header>
 
       <main className="flex-1 overflow-y-auto px-6 pb-32 space-y-6 no-scrollbar">
+        {/* Vibe Points — economic layer (primary surface) */}
+        <section>
+          <PointsCard />
+        </section>
+
         {/* On-Chain Identity (DappChain microchain — primary surface) */}
         <section>
           <ChainIdentityCard profileComplete={profileComplete} />

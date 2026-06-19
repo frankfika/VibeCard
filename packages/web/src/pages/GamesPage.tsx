@@ -79,6 +79,7 @@ export default function GamesPage() {
       setSynced(true);
     } catch (error) {
       console.error('Failed to sync game to chain:', error);
+      alert(`同步失败：${(error as Error)?.message ?? '未知错误'}`);
     } finally {
       setSyncing(false);
     }

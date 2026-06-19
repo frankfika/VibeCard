@@ -1,11 +1,17 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import {
+  mainnet,
   sepolia,
+  base,
   baseSepolia,
+  arbitrum,
   arbitrumSepolia,
+  polygon,
   polygonAmoy,
   hardhat,
 } from 'wagmi/chains';
+import { createConfig, http, createStorage, type Config } from 'wagmi';
+import { injected } from 'wagmi/connectors';
 
 export const supportedChains = [
   hardhat,
@@ -13,22 +19,34 @@ export const supportedChains = [
   baseSepolia,
   arbitrumSepolia,
   polygonAmoy,
+  mainnet,
+  base,
+  arbitrum,
+  polygon,
 ] as const;
 
 export const chainNames: Record<number, string> = {
+  [hardhat.id]: 'Hardhat Local',
   [sepolia.id]: 'Ethereum Sepolia',
   [baseSepolia.id]: 'Base Sepolia',
   [arbitrumSepolia.id]: 'Arbitrum Sepolia',
   [polygonAmoy.id]: 'Polygon Amoy',
-  31337: 'Hardhat Local',
+  [mainnet.id]: 'Ethereum',
+  [base.id]: 'Base',
+  [arbitrum.id]: 'Arbitrum',
+  [polygon.id]: 'Polygon',
 };
 
 export const chainLogos: Record<number, string> = {
+  [hardhat.id]: 'https://cryptologos.cc/logos/ethereum-eth-logo.svg',
   [sepolia.id]: 'https://cryptologos.cc/logos/ethereum-eth-logo.svg',
   [baseSepolia.id]: 'https://cryptologos.cc/logos/base-base-logo.svg',
   [arbitrumSepolia.id]: 'https://cryptologos.cc/logos/arbitrum-arb-logo.svg',
   [polygonAmoy.id]: 'https://cryptologos.cc/logos/polygon-matic-logo.svg',
-  31337: 'https://cryptologos.cc/logos/ethereum-eth-logo.svg',
+  [mainnet.id]: 'https://cryptologos.cc/logos/ethereum-eth-logo.svg',
+  [base.id]: 'https://cryptologos.cc/logos/base-base-logo.svg',
+  [arbitrum.id]: 'https://cryptologos.cc/logos/arbitrum-arb-logo.svg',
+  [polygon.id]: 'https://cryptologos.cc/logos/polygon-matic-logo.svg',
 };
 
 export const walletConnectProjectId = (() => {
@@ -47,12 +65,38 @@ export const walletConnectProjectId = (() => {
 
 export const isWalletConnectReady = !!walletConnectProjectId;
 
-export const wagmiConfig = getDefaultConfig({
-  appName: 'vibecard',
-  projectId: walletConnectProjectId || 'vibecard_default_project_id',
-  chains: supportedChains as unknown as [typeof hardhat, typeof sepolia, typeof baseSepolia, typeof arbitrumSepolia, typeof polygonAmoy],
-  ssr: false,
-});
+const chainsTuple = supportedChains as unknown as [
+  typeof hardhat,
+  typeof sepolia,
+  typeof baseSepolia,
+  typeof arbitrumSepolia,
+  typeof polygonAmoy,
+  typeof mainnet,
+  typeof base,
+  typeof arbitrum,
+  typeof polygon,
+];
+
+export let wagmiConfig: Config;
+
+if (walletConnectProjectId) {
+  wagmiConfig = getDefaultConfig({
+    appName: 'vibecard',
+    projectId: walletConnectProjectId,
+    chains: chainsTuple,
+    ssr: false,
+  });
+} else {
+  wagmiConfig = createConfig({
+    chains: chainsTuple,
+    connectors: [injected()],
+    transports: Object.fromEntries(supportedChains.map((chain) => [chain.id, http()])),
+    ssr: false,
+    storage: createStorage({
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    }),
+  });
+}
 
 export const CONTRACT_ADDRESS: Record<number, `0x${string}`> = {
   [hardhat.id]: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
@@ -60,6 +104,10 @@ export const CONTRACT_ADDRESS: Record<number, `0x${string}`> = {
   [baseSepolia.id]: '0x0000000000000000000000000000000000000000',
   [arbitrumSepolia.id]: '0x0000000000000000000000000000000000000000',
   [polygonAmoy.id]: '0x0000000000000000000000000000000000000000',
+  [mainnet.id]: '0x0000000000000000000000000000000000000000',
+  [base.id]: '0x0000000000000000000000000000000000000000',
+  [arbitrum.id]: '0x0000000000000000000000000000000000000000',
+  [polygon.id]: '0x0000000000000000000000000000000000000000',
 };
 
 export const CONTRACT_ABI = [

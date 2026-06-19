@@ -236,6 +236,140 @@ vibecard 采用 **双层存储架构**，参考 mirror.xyz 的实现逻辑：
 - `vibecard_activities` — 活动列表
 - `vibecard_profile_sync` — 链上同步状态
 
+## 部署上线指南
+
+### 1. 环境变量配置
+
+复制示例文件并填入实际值：
+
+```bash
+cd packages/web
+cp .env.example .env
+```
+
+编辑 `.env`：
+
+```bash
+# Pinata IPFS JWT（链上同步必需）
+# 注册 https://pinata.cloud/ → API Keys → New Key → 复制 JWT
+VITE_PINATA_JWT=your_pinata_jwt_here
+
+# WalletConnect Project ID（钱包连接必需）
+# 注册 https://cloud.walletconnect.com/ → New Project → 复制 Project ID
+VITE_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id_here
+
+# 可选：Alchemy RPC 加速
+# VITE_ALCHEMY_KEY=your_alchemy_key
+```
+
+> ⚠️ **`.env` 文件包含敏感信息，不要提交到 Git。已加入 `.gitignore`。**
+
+### 2. 获取测试网 ETH
+
+部署合约需要支付 Gas 费。推荐网络：**Base Sepolia**（Gas 低，速度快）。
+
+| 网络 | 水龙头 |
+|------|--------|
+| Base Sepolia | https://www.coinbase.com/faucets/base-sepolia-faucet |
+| Ethereum Sepolia | https://sepoliafaucet.com/ |
+| Arbitrum Sepolia | https://faucet.quicknode.com/arbitrum/sepolia |
+| Polygon Amoy | https://faucet.polygon.technology/ |
+
+### 3. 部署智能合约
+
+```bash
+cd packages/contracts
+
+# 1. 配置私钥（仅当前终端有效，不会写入文件）
+export PRIVATE_KEY=0x你的私钥（去掉0x前缀）
+
+# 2. 部署到 Base Sepolia（推荐）
+npm run deploy:baseSepolia
+
+# 或部署到 Ethereum Sepolia
+npm run deploy:sepolia
+
+# 3. 部署成功后会自动更新 Web 端配置
+# 查看输出中的合约地址，确认已写入：
+# - packages/web/src/lib/web3/config.ts
+# - packages/web/public/widget-config.json
+```
+
+部署脚本会自动检测 `CONTRACT_ADDRESS` 中的零地址并替换为实际部署地址。如果未自动更新，请手动修改：
+
+```typescript
+// packages/web/src/lib/web3/config.ts
+export const CONTRACT_ADDRESS: Record<number, `0x${string}`> = {
+  [hardhat.id]: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+  [baseSepolia.id]: '0x你部署的地址',  // ← 填入这里
+  // ...
+};
+```
+
+### 4. 构建生产版本
+
+```bash
+cd packages/web
+npm run build
+```
+
+构建产物位于 `packages/web/dist/`，包含：
+- `index.html` — 入口页面
+- `assets/` — JS/CSS 分块（已 gzip + brotli 压缩）
+- `manifest.json` — PWA 配置
+- `sw.js` — Service Worker（离线缓存）
+- `widget.js` — 外部嵌入脚本
+
+### 5. 部署到 Vercel（推荐）
+
+```bash
+# 安装 Vercel CLI
+npm i -g vercel
+
+# 登录
+vercel login
+
+# 部署（从 web 目录）
+cd packages/web
+vercel --prod
+
+# 或手动上传 dist 目录
+vercel --prod --cwd dist
+```
+
+在 Vercel Dashboard 中设置环境变量：
+- `VITE_PINATA_JWT`
+- `VITE_WALLETCONNECT_PROJECT_ID`
+- `VITE_ALCHEMY_KEY`（可选）
+
+### 6. 部署后验证
+
+部署完成后，逐项检查：
+
+- [ ] 访问主站，确认页面正常加载
+- [ ] 测试钱包连接（MetaMask / Rainbow / WalletConnect）
+- [ ] 创建名片 → 同步到链上 → 从链恢复，完整流程
+- [ ] 测试嵌入页面：`https://你的域名/?address=0x某个地址`
+- [ ] PWA：安装到主屏幕、离线刷新、Service Worker 注册
+- [ ] 主题切换：system / light / dark 三种模式
+- [ ] 移动端：iOS Safari、Android Chrome、微信内置浏览器
+- [ ] 分享功能：生成名片图片、二维码、复制链接
+- [ ] 卡牌游戏：抽卡、收藏、同步到链上
+
+### 7. 常见问题
+
+**Q: 部署失败 "Account has zero balance"**
+> 确保私钥对应的地址在水龙头页面领取了测试网 ETH，并在正确的网络上。
+
+**Q: 钱包连接报错 "Project ID is missing"**
+> 在 `.env` 中设置 `VITE_WALLETCONNECT_PROJECT_ID`，重启 dev server 或重新构建。
+
+**Q: 同步到链上失败 "IPFS hash required"**
+> 确保 `VITE_PINATA_JWT` 正确配置，或设置 `VITE_MOCK_IPFS=true` 使用本地 Mock 模式。
+
+**Q: 构建产物过大？**
+> 当前 `web3` chunk 约 756KB（gzip 237KB），这是 wagmi + viem + RainbowKit 的体积。已通过 `manualChunks` 拆分，不影响首屏加载。如需进一步优化，可配置 RainbowKit 的 `locale` 限制语言包数量。
+
 ## 贡献指南
 
 欢迎提交 Issue 和 Pull Request！

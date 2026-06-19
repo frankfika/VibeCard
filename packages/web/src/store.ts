@@ -3,6 +3,7 @@ import { useAccount, useWriteContract } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, chainNames } from './lib/web3/config';
 import { uploadToIPFS, fetchFromIPFS, computeContentHash, type ChainContent } from './lib/web3/ipfs';
 import { emit as chainEmit } from './lib/chain/chain';
+import { award as awardPoints } from './lib/web3/points';
 import { useToast } from './components/ui/ToastProvider';
 
 export interface Profile {
@@ -20,6 +21,18 @@ export interface Profile {
     wechat: string;
   };
   event: string;
+  threads: Thread[];
+}
+
+export interface Thread {
+  id: string;
+  content: string;
+  images?: string[];
+  tags: string[];
+  timestamp: number;
+  likes?: number;
+  isLiked?: boolean;
+  proofId?: string;
 }
 
 export interface GameSession {
@@ -62,6 +75,7 @@ const DEFAULT_PROFILE: Profile = {
   highlights: [],
   verified: { wallet: '', twitter: '', discord: '', wechat: '' },
   event: '',
+  threads: [],
 };
 
 const DEFAULT_GAME_SESSION: GameSession = {
@@ -104,12 +118,18 @@ export function useProfile() {
   const toast = useToast();
 
   useEffect(() => {
-    localStorage.setItem('vibecard_profile', JSON.stringify(profile));
-    setIsSetup(!!profile.name);
+    const timer = setTimeout(() => {
+      localStorage.setItem('vibecard_profile', JSON.stringify(profile));
+      setIsSetup(!!profile.name);
+    }, 300);
+    return () => clearTimeout(timer);
   }, [profile]);
 
   useEffect(() => {
-    localStorage.setItem('vibecard_profile_sync', JSON.stringify(syncStatus));
+    const timer = setTimeout(() => {
+      localStorage.setItem('vibecard_profile_sync', JSON.stringify(syncStatus));
+    }, 300);
+    return () => clearTimeout(timer);
   }, [syncStatus]);
 
   const updateProfile = useCallback((updates: Partial<Profile>) => {
@@ -119,6 +139,7 @@ export function useProfile() {
       if (isFirstCreate) {
         initialNameRef.current = next.name;
         chainEmit('profile.create', { name: next.name }).catch(() => {});
+        awardPoints('create_profile');
       } else if (initialNameRef.current) {
         const changedKeys = Object.keys(updates);
         chainEmit('profile.update', { fields: changedKeys }).catch(() => {});
@@ -289,6 +310,7 @@ export function useGameSession() {
       history: [...prev.history.filter(id => id !== cardId), cardId],
     }));
     chainEmit('card.draw', { cardId }).catch(() => {});
+    awardPoints('interaction'); // cooldown + daily limit enforced internally
   }, []);
 
   const toggleFavorite = useCallback((cardId: string) => {
@@ -338,6 +360,7 @@ export function useActivities() {
     setActivities(prev => [newActivity, ...prev]);
     setSyncStatus(prev => ({ ...prev, isSynced: false }));
     chainEmit('activity.create', { id: newActivity.id, title: newActivity.title, category: newActivity.category }).catch(() => {});
+    awardPoints('activity_host');
     return newActivity;
   }, []);
 
@@ -348,6 +371,7 @@ export function useActivities() {
         : a
     ));
     chainEmit('activity.join', { id }).catch(() => {});
+    awardPoints('activity_join');
   }, []);
 
   const leaveActivity = useCallback((id: string) => {
