@@ -16,7 +16,15 @@ const HARDHAT_TEST_KEYS = [
 ];
 
 export default {
-  solidity: '0.8.20',
+  solidity: {
+    version: '0.8.20',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
   plugins: [hardhatEthersPlugin],
   networks: {
     hardhat: {
@@ -46,6 +54,26 @@ export default {
     amoy: {
       type: 'http',
       url: process.env.AMOY_RPC || 'https://rpc-amoy.polygon.technology',
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    mainnet: {
+      type: 'http',
+      url: process.env.MAINNET_RPC || 'https://ethereum.publicnode.com',
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    base: {
+      type: 'http',
+      url: process.env.BASE_RPC || 'https://mainnet.base.org',
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    arbitrum: {
+      type: 'http',
+      url: process.env.ARBITRUM_RPC || 'https://arb1.arbitrum.io/rpc',
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    polygon: {
+      type: 'http',
+      url: process.env.POLYGON_RPC || 'https://polygon-rpc.com',
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
