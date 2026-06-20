@@ -2,5 +2,5 @@ export { allCards, getCardsByTags, shuffleArray } from './cards';
 export type { Card } from './cards';
 export { tags, tagCategories, presets, getTagsByCategory } from './tags';
 export type { TagDefinition, TagCategory, Preset } from './tags';
-export { companionTypes, mockActivities } from './companion-types';
+export { companionTypes } from './companion-types';
 export type { CompanionCategory, Activity } from './companion-types';

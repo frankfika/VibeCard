@@ -124,12 +124,8 @@ const companionTypes = [
   { id: 'hobby', name: '兴趣', icon: '🎨', color: '#FFDAB9', subcategories: [{ id: 'painting', name: '画画' }, { id: 'photography', name: '摄影' }] },
 ];
 
-const mockActivities = [
-  { id: '1', title: '周末朝阳公园跑步', category: 'sport', subcategory: 'running', location: '朝阳公园', time: '周六 7:00', participants: 3, maxParticipants: 6, avatar: '', creator: '小明' },
-  { id: '2', title: '三里屯新开的日料探店', category: 'food', subcategory: 'explore', location: '三里屯', time: '周五 18:30', participants: 2, maxParticipants: 4, avatar: '', creator: '美食家' },
-  { id: '3', title: '周末密室逃脱组队', category: 'game', subcategory: 'escape', location: '望京', time: '周六 14:00', participants: 4, maxParticipants: 6, avatar: '', creator: '密室达人' },
-  { id: '4', title: '香山徒步一日游', category: 'travel', subcategory: 'nearby', location: '香山', time: '周日 8:00', participants: 5, maxParticipants: 10, avatar: '', creator: '户外爱好者' },
-];
+// mockActivities removed — activities are now loaded from chain/backend only
+const mockActivities = [];
 
 function getCardsByTags(selectedTags) {
   if (!selectedTags || selectedTags.length === 0) return allCards;
