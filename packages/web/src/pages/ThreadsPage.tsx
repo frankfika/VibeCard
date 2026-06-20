@@ -42,21 +42,9 @@ export default function ThreadsPage() {
     ? threads
     : threads.filter(t => t.tags.includes(activeTag));
 
-  const handleLike = (id: string) => {
-    const next = threads.map(t => {
-      if (t.id !== id) return t;
-      const liked = !t.isLiked;
-      return { ...t, likes: (t.likes || 0) + (liked ? 1 : -1), isLiked: liked };
-    });
-    updateProfile({ threads: next });
-  };
-
-  const handleShare = async (thread: Thread) => {
-    const url = `${window.location.origin}?t=${thread.id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      // fallback: do nothing
+  const handleDelete = (id: string) => {
+    if (confirm('确定要删除这条动态吗？')) {
+      updateProfile({ threads: threads.filter(t => t.id !== id) });
     }
   };
 
@@ -98,12 +86,12 @@ export default function ThreadsPage() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center py-20 text-center"
           >
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4 border border-white/5 shadow-sm">
+              <MessageCircle className="w-8 h-8 text-muted-foreground/50" />
             </div>
-            <h3 className="text-[16px] font-bold text-foreground mb-1">暂无动态</h3>
+            <h3 className="text-[16px] font-bold text-foreground mb-1">暂无个人动态</h3>
             <p className="text-[13px] text-muted-foreground max-w-[200px]">
-              {activeTag === 'All' ? '成为第一个发布动态的人吧！' : `该标签下还没有内容，换个标签试试`}
+              {activeTag === 'All' ? '记录一下你最近的进展、想法或高光时刻吧。' : `该标签下还没有内容，换个标签试试`}
             </p>
           </motion.div>
         ) : (
@@ -113,28 +101,32 @@ export default function ThreadsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="bg-card/40 backdrop-blur-xl border border-border rounded-3xl p-5 shadow-sm"
+              className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-5 shadow-sm ring-1 ring-white/5 relative group"
             >
-              {/* Author Info */}
+              {/* Header Info */}
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <img src={profile.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name}&backgroundColor=transparent`} alt={profile.name} className="w-10 h-10 rounded-full bg-secondary" />
-                  <div>
-                    <h3 className="text-[15px] font-bold text-foreground leading-tight">{profile.name || 'Anonymous'}</h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[12px] text-muted-foreground">{profile.handle || '0x...'}</span>
-                      <span className="text-[12px] text-muted-foreground">·</span>
-                      <span className="text-[12px] text-muted-foreground">{formatTime(thread.timestamp)}</span>
-                    </div>
+                <div className="flex items-center gap-2.5">
+                  <img 
+                    src={profile.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name || 'default'}&backgroundColor=transparent`} 
+                    alt={profile.name} 
+                    className="w-8 h-8 rounded-full bg-secondary/50 border border-white/10" 
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-bold text-foreground">{profile.name || 'Anonymous'}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-md border border-white/5">
+                      {formatTime(thread.timestamp)}
+                    </span>
                   </div>
                 </div>
-                <button className="text-muted-foreground hover:text-foreground p-2 -mr-2">
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
+                {!isSharedView && (
+                  <button onClick={() => handleDelete(thread.id)} className="text-muted-foreground/50 hover:text-red-400 p-1.5 rounded-full hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               {/* Content */}
-              <p className="text-[15px] text-foreground leading-relaxed mb-4">
+              <p className="text-[15px] font-medium text-foreground/90 leading-relaxed mb-4 whitespace-pre-wrap">
                 {thread.content}
               </p>
 
@@ -146,19 +138,19 @@ export default function ThreadsPage() {
                   'grid-cols-3'
                 }`}>
                   {thread.images.map((img, idx) => (
-                    <div key={idx} className={`w-full rounded-2xl overflow-hidden bg-secondary ${
+                    <div key={idx} className={`w-full rounded-[16px] overflow-hidden bg-secondary/50 border border-white/5 ${
                       thread.images!.length === 1 ? 'aspect-video' : 'aspect-square'
                     }`}>
-                      <img src={img} alt={`Thread media ${idx}`} className="w-full h-full object-cover cursor-pointer" onClick={() => setPreviewImage(img)} />
+                      <img src={img} alt={`Thread media ${idx}`} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-500" onClick={() => setPreviewImage(img)} />
                     </div>
                   ))}
                 </div>
               )}
 
               {/* Tags */}
-              <div className="flex flex-wrap gap-2 mb-4 items-center">
+              <div className="flex flex-wrap gap-2 items-center">
                 {thread.tags.map(tag => (
-                  <span key={tag} className="text-[12px] font-semibold text-muted-foreground bg-secondary px-2 py-1 rounded-md">
+                  <span key={tag} className="text-[11px] font-bold text-foreground/60 bg-secondary/40 border border-white/5 px-2 py-1 rounded-md">
                     #{tag}
                   </span>
                 ))}
@@ -166,27 +158,6 @@ export default function ThreadsPage() {
                   <ProofPill hash={thread.proofId} variant="subtle" label="" />
                 )}
               </div>
-
-              {/* Interactions - No Comments */}
-              {!isSharedView && (
-                <div className="flex items-center gap-6 border-t border-border pt-3">
-                  <button
-                    onClick={() => handleLike(thread.id)}
-                    className={`flex items-center gap-1.5 transition-colors ${thread.isLiked ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                  >
-                    <ThumbsUp className={`w-5 h-5 ${thread.isLiked ? 'fill-current' : ''}`} />
-                    <span className="text-[13px] font-medium">{thread.likes > 0 ? thread.likes : 'Like'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleShare(thread)}
-                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Share2 className="w-5 h-5" />
-                    <span className="text-[13px] font-medium">Share</span>
-                  </button>
-                </div>
-              )}
             </motion.div>
           ))
         )}

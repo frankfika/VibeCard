@@ -6,19 +6,32 @@ import { emit as chainEmit } from './lib/chain/chain';
 import { award as awardPoints } from './lib/web3/points';
 import { useToast } from './components/ui/ToastProvider';
 
+export interface Contact {
+  id: string;
+  platform: string;
+  value: string;
+  url: string;
+}
+
 export interface Profile {
   name: string;
   handle: string;
   avatar: string;
   bio: string;
+  mbti?: string;
+  zodiac?: string;
+  age?: string;
+  location?: string;
   tags: { label: string; icon: string }[];
   lookingFor: string;
   highlights: { id: number; title: string; type: string; icon: string; link: string }[];
+  contacts?: Contact[];
   verified: {
     wallet: string;
     twitter: string;
     discord: string;
     wechat: string;
+    telegram: string;
   };
   event: string;
   threads: Thread[];
@@ -73,7 +86,8 @@ const DEFAULT_PROFILE: Profile = {
   tags: [],
   lookingFor: '',
   highlights: [],
-  verified: { wallet: '', twitter: '', discord: '', wechat: '' },
+  contacts: [],
+  verified: { wallet: '', twitter: '', discord: '', wechat: '', telegram: '' },
   event: '',
   threads: [],
 };
@@ -101,12 +115,39 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   return fallback;
 }
 
+function loadProfileFromStorage(): Profile {
+  try {
+    const stored = localStorage.getItem('vibecard_profile');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Migration: migrate old verified to contacts
+      if (!parsed.contacts) {
+        parsed.contacts = [];
+        if (parsed.verified?.twitter) {
+          parsed.contacts.push({ id: 'legacy_twitter', platform: 'twitter', value: parsed.verified.twitter, url: `https://x.com/${parsed.verified.twitter.replace('@', '')}` });
+        }
+        if (parsed.verified?.discord) {
+          parsed.contacts.push({ id: 'legacy_discord', platform: 'discord', value: parsed.verified.discord, url: '' });
+        }
+        if (parsed.verified?.wechat) {
+          parsed.contacts.push({ id: 'legacy_wechat', platform: 'wechat', value: parsed.verified.wechat, url: '' });
+        }
+        if (parsed.verified?.telegram) {
+          parsed.contacts.push({ id: 'legacy_telegram', platform: 'telegram', value: parsed.verified.telegram, url: `https://t.me/${parsed.verified.telegram.replace('@', '')}` });
+        }
+      }
+      return { ...DEFAULT_PROFILE, ...parsed };
+    }
+  } catch {}
+  return DEFAULT_PROFILE;
+}
+
 export function useProfile() {
   const [profile, setProfile] = useState<Profile>(() =>
-    loadFromStorage('vibecard_profile', DEFAULT_PROFILE)
+    loadProfileFromStorage()
   );
   const [isSetup, setIsSetup] = useState(() => {
-    return !!loadFromStorage('vibecard_profile', DEFAULT_PROFILE).name;
+    return !!loadProfileFromStorage().name;
   });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
     loadFromStorage('vibecard_profile_sync', DEFAULT_SYNC_STATUS)

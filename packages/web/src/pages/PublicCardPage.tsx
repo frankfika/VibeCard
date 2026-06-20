@@ -6,21 +6,29 @@ import {
 } from 'lucide-react';
 import { useAccount } from 'wagmi';
 
+import { getSocialIcon, getSocialLabel } from '../lib/social';
+
 interface SharedProfile {
   name: string;
   handle: string;
   avatar: string;
   bio: string;
+  mbti?: string;
+  zodiac?: string;
+  age?: string;
+  location?: string;
   tags: { label: string; icon: string }[];
   lookingFor: string;
   event: string;
   highlights: { id: number; title: string; type: string; icon: string; link: string }[];
   threads: { id: string; content: string; images?: string[]; tags: string[]; timestamp: number }[];
+  contacts?: { id?: string; platform: string; value: string; url: string }[];
   verified: {
     wallet: string;
     twitter: string;
     discord: string;
     wechat: string;
+    telegram: string;
   };
 }
 
@@ -217,6 +225,28 @@ function SimpleCardView({
             </div>
           )}
 
+          {profile.contacts && profile.contacts.length > 0 && (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {profile.contacts.map(contact => {
+                const Icon = getSocialIcon(contact.platform);
+                const label = getSocialLabel(contact.platform);
+                return (
+                  <a
+                    key={contact.id || contact.platform}
+                    href={contact.url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/15 transition-colors border border-white/10 text-white/90 text-[12px] font-medium"
+                    onClick={(e) => { if (!contact.url) e.preventDefault(); }}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{contact.value || label}</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+
           {tags.length > 0 && (
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {tags.map(tag => (
@@ -307,6 +337,28 @@ function FullCardView({
             </div>
           )}
 
+          {profile.contacts && profile.contacts.length > 0 && (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {profile.contacts.map(contact => {
+                const Icon = getSocialIcon(contact.platform);
+                const label = getSocialLabel(contact.platform);
+                return (
+                  <a
+                    key={contact.id || contact.platform}
+                    href={contact.url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/15 transition-colors border border-white/10 text-white/90 text-[12px] font-medium"
+                    onClick={(e) => { if (!contact.url) e.preventDefault(); }}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{contact.value || label}</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+
           {profile.bio && (
             <p className="mt-4 text-[14px] font-medium text-white/65 leading-relaxed">{profile.bio}</p>
           )}
@@ -324,15 +376,29 @@ function FullCardView({
             </div>
           )}
 
-          {profile.lookingFor && (
-            <div className="mt-5 bg-white/[0.06] rounded-[20px] p-4 flex gap-3 items-center border border-white/10">
-              <div className="w-10 h-10 rounded-[14px] bg-white flex items-center justify-center shrink-0">
-                <Zap className="w-5 h-5 text-black" />
-              </div>
-              <div className="text-left">
-                <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-0.5">Looking for</div>
-                <div className="text-[14px] font-bold text-white">{profile.lookingFor}</div>
-              </div>
+          {(profile.mbti || profile.zodiac || profile.age || profile.location) && (
+            <div className="mt-5 flex flex-wrap justify-start gap-2">
+              {profile.mbti && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-black bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm border border-indigo-400/20">
+                  {profile.mbti}
+                </span>
+              )}
+              {profile.zodiac && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/10 text-white border border-white/5 shadow-sm backdrop-blur-sm">
+                  {profile.zodiac}
+                </span>
+              )}
+              {profile.age && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/10 text-white border border-white/5 shadow-sm backdrop-blur-sm">
+                  {profile.age}
+                </span>
+              )}
+              {profile.location && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-white/10 text-white border border-white/5 shadow-sm backdrop-blur-sm flex items-center gap-1">
+                  <MapPin className="w-3 h-3 opacity-70" />
+                  {profile.location.replace('📍 ', '')}
+                </span>
+              )}
             </div>
           )}
 
@@ -355,35 +421,43 @@ function FullCardView({
             </div>
           )}
 
+          {/* Threads Box */}
           {profile.threads?.length > 0 && (
-            <div className="mt-5 text-left">
-              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-2">最新动态</h3>
-              <div className="space-y-3">
+            <div className="md:col-span-2 bg-white/[0.04] backdrop-blur-2xl border border-white/10 shadow-sm rounded-[24px] p-5 sm:p-6">
+              <h3 className="text-[11px] sm:text-[12px] font-bold uppercase tracking-widest text-white/50 mb-5">个人动态</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {profile.threads.slice(0, 2).map(thread => (
-                  <div
-                    key={thread.id}
-                    className="bg-white/[0.05] rounded-[18px] p-4 border border-white/10"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[11px] font-bold text-white/40">{formatTime(thread.timestamp)}</span>
-                      {thread.tags?.map(tag => (
-                        <span key={tag} className="text-[10px] font-bold text-white/50 bg-white/10 px-2 py-0.5 rounded-md">
-                          #{tag}
-                        </span>
-                      ))}
+                  <div key={thread.id} className="bg-white/[0.04] rounded-[18px] p-5 border border-white/10 relative group hover:bg-white/[0.06] transition-colors">
+                    <div className="flex items-center gap-2 mb-3">
+                    <img 
+                      src={profile.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name || 'default'}&backgroundColor=transparent`} 
+                      alt={profile.name} 
+                      className="w-6 h-6 rounded-full bg-white/10 border border-white/10" 
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12px] font-bold text-white/90">{profile.name || 'Anonymous'}</span>
+                      <span className="text-[10px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded-md">{formatTime(thread.timestamp)}</span>
                     </div>
-                    <p className="text-[14px] font-medium text-white/80 leading-relaxed line-clamp-4">
+                  </div>
+                    <p className="text-[14px] font-medium text-white/90 leading-relaxed line-clamp-3 mb-4 whitespace-pre-wrap">
                       {thread.content}
                     </p>
                     {thread.images && thread.images.length > 0 && (
-                      <div className={`grid gap-2 mt-3 ${thread.images.length === 1 ? 'grid-cols-1' : thread.images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                        {thread.images.map((img, idx) => (
-                          <div key={idx} className={`rounded-xl overflow-hidden bg-white/5 ${thread.images!.length === 1 ? 'aspect-video' : 'aspect-square'}`}>
-                            <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                      <div className={`grid gap-2 mb-4 ${thread.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        {thread.images.slice(0, 2).map((img, idx) => (
+                          <div key={idx} className={`rounded-[14px] overflow-hidden bg-white/5 border border-white/5 ${thread.images!.length === 1 ? 'aspect-video' : 'aspect-square'}`}>
+                            <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                           </div>
                         ))}
                       </div>
                     )}
+                    <div className="flex flex-wrap gap-2 mt-auto">
+                      {thread.tags?.map(tag => (
+                        <span key={tag} className="text-[10px] font-bold text-white/60 bg-white/10 px-2 py-1 rounded-md">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

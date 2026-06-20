@@ -102,20 +102,23 @@ export default function MorePage() {
           <motion.button
             whileHover={{ scale: 0.98 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setActiveView('discover')}
-            className="w-full text-left p-5 rounded-[24px] bg-gradient-to-br from-secondary/50 to-secondary/10 border border-border/50 shadow-sm backdrop-blur-md flex items-center justify-between group"
+            className="w-full bg-card/40 backdrop-blur-xl border border-border rounded-[24px] p-6 flex items-center justify-between group opacity-50 cursor-not-allowed"
+            disabled
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[16px] bg-foreground flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-[16px] bg-foreground/50 flex items-center justify-center shadow-lg">
                 <Compass className="w-6 h-6 text-background" />
               </div>
-              <div>
-                <h4 className="text-[17px] font-bold text-foreground leading-tight mb-1">发现搭子</h4>
+              <div className="text-left">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-[17px] font-bold text-foreground leading-tight">发现搭子</h4>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">Coming Soon</span>
+                </div>
                 <p className="text-[13px] font-medium text-muted-foreground">探索并连接志同道合的朋友</p>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors">
-              <ChevronRight className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center">
+              <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
             </div>
           </motion.button>
         </section>

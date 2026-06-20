@@ -5,23 +5,16 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../store';
-import { useChain } from '../lib/chain/useChain';
-import { usePoints } from '../lib/web3/usePoints';
 import { useAccount } from 'wagmi';
 import QRCode from 'qrcode';
-import ProofPill from '../components/chain/ProofPill';
-import { tierGradient } from '../lib/chain/reputation';
-import { tierGradient as pointsTierGradient } from '../lib/web3/points';
+import { getSocialIcon, getSocialLabel } from '../lib/social';
 import OnboardingFlow from '../components/card/OnboardingFlow';
-import SyncActionBar from '../components/card/SyncActionBar';
 
 const EditProfile = lazy(() => import('../components/card/EditProfile'));
 const ShareDrawer = lazy(() => import('../components/card/ShareDrawer'));
 
 export default function CardPage() {
-  const { profile: myProfile, updateProfile, isSetup, syncStatus, syncToChain, loadFromChain } = useProfile();
-  const { state: chainState, reputation } = useChain();
-  const { balance: pointsBalance, tier: pointsTier } = usePoints();
+  const { profile: myProfile, updateProfile, isSetup } = useProfile();
   const { address } = useAccount();
   const [isEditing, setIsEditing] = useState(false);
   const [showShareDiv, setShowShareDiv] = useState(false);
@@ -95,36 +88,6 @@ export default function CardPage() {
               </motion.div>
             )}
 
-            {chainState && (
-              <motion.div
-                initial={{ y: 10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.22 }}
-                className="mt-3 flex flex-col items-center gap-2"
-              >
-                <div className="flex items-center gap-2 flex-wrap justify-center">
-                  <ProofPill
-                    hash={chainState.blocks[chainState.blocks.length - 1].hash}
-                    label="On-Chain"
-                    variant="glow"
-                  />
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-gradient-to-r ${tierGradient(reputation.tier)} bg-clip-text text-transparent border border-border/60`}>
-                    <span className="text-foreground">Lv.{reputation.level}</span>
-                    <span className="opacity-60 text-foreground">·</span>
-                    <span>{reputation.tier}</span>
-                  </span>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide text-white bg-gradient-to-r ${pointsTierGradient(pointsTier.tier)} shadow-sm`}>
-                    <Coins className="w-3 h-3" />
-                    {pointsBalance.toLocaleString()}
-                  </span>
-                </div>
-                <SyncActionBar
-                  syncStatus={syncStatus}
-                  onSync={syncToChain}
-                  onRestore={loadFromChain}
-                />
-              </motion.div>
-            )}
           </div>
 
           {profile.tags?.length > 0 && (
@@ -143,15 +106,29 @@ export default function CardPage() {
             </motion.div>
           )}
 
-          {profile.lookingFor && (
-            <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.35 }} className="bg-gradient-to-br from-secondary/40 to-secondary/10 backdrop-blur-xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] p-5 mb-5 flex gap-4 items-center">
-              <div className="w-10 h-10 rounded-[14px] bg-foreground flex items-center justify-center shrink-0 shadow-md">
-                <Zap className="w-5 h-5 text-background" />
-              </div>
-              <div>
-                <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Looking for</div>
-                <span className="text-[15px] font-bold text-foreground">{profile.lookingFor}</span>
-              </div>
+          {(profile.mbti || profile.zodiac || profile.age || profile.location) && (
+            <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.35 }} className="flex flex-wrap justify-center gap-2 mb-6">
+              {profile.mbti && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-black bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm border border-indigo-400/20">
+                  {profile.mbti}
+                </span>
+              )}
+              {profile.zodiac && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-secondary/80 text-foreground border border-border/50 shadow-sm backdrop-blur-sm">
+                  {profile.zodiac}
+                </span>
+              )}
+              {profile.age && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-secondary/80 text-foreground border border-border/50 shadow-sm backdrop-blur-sm">
+                  {profile.age}
+                </span>
+              )}
+              {profile.location && (
+                <span className="px-3 py-1.5 rounded-full text-[12px] font-bold bg-secondary/80 text-foreground border border-border/50 shadow-sm backdrop-blur-sm flex items-center gap-1">
+                  <MapPin className="w-3 h-3 opacity-70" />
+                  {profile.location.replace('📍 ', '')}
+                </span>
+              )}
             </motion.div>
           )}
 
@@ -160,47 +137,35 @@ export default function CardPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">联系方式</h3>
                 {profile.verified?.wallet && (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                    <Wallet className="w-3 h-3" />
                     {profile.verified.wallet.slice(0, 6)}…{profile.verified.wallet.slice(-4)}
                   </span>
                 )}
               </div>
-              <div className="flex justify-around">
-                {profile.verified?.wallet ? (
-                  <div className="flex flex-col items-center gap-2.5">
-                    <div className="w-12 h-12 rounded-[16px] bg-emerald-100 flex items-center justify-center shadow-sm">
-                      <Check className="w-5 h-5 text-emerald-700" />
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Wallet</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2.5 opacity-40">
-                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm">
-                      <Wallet className="w-5 h-5 text-foreground" />
-                    </div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Wallet</span>
-                  </div>
-                )}
-                {profile.verified?.twitter ? (
-                  <div className="flex flex-col items-center gap-2.5">
-                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><Twitter className="w-5 h-5 text-foreground" /></div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">X</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2.5 opacity-40">
-                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><Twitter className="w-5 h-5 text-foreground" /></div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">X</span>
-                  </div>
-                )}
-                {profile.verified?.discord ? (
-                  <div className="flex flex-col items-center gap-2.5">
-                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><MessageCircle className="w-5 h-5 text-foreground" /></div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Discord</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2.5 opacity-40">
-                    <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm"><MessageCircle className="w-5 h-5 text-foreground" /></div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Discord</span>
+              <div className="flex flex-wrap gap-4">
+                {profile.contacts && profile.contacts.map(contact => {
+                  const Icon = getSocialIcon(contact.platform);
+                  const label = getSocialLabel(contact.platform);
+                  return (
+                    <a
+                      key={contact.id || contact.platform}
+                      href={contact.url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col items-center gap-2.5 group"
+                      onClick={(e) => { if (!contact.url) e.preventDefault(); }}
+                    >
+                      <div className="w-12 h-12 rounded-[16px] bg-secondary/80 flex items-center justify-center shadow-sm group-hover:bg-secondary transition-colors">
+                        <Icon className="w-5 h-5 text-foreground" />
+                      </div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
+                    </a>
+                  );
+                })}
+                {(!profile.contacts || profile.contacts.length === 0) && (
+                  <div className="w-full text-center py-4 text-sm text-muted-foreground">
+                    暂未添加联系方式，点击右上角编辑添加
                   </div>
                 )}
               </div>
