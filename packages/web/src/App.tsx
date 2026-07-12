@@ -66,7 +66,7 @@ export default function App() {
   });
 
   const searchParams = new URLSearchParams(window.location.search);
-  const isSharedView = searchParams.has('c');
+  const isSharedView = searchParams.has('c') || searchParams.has('id');
   const isEmbedView = searchParams.has('address') || searchParams.has('cid');
   const isE2EChainSync = window.location.pathname === '/e2e/chain-sync';
 

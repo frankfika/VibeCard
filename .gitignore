@@ -4,5 +4,7 @@ dist/
 .env
 .env.local
 .playwright-mcp/
+.data/
 *.log
 test-results/
+packages/web/scripts/quick*.mjs

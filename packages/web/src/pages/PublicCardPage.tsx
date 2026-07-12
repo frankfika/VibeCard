@@ -62,40 +62,66 @@ function formatTime(ts: number) {
 
 function useSharedProfile() {
   const [profile, setProfile] = useState<SharedProfile | null>(null);
+  const [id, setId] = useState<string | null>(null);
   const [raw, setRaw] = useState<string | null>(null);
   const [isFull, setIsFull] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const c = params.get('c');
-    setRaw(c);
-    setIsFull(params.get('view') === 'full');
-    if (c) {
-      setProfile(decodeSharedProfile(c));
+    const isFullParam = params.get('view') === 'full';
+    setIsFull(isFullParam);
+    const idParam = params.get('id');
+    const cParam = params.get('c');
+    if (idParam) {
+      setId(idParam);
+      setLoadError(null);
+      fetch(`/api/cards/${encodeURIComponent(idParam)}`)
+        .then((r) => {
+          if (r.status === 404) throw new Error('not_found');
+          if (!r.ok) throw new Error(`http_${r.status}`);
+          return r.json();
+        })
+        .then((data: { profile: SharedProfile }) => {
+          if (data && data.profile) setProfile(data.profile);
+          else setLoadError('invalid_payload');
+        })
+        .catch((e) => setLoadError(String(e?.message || e)));
+    } else if (cParam) {
+      setRaw(cParam);
+      setProfile(decodeSharedProfile(cParam));
     }
   }, []);
 
   const buildUrl = (full?: boolean) => {
-    if (!raw) return '/';
     const url = new URL(window.location.href);
-    url.searchParams.set('c', raw);
+    if (id) {
+      url.searchParams.set('id', id);
+      url.searchParams.delete('c');
+    } else if (raw) {
+      url.searchParams.set('c', raw);
+    } else {
+      return '/';
+    }
     if (full) url.searchParams.set('view', 'full');
     else url.searchParams.delete('view');
     return url.pathname + url.search;
   };
 
-  return { profile, raw, isFull, buildUrl };
+  return { profile, id, raw, isFull, buildUrl, loadError };
 }
 
 export default function PublicCardPage() {
-  const { profile, raw, isFull, buildUrl } = useSharedProfile();
+  const { profile, raw, isFull, buildUrl, loadError } = useSharedProfile();
   const { address } = useAccount();
 
   if (!profile) {
     return (
       <div className="min-h-dvh bg-[#050505] text-white flex flex-col items-center justify-center px-6">
         <div className="text-[48px] mb-4 opacity-20 font-black">?</div>
-        <p className="text-[16px] font-semibold text-white/60">名片链接已失效或格式错误</p>
+        <p className="text-[16px] font-semibold text-white/60">
+          {loadError === 'not_found' ? '名片不存在或已被删除' : '名片链接已失效或格式错误'}
+        </p>
         <a
           href="/"
           className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-white text-black rounded-2xl font-bold text-[15px] hover:opacity-90 transition-opacity"
