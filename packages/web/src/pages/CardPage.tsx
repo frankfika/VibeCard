@@ -62,7 +62,7 @@ export default function CardPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col relative">
-      <header className="px-6 py-4 flex justify-center items-center z-20 shrink-0">
+      <header className="hidden md:flex px-6 py-4 justify-center items-center z-20 shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground tracking-widest uppercase">
           我的名片
         </span>
@@ -81,10 +81,23 @@ export default function CardPage() {
             </motion.div>
             <motion.h1 initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-[24px] sm:text-[28px] md:text-[32px] font-black tracking-tight text-foreground mb-1">{profile.name}</motion.h1>
             {profile.handle && <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }} className="text-[15px] font-bold text-muted-foreground">{profile.handle}</motion.div>}
-            {profile.event && (
-              <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="mt-3 px-3 py-1.5 rounded-full bg-secondary/50 flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground backdrop-blur-sm">
-                <MapPin className="w-3.5 h-3.5" />
-                {profile.event}
+            {(profile.event || profile.lookingFor) && (
+              <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                {profile.event && (
+                  <span className="px-3 py-1.5 rounded-full bg-secondary/50 flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground backdrop-blur-sm">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {profile.event}
+                  </span>
+                )}
+                {profile.lookingFor && (
+                  <span className="px-3 py-1.5 rounded-full bg-foreground/5 border border-foreground/10 flex items-center gap-1.5 text-[12px] font-bold text-foreground/80 backdrop-blur-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    找: {profile.lookingFor}
+                  </span>
+                )}
               </motion.div>
             )}
 
@@ -187,25 +200,10 @@ export default function CardPage() {
               </div>
             </motion.div>
           )}
-          {qrDataUrl && (
-            <motion.div
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] p-4 mb-8 flex items-center justify-between gap-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-[14px] bg-foreground flex items-center justify-center shrink-0 shadow-md">
-                  <QrCode className="w-5 h-5 text-background" />
-                </div>
-                <div>
-                  <div className="text-[14px] font-bold text-foreground">扫码查看名片</div>
-                  <div className="text-[11px] text-muted-foreground">微信 / 相机扫码即可访问</div>
-                </div>
-              </div>
-              <img src={qrDataUrl} alt="名片二维码" className="w-14 h-14 rounded-xl bg-white p-1 shadow-sm shrink-0" />
-            </motion.div>
-          )}
+          {/* Note: an inline QR card used to live here, but the fixed
+              bottom action bar covered it on mobile. Use the share drawer
+              ("面对面扫码") to view the QR — that path is the only one
+              that actually works on small screens. */}
         </div>
       </main>
 

@@ -23,7 +23,7 @@ export interface Profile {
   age?: string;
   location?: string;
   tags: { label: string; icon: string }[];
-  lookingFor: string;
+  lookingFor?: string;
   highlights: { id: number; title: string; type: string; icon: string; link: string }[];
   contacts?: Contact[];
   verified: {
@@ -33,7 +33,7 @@ export interface Profile {
     wechat: string;
     telegram: string;
   };
-  event: string;
+  event?: string;
   threads: Thread[];
 }
 

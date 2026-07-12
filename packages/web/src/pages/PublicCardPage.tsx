@@ -93,16 +93,36 @@ export default function PublicCardPage() {
 
   if (!profile) {
     return (
-      <div className="min-h-dvh bg-[#050505] text-white flex flex-col items-center justify-center px-6">
-        <div className="text-[48px] mb-4 opacity-20 font-black">?</div>
-        <p className="text-[16px] font-semibold text-white/60">名片链接已失效或格式错误</p>
-        <a
-          href="/"
-          className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-white text-black rounded-2xl font-bold text-[15px] hover:opacity-90 transition-opacity"
-        >
-          <Sparkles className="w-5 h-5" />
-          创建我的名片
-        </a>
+      <div className="min-h-dvh bg-[#050505] text-white flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-5">
+          <User className="w-7 h-7 text-white/40" />
+        </div>
+        <h1 className="text-[20px] font-black text-white mb-2">这张名片找不到了</h1>
+        <p className="text-[14px] font-medium text-white/55 max-w-[300px] leading-relaxed mb-8">
+          {raw
+            ? '链接格式有误, 名片内容无法解析。你可以问问分享者重新发一次。'
+            : '该名片可能已被删除, 或者链接地址写错了。'}
+        </p>
+        <div className="flex flex-col gap-3 w-full max-w-[280px]">
+          <a
+            href="/"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-black rounded-2xl font-bold text-[15px] hover:opacity-90 transition-opacity"
+          >
+            <Sparkles className="w-5 h-5" />
+            创建我的名片
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              const subject = encodeURIComponent('vibecard 名片链接失效');
+              const body = encodeURIComponent(`我打开了这个链接发现名片失效: ${typeof window !== 'undefined' ? window.location.href : ''}`);
+              window.location.href = `mailto:hi@opencsg.com?subject=${subject}&body=${body}`;
+            }}
+            className="inline-flex items-center justify-center gap-2 px-7 py-3 bg-white/5 text-white/80 rounded-2xl font-semibold text-[13px] hover:bg-white/10 transition-colors border border-white/10"
+          >
+            举报失效链接
+          </button>
+        </div>
       </div>
     );
   }

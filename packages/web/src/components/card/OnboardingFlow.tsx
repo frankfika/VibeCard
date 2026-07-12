@@ -29,6 +29,8 @@ export default function OnboardingFlow({
   const [age, setAge] = useState('');
   const [location, setLocation] = useState('');
   const [locationFocused, setLocationFocused] = useState(false);
+  const [event, setEvent] = useState('');
+  const [lookingFor, setLookingFor] = useState('');
   const [highlights, setHighlights] = useState<Profile['highlights']>([{ id: Date.now(), title: '', type: '', icon: '✨', link: '' }]);
   const [avatarSeed, setAvatarSeed] = useState(AVATAR_SEEDS[0]);
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
@@ -84,13 +86,15 @@ export default function OnboardingFlow({
       zodiac,
       age,
       location: location.trim() || undefined,
+      event: event.trim() || undefined,
+      lookingFor: lookingFor.trim() || undefined,
       tags: selectedTags,
       highlights: highlights.filter(h => h.title.trim()),
       avatar: avatarMode === 'custom' && customAvatar ? customAvatar : `https://api.dicebear.com/7.x/notionists/svg?seed=${avatarSeed}&backgroundColor=transparent`,
     });
   };
 
-  const totalSteps = 5;
+  const totalSteps = 6;
   const currentStepIndex = step + 1;
   const progress = Math.max(0, Math.min(100, (currentStepIndex / (totalSteps - 1)) * 100));
 
@@ -388,6 +392,54 @@ export default function OnboardingFlow({
               </div>
             </div>
           )}
+
+          {step === 4 && (
+            <div className="flex flex-col h-full pt-4">
+              <div className="flex-1 space-y-6">
+                <div>
+                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">场景 & 诉求</h2>
+                  <p className="text-[13px] text-muted-foreground font-medium">
+                    都可跳过，但填了更精准。
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[12px] font-bold uppercase tracking-widest text-muted-foreground">最近活动 / 会议（选填）</label>
+                  <div className="rounded-[16px] border border-border bg-card/60 backdrop-blur-sm flex items-center px-3 py-2.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground shrink-0 mr-2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    <input
+                      value={event}
+                      onChange={e => setEvent(e.target.value)}
+                      placeholder="如 ETHGlobal Singapore 2024"
+                      className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/70">会作为 tag 出现在名片顶部，方便线下相遇时识别。</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[12px] font-bold uppercase tracking-widest text-muted-foreground">想找什么搭子（选填）</label>
+                  <div className="rounded-[16px] border border-border bg-card/60 backdrop-blur-sm flex items-center px-3 py-2.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground shrink-0 mr-2">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      value={lookingFor}
+                      onChange={e => setLookingFor(e.target.value)}
+                      placeholder="如 co-founder / 投资人 / 跑友"
+                      className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
@@ -402,11 +454,11 @@ export default function OnboardingFlow({
             </button>
           )}
           <button
-            onClick={() => step < 3 ? setStep(s => s + 1) : finish()}
+            onClick={() => step < 4 ? setStep(s => s + 1) : finish()}
             disabled={!canProceed()}
             className="tap-target flex-1 h-11 rounded-lg bg-foreground text-background font-semibold text-[15px] flex items-center justify-center hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-30"
           >
-            {step === -1 ? '开始' : step < 3 ? '继续' : '完成'}
+            {step === -1 ? '开始' : step < 4 ? '继续' : '完成'}
           </button>
         </div>
       </div>

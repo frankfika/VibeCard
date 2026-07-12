@@ -5,6 +5,7 @@ import {
 import { motion } from 'motion/react';
 import { useAccount } from 'wagmi';
 import type { Profile, Contact } from '../../store';
+import WalletConnect from '../../components/WalletConnect';
 import {
   AVATAR_SEEDS,
   MBTI_OPTIONS,
@@ -343,12 +344,13 @@ export default function EditProfile({
               <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
                 <Wallet className="w-4 h-4 text-muted-foreground" />
               </div>
-              <div className="flex-1 flex items-center border border-border rounded-xl px-3 py-2 bg-background">
+              <div className="flex-1 flex items-center border border-border rounded-xl px-3 py-2 bg-background gap-2">
                 {address ? (
-                  <span className="text-[13px] font-medium text-foreground">{address.slice(0, 8)}…{address.slice(-6)}</span>
+                  <span className="text-[13px] font-medium text-foreground flex-1">{address.slice(0, 8)}…{address.slice(-6)}</span>
                 ) : (
-                  <span className="text-[13px] font-medium text-muted-foreground">未连接钱包</span>
+                  <span className="text-[13px] font-medium text-muted-foreground flex-1">未连接钱包</span>
                 )}
+                {!address && <WalletConnect />}
               </div>
             </div>
             <div className="flex items-center gap-3">

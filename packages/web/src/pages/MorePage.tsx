@@ -10,11 +10,13 @@ import ChainIdentityCard from '../components/chain/ChainIdentityCard';
 import PointsCard from '../components/chain/PointsCard';
 import { useProfile } from '../store';
 import { useTheme } from '../components/ThemeProvider';
+import { useToast } from '../components/ui/ToastProvider';
 
 export default function MorePage() {
   const [activeView, setActiveView] = useState<'index' | 'discover' | 'games'>('index');
   const { profile } = useProfile();
   const { theme, resolved, toggle } = useTheme();
+  const toast = useToast();
   const profileComplete = !!(
     profile.name && profile.bio && profile.tags?.length >= 3 &&
     (profile.verified?.wallet || profile.verified?.twitter || profile.verified?.discord)
@@ -99,20 +101,23 @@ export default function MorePage() {
             <Sparkles className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">Network</h3>
           </div>
-          <motion.button
-            whileHover={{ scale: 0.98 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-full bg-card/40 backdrop-blur-xl border border-border rounded-[24px] p-6 flex items-center justify-between group opacity-50 cursor-not-allowed"
-            disabled
+          <button
+            type="button"
+            onClick={() => {
+              // Discover-companion feature is on the roadmap; clicking tells
+              // the user it's not live yet instead of leaving a dead button.
+              toast.show({ message: '搭子发现功能即将上线, 关注更新', type: 'info', duration: 3000 });
+            }}
+            className="w-full bg-card/40 backdrop-blur-xl border border-border rounded-[24px] p-6 flex items-center justify-between group hover:bg-card/60 active:scale-[0.99] transition-all"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[16px] bg-foreground/50 flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-[16px] bg-foreground flex items-center justify-center shadow-lg">
                 <Compass className="w-6 h-6 text-background" />
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-2 mb-1">
                   <h4 className="text-[17px] font-bold text-foreground leading-tight">发现搭子</h4>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">Coming Soon</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">即将上线</span>
                 </div>
                 <p className="text-[13px] font-medium text-muted-foreground">探索并连接志同道合的朋友</p>
               </div>
@@ -120,7 +125,7 @@ export default function MorePage() {
             <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center">
               <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
             </div>
-          </motion.button>
+          </button>
         </section>
 
         {/* Utilities Module */}
