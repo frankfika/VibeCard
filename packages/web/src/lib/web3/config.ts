@@ -87,10 +87,14 @@ if (walletConnectProjectId) {
     ssr: false,
   });
 } else {
+  const transports = {} as Record<(typeof supportedChains)[number]['id'], ReturnType<typeof http>>;
+  for (const chain of supportedChains) {
+    transports[chain.id] = http();
+  }
   wagmiConfig = createConfig({
     chains: chainsTuple,
     connectors: [injected()],
-    transports: Object.fromEntries(supportedChains.map((chain) => [chain.id, http()])),
+    transports,
     ssr: false,
     storage: createStorage({
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
