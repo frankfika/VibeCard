@@ -9,6 +9,7 @@ import { useAccount } from 'wagmi';
 import QRCode from 'qrcode';
 import { getSocialIcon, getSocialLabel } from '../lib/social';
 import OnboardingFlow from '../components/card/OnboardingFlow';
+import { useNamecardUrl } from '../hooks/useNamecardUrl';
 
 const EditProfile = lazy(() => import('../components/card/EditProfile'));
 const ShareDrawer = lazy(() => import('../components/card/ShareDrawer'));
@@ -19,21 +20,12 @@ export default function CardPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [showShareDiv, setShowShareDiv] = useState(false);
 
-  const shareUrl = useMemo(() => {
-    try {
-      const profileData = btoa(encodeURIComponent(JSON.stringify(myProfile)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '.');
-      return `${window.location.origin}/?c=${profileData}`;
-    } catch {
-      return window.location.href;
-    }
-  }, [myProfile]);
-
+  // Stable short share URL backed by /api/cards; falls back to legacy base64.
+  const { url: shareUrl } = useNamecardUrl(myProfile);
   const shareUrlFull = useMemo(() => {
-    if (shareUrl === window.location.href) return shareUrl;
-    return `${shareUrl}&view=full`;
+    if (!shareUrl || shareUrl === window.location.href) return shareUrl;
+    const sep = shareUrl.includes('?') ? '&' : '?';
+    return `${shareUrl}${sep}view=full`;
   }, [shareUrl]);
 
   const [qrDataUrl, setQrDataUrl] = useState('');
