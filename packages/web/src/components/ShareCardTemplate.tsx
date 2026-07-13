@@ -209,7 +209,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
         className={`rounded-2xl p-4 text-[16px] leading-relaxed font-medium italic ${isCenter ? 'text-center' : 'text-left'}`}
         style={{ background: tokens.pillBg, color: tokens.secondary }}
       >
-        "{profile.bio}"
+        {profile.bio}
       </div>
     );
   };
@@ -400,7 +400,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
                   style={{ borderColor: tokens.cardBorder }}
                 >
                   <div>
-                    <div className="text-[22px] font-black" style={{ color: tokens.primary }}>Let's Connect</div>
+                    <div className="text-[22px] font-black" style={{ color: tokens.primary }}>来连接</div>
                     <div className="text-[13px] font-medium" style={{ color: tokens.secondary }}>扫码查看完整主页与动态</div>
                   </div>
                   {renderQR(88)}

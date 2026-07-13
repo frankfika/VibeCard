@@ -10,11 +10,11 @@ import type { Profile } from '../../store';
 import { ShareCardTemplate, type CardTheme, type CardLayout, type CardOrientation, type CardVisibleFields } from '../ShareCardTemplate';
 
 const THEMES: { id: CardTheme; label: string }[] = [
-  { id: 'dark', label: 'Dark Vibe' },
-  { id: 'light', label: 'Pure Light' },
-  { id: 'neon', label: 'Web3 Neon' },
-  { id: 'chill', label: 'Chill Breeze' },
-  { id: 'retro', label: 'Retro Classic' },
+  { id: 'dark', label: 'Dark Vibe · 暗黑' },
+  { id: 'light', label: 'Pure Light · 纯净' },
+  { id: 'neon', label: 'Web3 Neon · 链上霓虹' },
+  { id: 'chill', label: 'Chill Breeze · 清新' },
+  { id: 'retro', label: 'Retro Classic · 复古' },
 ];
 
 const LOADING_TEXTS = [
@@ -536,7 +536,7 @@ export default function ShareDrawer({
               </div>
               <span className="text-[15px] font-semibold text-foreground">复制名片链接</span>
             </div>
-            {isCopied ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <span className="text-[13px] font-medium text-muted-foreground">复制</span>}
+            {isCopied ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <span className="text-[13px] font-medium text-muted-foreground"></span>}
           </button>
 
           {canNativeShare && (
