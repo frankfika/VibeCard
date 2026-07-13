@@ -1,8 +1,11 @@
 import { forwardRef } from 'react';
 import {
   Check, Hexagon, Zap, MapPin, Twitter, MessageCircle, Wallet, Github,
+  Send, Mail, Globe, Linkedin, Link as LinkIcon
 } from 'lucide-react';
-import { type Profile } from '../store';
+import { type Profile, type Contact } from '../store';
+
+import { getSocialIcon, getSocialLabel } from '../lib/social';
 
 export type CardTheme = 'dark' | 'light' | 'neon' | 'retro' | 'chill';
 export type CardLayout = 'center' | 'left';
@@ -15,7 +18,7 @@ export interface CardVisibleFields {
   event: boolean;
   tags: boolean;
   bio: boolean;
-  lookingFor: boolean;
+  specialTags: boolean;
   verified: boolean;
   highlights: boolean;
   qr: boolean;
@@ -37,7 +40,7 @@ const DEFAULT_VISIBLE: CardVisibleFields = {
   event: true,
   tags: true,
   bio: true,
-  lookingFor: true,
+  specialTags: true,
   verified: true,
   highlights: true,
   qr: true,
@@ -125,15 +128,26 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
     },
   }[theme];
 
-  const socialItems = [
-    { key: 'wallet', show: !!profile.verified?.wallet, icon: Wallet, label: 'Wallet', value: profile.verified?.wallet ? `${profile.verified.wallet.slice(0, 6)}...${profile.verified.wallet.slice(-4)}` : '' },
-    { key: 'twitter', show: !!profile.verified?.twitter, icon: Twitter, label: 'X', value: 'Verified' },
-    { key: 'discord', show: !!profile.verified?.discord, icon: MessageCircle, label: 'Discord', value: 'Verified' },
-  ].filter(s => s.show);
+  const socialItems = (profile.contacts || []).map(contact => {
+    const Icon = getSocialIcon(contact.platform);
+    return {
+      key: contact.id || contact.platform,
+      icon: Icon,
+      label: getSocialLabel(contact.platform),
+      value: contact.value,
+    };
+  });
 
-  const fallbackSocial = (!profile.verified?.twitter && !profile.verified?.discord)
-    ? { icon: Github, label: 'Github', value: 'Connected' }
-    : null;
+  if (profile.verified?.wallet && !socialItems.some(s => s.key === 'wallet')) {
+    socialItems.unshift({
+      key: 'wallet',
+      icon: getSocialIcon('wallet'),
+      label: 'Wallet',
+      value: `${profile.verified.wallet.slice(0, 6)}...${profile.verified.wallet.slice(-4)}`
+    });
+  }
+
+  const fallbackSocial = null;
 
   const visibleCount = [
     show.avatar,
@@ -142,15 +156,15 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
     show.event && profile.event,
     show.tags && tags.length > 0,
     show.bio && profile.bio,
-    show.lookingFor && profile.lookingFor,
-    show.verified && (socialItems.length > 0 || !!fallbackSocial),
+    show.specialTags && (profile.mbti || profile.zodiac || profile.age || profile.location),
+    show.verified && socialItems.length > 0,
     show.highlights && highlights.length > 0,
     show.qr,
   ].filter(Boolean).length;
   const isSparse = visibleCount <= 5;
 
   const renderSocials = () => {
-    if (!show.verified) return null;
+    if (!show.verified || socialItems.length === 0) return null;
     return (
       <div className={`flex flex-wrap ${isCenter ? 'justify-center' : 'justify-start'} gap-2.5`}>
         {socialItems.map(s => (
@@ -167,18 +181,6 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
             {s.key === 'wallet' && <Check className="w-3.5 h-3.5 text-emerald-500 ml-0.5" />}
           </div>
         ))}
-        {fallbackSocial && (
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-2xl border"
-            style={{ background: tokens.pillBg, borderColor: tokens.cardBorder }}
-          >
-            <fallbackSocial.icon className="w-4 h-4" style={{ color: tokens.secondary }} />
-            <div className="flex flex-col">
-              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: tokens.muted }}>{fallbackSocial.label}</span>
-              <span className="text-[12px] font-bold leading-tight" style={{ color: tokens.primary }}>{fallbackSocial.value}</span>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -212,23 +214,32 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
     );
   };
 
-  const renderLookingFor = () => {
-    if (!show.lookingFor || !profile.lookingFor) return null;
+  const renderSpecialTags = () => {
+    if (!show.specialTags) return null;
+    if (!profile.mbti && !profile.zodiac && !profile.age && !profile.location) return null;
     return (
-      <div
-        className="rounded-2xl p-4 flex items-center gap-3 border"
-        style={{ background: tokens.pillBg, borderColor: tokens.cardBorder }}
-      >
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: tokens.tagBg }}
-        >
-          <Hexagon className="w-5 h-5" style={{ color: tokens.primary }} />
-        </div>
-        <div className="min-w-0 flex-1 text-left">
-          <div className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: tokens.muted }}>Looking for</div>
-          <div className="text-[16px] font-bold truncate" style={{ color: tokens.primary }}>{profile.lookingFor}</div>
-        </div>
+      <div className={`flex flex-wrap ${isCenter ? 'justify-center' : 'justify-start'} gap-2`}>
+        {profile.mbti && (
+          <span className="px-3 py-1.5 rounded-full text-[14px] font-black shadow-sm" style={{ background: tokens.tagBg, color: tokens.primary }}>
+            {profile.mbti}
+          </span>
+        )}
+        {profile.zodiac && (
+          <span className="px-3 py-1.5 rounded-full text-[14px] font-bold shadow-sm" style={{ background: tokens.tagBg, color: tokens.primary }}>
+            {profile.zodiac}
+          </span>
+        )}
+        {profile.age && (
+          <span className="px-3 py-1.5 rounded-full text-[14px] font-bold shadow-sm" style={{ background: tokens.tagBg, color: tokens.primary }}>
+            {profile.age}
+          </span>
+        )}
+        {profile.location && (
+          <span className="px-3 py-1.5 rounded-full text-[14px] font-bold shadow-sm flex items-center gap-1" style={{ background: tokens.tagBg, color: tokens.primary }}>
+            <MapPin className="w-3 h-3" />
+            {profile.location.replace('📍 ', '')}
+          </span>
+        )}
       </div>
     );
   };
@@ -329,7 +340,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
               )}
               {renderTags()}
               {renderBio()}
-              {renderLookingFor()}
+              {renderSpecialTags()}
               {renderSocials()}
               {renderHighlights()}
               {show.qr && (
@@ -377,7 +388,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-4">
                 {renderTags()}
                 {renderBio()}
-                {renderLookingFor()}
+                {renderSpecialTags()}
                 {renderSocials()}
                 {renderHighlights()}
               </div>
@@ -443,7 +454,7 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
           {/* Right Column */}
           <div className="flex-1 min-w-0 flex flex-col justify-center gap-4 overflow-hidden">
             {renderBio()}
-            {renderLookingFor()}
+            {renderSpecialTags()}
             {renderSocials()}
             {renderHighlights()}
           </div>

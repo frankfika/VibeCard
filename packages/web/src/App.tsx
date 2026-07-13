@@ -5,6 +5,7 @@ import CardPage from './pages/CardPage';
 import EmbedCardPage from './pages/EmbedCardPage';
 import PublicCardPage from './pages/PublicCardPage';
 import IMBrowserNotice from './components/IMBrowserNotice';
+import { useProfile } from './store';
 
 const ThreadsPage = lazy(() => import('./pages/ThreadsPage'));
 const MorePage = lazy(() => import('./pages/MorePage'));
@@ -21,8 +22,9 @@ const TAB_CONFIG: { id: Tab; icon: ReactNode; label: string }[] = [
   { id: 'more', icon: <Menu className="w-5 h-5" />, label: '更多' },
 ];
 
-function MobileHeader({ activeTab, onBack, hidden }: { activeTab: string; onBack?: () => void; hidden?: boolean }) {
+function MobileHeader({ activeTab, onBack, hidden, onboarding }: { activeTab: string; onBack?: () => void; hidden?: boolean; onboarding?: boolean }) {
   const getTitle = () => {
+    if (onboarding) return '创建你的名片';
     switch (activeTab) {
       case 'card': return '我的名片';
       case 'threads': return '动态';
@@ -64,9 +66,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     return (localStorage.getItem('vibecard_tab') as Tab) || 'card';
   });
+  const { isSetup } = useProfile();
 
   const searchParams = new URLSearchParams(window.location.search);
-  const isSharedView = searchParams.has('c');
+  const isSharedView = searchParams.has('c') || searchParams.has('id');
   const isEmbedView = searchParams.has('address') || searchParams.has('cid');
   const isE2EChainSync = window.location.pathname === '/e2e/chain-sync';
 
@@ -96,7 +99,7 @@ export default function App() {
     <>
       <IMBrowserNotice />
       <div className="min-h-dvh bg-background text-foreground flex md:flex-row flex-col">
-        <MobileHeader activeTab={activeTab} hidden={isSharedView} />
+        <MobileHeader activeTab={activeTab} hidden={isSharedView} onboarding={!isSetup} />
 
         {/* Desktop Sidebar */}
         {!isSharedView && (

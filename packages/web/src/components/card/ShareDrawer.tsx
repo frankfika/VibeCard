@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Share, Twitter, Send, Download, QrCode,
-  CheckCircle2, Link2, X, Code, Palette, LayoutTemplate, Smartphone, Monitor, Check
+  CheckCircle2, Link2, X, Code, Palette, LayoutTemplate, Smartphone, Monitor, Check, MessageCircle,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import QRCode from 'qrcode';
@@ -43,7 +43,7 @@ export default function ShareDrawer({
   const [isScriptEmbedCopied, setIsScriptEmbedCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
-  
+
   // Customization states
   const [theme, setTheme] = useState<CardTheme>('dark');
   const [layout, setLayout] = useState<CardLayout>('center');
@@ -57,7 +57,7 @@ export default function ShareDrawer({
     event: true,
     tags: true,
     bio: true,
-    lookingFor: true,
+    specialTags: true,
     verified: true,
     highlights: true,
     qr: true,
@@ -136,8 +136,6 @@ export default function ShareDrawer({
     const el = previewContainerRef.current;
     if (!el) return;
 
-    let timeoutId: NodeJS.Timeout;
-
     const observer = new ResizeObserver((entries) => {
       // 避免 ResizeObserver loop 报错，使用 requestAnimationFrame 延迟更新
       window.requestAnimationFrame(() => {
@@ -145,13 +143,13 @@ export default function ShareDrawer({
         const { width, height } = entries[0].contentRect;
         const targetWidth = orientation === 'portrait' ? 800 : 1100;
         const targetHeight = orientation === 'portrait' ? 1100 : 800;
-        
-      // 计算缩放比例，留出极小的 padding 即可
-      const padding = 16;
-      const scaleX = (width - padding) / targetWidth;
-      const scaleY = (height - padding) / targetHeight;
-      
-      setPreviewScale(Math.min(scaleX, scaleY));
+
+        // 计算缩放比例，留出极小的 padding 即可
+        const padding = 16;
+        const scaleX = (width - padding) / targetWidth;
+        const scaleY = (height - padding) / targetHeight;
+
+        setPreviewScale(Math.min(scaleX, scaleY));
       });
     });
 
@@ -162,13 +160,13 @@ export default function ShareDrawer({
   const generateCardImage = async () => {
     if (!hiddenCardRef.current) return;
     setIsSaving(true);
-    
+
     // Give it a tiny delay to ensure React has fully rendered the hidden ref with the new theme
     await new Promise(r => setTimeout(r, 50));
-    
+
     try {
-      const dataUrl = await toPng(hiddenCardRef.current, { 
-        pixelRatio: 2, 
+      const dataUrl = await toPng(hiddenCardRef.current, {
+        pixelRatio: 2,
         backgroundColor: theme === 'light' || theme === 'chill' || theme === 'retro' ? '#ffffff' : '#0a0a0a',
         style: {
           transform: 'none',
@@ -194,11 +192,16 @@ export default function ShareDrawer({
   const openPlatform = (key: string) => {
     const encodedUrl = encodeURIComponent(shareUrl);
     const encodedText = encodeURIComponent(shareText);
+    // Each platform must have both a URL here AND a button rendered below;
+    // dead config here (no matching button) was a UX bug found in audit.
     const urls: Record<string, string> = {
       x: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
       telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
-      discord: `https://discord.com/channels/@me`,
       weibo: `https://service.weibo.com/share/share.php?title=${encodedText}&url=${encodedUrl}`,
+      // wechat & discord: no public web-share intent, so we open the
+      // service home in a new tab so the user can paste the link manually.
+      wechat: `https://web.wechat.com/`,
+      discord: `https://discord.com/channels/@me`,
     };
     if (urls[key]) window.open(urls[key], '_blank', 'width=600,height=500,noopener,noreferrer');
   };
@@ -206,8 +209,15 @@ export default function ShareDrawer({
   if (mode === 'qr') {
     return (
       <>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-foreground/20 z-50" />
-        <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[28px] p-6 pt-5 z-50 border-t border-border">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-foreground/20 z-[60]" />
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="fixed bottom-0 left-0 right-0 bg-background rounded-t-[28px] p-6 pt-5 z-[60] border-t border-border max-h-[calc(100dvh-64px)] overflow-y-auto"
+          style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}
+        >
           <div className="w-10 h-[4px] bg-border rounded-full mx-auto mb-5" />
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-[18px] font-bold text-foreground">二维码分享</h3>
@@ -355,7 +365,7 @@ export default function ShareDrawer({
                     { key: 'event', label: '活动' },
                     { key: 'tags', label: '标签' },
                     { key: 'bio', label: '简介' },
-                    { key: 'lookingFor', label: 'Looking for' },
+                    { key: 'specialTags', label: '特殊标识' },
                     { key: 'verified', label: '联系方式' },
                     { key: 'highlights', label: '亮点' },
                     { key: 'qr', label: '扫码查看更多' },
@@ -443,8 +453,8 @@ export default function ShareDrawer({
   if (mode === 'imagePreview') {
     return (
       <>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-foreground/40 z-50" />
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="absolute inset-x-4 top-[10%] bottom-[10%] bg-background rounded-[28px] p-5 z-50 border border-border shadow-2xl flex flex-col">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-foreground/40 z-[60]" />
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed inset-x-4 top-[10%] bottom-[10%] bg-background rounded-[28px] p-5 z-[60] border border-border shadow-2xl flex flex-col">
           <div className="flex items-center justify-between mb-3 shrink-0">
             <h3 className="text-[16px] font-bold text-foreground">海报已生成</h3>
             <button onClick={() => setMode('posterBuilder')} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-foreground hover:text-background transition-colors">
@@ -481,10 +491,17 @@ export default function ShareDrawer({
 
   return (
     <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-foreground/20 z-50 backdrop-blur-[2px]" />
-      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[32px] p-6 pt-5 z-50 border-t border-border shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-foreground/20 z-[60] backdrop-blur-[2px]" />
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="fixed bottom-0 left-0 right-0 bg-background rounded-t-[32px] p-6 pt-5 z-[60] border-t border-border shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.1)] max-h-[calc(100dvh-64px)] overflow-y-auto"
+        style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}
+      >
         <div className="w-12 h-[5px] bg-secondary-foreground/20 rounded-full mx-auto mb-6" />
-        
+
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-[22px] font-black text-foreground tracking-tight">分享名片</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary-foreground/10 transition-colors">
@@ -501,7 +518,7 @@ export default function ShareDrawer({
             </div>
             <span className="text-[14px] font-bold text-background relative z-10">定制专属海报</span>
           </button>
-          
+
           <button onClick={() => setMode('qr')} className="flex flex-col items-center gap-3 p-5 rounded-[24px] bg-secondary hover:bg-secondary/80 transition-all active:scale-[0.98]">
             <div className="w-12 h-12 rounded-full bg-background text-foreground flex items-center justify-center shadow-sm">
               <QrCode className="w-6 h-6" />
@@ -537,7 +554,7 @@ export default function ShareDrawer({
         {/* 社交媒体 */}
         <div className="mb-8">
           <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-1">分享至社交媒体</p>
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-1 -mx-1">
+          <div className="flex flex-wrap gap-3 pb-2 px-1 -mx-1">
             <button onClick={() => openPlatform('x')} className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-secondary hover:bg-secondary/80 transition-colors shrink-0">
               <Twitter className="w-4 h-4" />
               <span className="text-[14px] font-bold text-foreground">X (Twitter)</span>
@@ -546,8 +563,16 @@ export default function ShareDrawer({
               <Send className="w-4 h-4" />
               <span className="text-[14px] font-bold text-foreground">Telegram</span>
             </button>
+            <button onClick={() => openPlatform('wechat')} className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-secondary hover:bg-secondary/80 transition-colors shrink-0" title="复制链接后到微信粘贴分享">
+              <MessageCircle className="w-4 h-4" />
+              <span className="text-[14px] font-bold text-foreground">微信</span>
+            </button>
             <button onClick={() => openPlatform('weibo')} className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-secondary hover:bg-secondary/80 transition-colors shrink-0">
               <span className="text-[14px] font-bold text-foreground">Weibo</span>
+            </button>
+            <button onClick={() => openPlatform('discord')} className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-secondary hover:bg-secondary/80 transition-colors shrink-0" title="复制链接后到 Discord 粘贴分享">
+              <MessageCircle className="w-4 h-4" />
+              <span className="text-[14px] font-bold text-foreground">Discord</span>
             </button>
           </div>
         </div>
