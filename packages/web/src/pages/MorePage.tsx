@@ -57,7 +57,7 @@ export default function MorePage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       <header className="px-6 pt-5 pb-4 shrink-0 z-10">
-        <h2 className="text-[22px] font-black tracking-tight text-foreground">Explore</h2>
+        <h2 className="text-[22px] font-black tracking-tight text-foreground">发现与工具</h2>
       </header>
 
       <main className="flex-1 overflow-y-auto px-6 pb-32 space-y-6 no-scrollbar">
@@ -99,7 +99,7 @@ export default function MorePage() {
         <section>
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-muted-foreground" />
-            <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">Network</h3>
+            <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">发现</h3>
           </div>
           <button
             type="button"
@@ -132,7 +132,7 @@ export default function MorePage() {
         <section>
           <div className="flex items-center gap-2 mb-3">
             <Box className="w-4 h-4 text-muted-foreground" />
-            <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">Utilities</h3>
+            <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">工具</h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <motion.button

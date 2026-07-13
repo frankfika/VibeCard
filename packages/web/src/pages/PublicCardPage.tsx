@@ -258,7 +258,7 @@ function SimpleCardView({
             {profile.name || 'Anonymous'}
           </h1>
           {profile.handle && (
-            <div className="text-[14px] font-semibold text-white/55">{profile.handle}</div>
+            <div className="text-[14px] font-semibold text-white/55">@{profile.handle}</div>
           )}
 
           {profile.verified?.wallet && (
