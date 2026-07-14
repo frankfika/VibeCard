@@ -1,7 +1,9 @@
 import { useState, type ChangeEvent } from 'react';
-import { User, Smile } from 'lucide-react';
+import { User, Smile, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Profile } from '../../store';
+import { useToast } from '../ui/ToastProvider';
+import { generateAvatarFromPrompt, pickRandomAvatarSeed } from '../../lib/genai';
 import {
   AVATAR_SEEDS,
   MBTI_OPTIONS,
@@ -35,6 +37,26 @@ export default function OnboardingFlow({
   const [avatarSeed, setAvatarSeed] = useState(AVATAR_SEEDS[0]);
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [avatarMode, setAvatarMode] = useState<'generated' | 'custom'>('generated');
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const toast = useToast();
+
+  const handleGenerateAvatar = async () => {
+    if (isGeneratingAvatar) return;
+    setAvatarMode('generated');
+    setIsGeneratingAvatar(true);
+    const prompt = [name.trim(), bio.trim()].filter(Boolean).join(' — ') || 'a friendly creative person';
+    const result = await generateAvatarFromPrompt(prompt);
+    setIsGeneratingAvatar(false);
+    if (result.ok === true) {
+      setCustomAvatar(result.dataUrl);
+      setAvatarMode('custom');
+      toast.show({ type: 'success', message: 'AI 头像已生成', duration: 1800 });
+    } else {
+      setAvatarSeed(pickRandomAvatarSeed(AVATAR_SEEDS));
+      const reason = result.reason === 'unconfigured' ? '未配置 Gemini key' : 'AI 生成失败';
+      toast.show({ type: 'info', title: reason, message: result.message, duration: 2400 });
+    }
+  };
 
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,10 +191,13 @@ export default function OnboardingFlow({
                   </div>
                   <div className="flex gap-2 mb-2">
                     <button
-                      onClick={() => setAvatarMode('generated')}
-                      className={`tap-target px-3 py-1 rounded-full text-[12px] font-semibold transition-all border ${avatarMode === 'generated' ? 'bg-foreground text-background border-foreground' : 'bg-background text-foreground border-border hover:border-foreground'}`}
+                      onClick={handleGenerateAvatar}
+                      disabled={isGeneratingAvatar}
+                      data-testid="onboarding-generate-avatar"
+                      className={`tap-target inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold transition-all border ${avatarMode === 'custom' ? 'bg-foreground text-background border-foreground' : 'bg-background text-foreground border-border hover:border-foreground'} disabled:opacity-50`}
                     >
-                      生成头像
+                      {isGeneratingAvatar && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {isGeneratingAvatar ? '生成中…' : '生成头像'}
                     </button>
                     <label className={`tap-target px-3 py-1 rounded-full text-[12px] font-semibold transition-all border cursor-pointer ${avatarMode === 'custom' ? 'bg-foreground text-background border-foreground' : 'bg-background text-foreground border-border hover:border-foreground'}`}>
                       <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
