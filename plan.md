@@ -8,16 +8,20 @@ VibeCard 是一个 Web3 社交名片 + 搭子发现平台，采用 monorepo 结�
 - **合约端** (`packages/contracts`): Hardhat 3 + Solidity 0.8.20 (4个合约)
 - **共享包** (`packages/shared`): 卡片数据、标签、搭子类型
 
-## 当前状态评估
+## 当前状态评估 (v1.1, 2026-07-14)
 
 ### ✅ 已通过的项
 - TypeScript 编译通过 (`tsc --noEmit`)
-- Vite 生产构建成功（8.48s）
+- Vite 生产构建成功（7.7-8.4s）
 - PWA 配置完整（manifest、sw.js、icons）
 - CI 配置完整（GitHub Actions：Web + Contract）
-- Playwright E2E 测试配置完整
+- Playwright E2E 测试配置完整 (27/27 通过)
 - 主题系统完整（dark/light/system）
 - 智能合约编译成功（`hardhat build --force`）
+- SIWE 钱包签名验证 (`lib/siwe.ts` + `verified.walletProof`)
+- Gemini AI 头像接入 (`lib/genai.ts` + DiceBear 降级)
+- 短 URL 服务 (`server.js` + `?id=` hook)
+- i18n 一致性（handle `@`、中英文统一、海报主题中英别名）
 
 ### ⚠️ 需要关注的问题
 1. **依赖清理**: `shadcn` 和 `vaul` 可能未使用（Drawer 为自定义实现）
@@ -27,9 +31,10 @@ VibeCard 是一个 Web3 社交名片 + 搭子发现平台，采用 monorepo 结�
 5. **Hardhat 3 缓存**: 正常 `build` 不触发编译，需要 `--force`
 6. **构建警告**: 多个 `/*#__PURE__*/` 注释位置警告（来自 node_modules，不严重但影响日志）
 7. **缺少安全扫描**: 未检查依赖漏洞、XSS 防护等
+8. **web3 chunk 体积**: 756KB / gzip 237KB，RainbowKit + wagmi + viem 链
 
 ### ❌ 阻塞项
-- 无当前阻塞项
+- 合约未部署测试网 (Base Sepolia 推荐)
 
 ## 执行计划
 

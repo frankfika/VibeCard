@@ -209,4 +209,43 @@ VibeCard 项目 Web 端已**基本具备上线条件**。核心功能完整、Ty
 
 ---
 
-*报告由 Kimi Work 自动生成，基于代码审查、构建验证和静态分析。*
+# v1.1 — 2026-07-14 持续优化
+
+在 7/13-7/14 一轮密集 UX 审计 + 多 agent 并行修复后, 12 个新 commit 上 main. 距 v1.0 主要变化:
+
+## 合并
+- `stage-a-ux-fixes` (P0 8 个 UI bug 修复 + 完整 e2e 套件)
+- `feat/namecard-shorturl` (短 URL 服务 /api/cards, ?id= 替代 ?c=)
+- 丢弃 `fix-mobile-card-overlap` (已被 stage-a 覆盖)
+
+## 新增能力
+- **SIWE 签名验证**: 钱包连接不再自动获得"验证 ✓"徽章. 用户必须主动签 EIP-4361 消息 (`lib/siwe.ts`), 签名 + 消息 + 时间戳存到 `profile.verified.walletProof`. 任何人可复现验签 (`verifySiweProof` 用 `recoverMessageAddress`).
+- **AI 头像 (Gemini)**: onboarding "生成头像" 按钮接真 `@google/genai` (`lib/genai.ts`), 用 name+bio 做 prompt. 缺 `VITE_GEMINI_API_KEY` 或调用失败时降级到 dicebear 随机 + 提示 toast. `.env.example` 已文档化.
+- **钱包 inline 入口**: EditProfile 钱包字段 dead "未连接钱包" 文字旁边加 inline connect 按钮; 已连接时加 disconnect 按钮.
+- **MorePage 钱包状态徽章**: 折叠默认展开 + dot 状态 + inline connect/disconnect 按钮. 钱包状态对首屏用户可见.
+
+## i18n / 死文字清理
+- PublicCardPage simple 视图 handle 补 `@` 前缀 (与 full 视图一致)
+- MorePage 英文 section title 全部中文化 (Explore→发现与工具, Network→发现, Utilities→工具)
+- 海报主题名加中文别名 (Dark Vibe · 暗黑 等)
+- 海报 "Let's Connect" → "来连接"; bio 移除 ASCII 引号
+- ShareDrawer "复制" 重复字去除
+
+## 工程修复
+- `lib/web3/config.ts` transports 显式 typed map, 修潜伏 TS 错误
+- 4 个 stage-A commit 通过 e2e 27/27
+
+## 验证
+- `tsc --noEmit`: 0 错误
+- `vite build`: 7.7-8.4s 成功
+- `scripts/e2e-stage-a.mjs`: PASS 27 / FAIL 0
+- `scripts/verify-stage-a.mjs` (mobile 390x844): 通过
+
+## 待办
+- 合约部署到 Base Sepolia (阻断 go-live)
+- `shareUrl` 服务从 local mock 迁 IPFS / 真后端
+- `web3` chunk 756KB 仍大, 后续做 tree-shaking
+
+---
+
+*v1.0 报告由 Kimi Work 自动生成，基于代码审查、构建验证和静态分析。*
