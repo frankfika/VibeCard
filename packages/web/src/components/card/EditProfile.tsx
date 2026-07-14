@@ -3,7 +3,7 @@ import {
   Wallet, Twitter, MessageCircle, Trash2, SmilePlus, Smile, Send,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useAccount } from 'wagmi';
+import { useAccount, useDisconnect } from 'wagmi';
 import type { Profile, Contact } from '../../store';
 import WalletConnect from '../../components/WalletConnect';
 import {
@@ -30,6 +30,7 @@ export default function EditProfile({
   onClose: () => void;
 }) {
   const { address } = useAccount();
+  const { disconnect } = useDisconnect();
   const [name, setName] = useState(profile.name);
   const [handle, setHandle] = useState(profile.handle);
   const [bio, setBio] = useState(profile.bio);
@@ -346,11 +347,23 @@ export default function EditProfile({
               </div>
               <div className="flex-1 flex items-center border border-border rounded-xl px-3 py-2 bg-background gap-2">
                 {address ? (
-                  <span className="text-[13px] font-medium text-foreground flex-1">{address.slice(0, 8)}…{address.slice(-6)}</span>
+                  <>
+                    <span className="text-[13px] font-medium text-foreground flex-1">{address.slice(0, 8)}…{address.slice(-6)}</span>
+                    <button
+                      type="button"
+                      onClick={() => disconnect()}
+                      data-testid="wallet-disconnect"
+                      className="tap-target text-[12px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      断开
+                    </button>
+                  </>
                 ) : (
-                  <span className="text-[13px] font-medium text-muted-foreground flex-1">未连接钱包</span>
+                  <>
+                    <span className="text-[13px] font-medium text-muted-foreground flex-1">未连接钱包</span>
+                    <WalletConnect />
+                  </>
                 )}
-                {!address && <WalletConnect />}
               </div>
             </div>
             <div className="flex items-center gap-3">

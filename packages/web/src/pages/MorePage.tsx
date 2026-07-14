@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  Compass, Gamepad2, ChevronRight, Sparkles, Box, Sun, Moon,
+  Compass, Gamepad2, ChevronRight, Sparkles, Box, Sun, Moon, Wallet, Loader2,
 } from 'lucide-react';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import DiscoverPage from './DiscoverPage';
 import GamesPage from './GamesPage';
-import WalletConnect from '../components/WalletConnect';
 import ChainIdentityCard from '../components/chain/ChainIdentityCard';
 import PointsCard from '../components/chain/PointsCard';
 import { useProfile } from '../store';
@@ -17,6 +17,9 @@ export default function MorePage() {
   const { profile } = useProfile();
   const { theme, resolved, toggle } = useTheme();
   const toast = useToast();
+  const { address, isConnected } = useAccount();
+  const { connect, connectors, isPending: isConnectPending } = useConnect();
+  const { disconnect } = useDisconnect();
   const profileComplete = !!(
     profile.name && profile.bio && profile.tags?.length >= 3 &&
     (profile.verified?.wallet || profile.verified?.twitter || profile.verified?.discord)
@@ -71,25 +74,76 @@ export default function MorePage() {
           <ChainIdentityCard profileComplete={profileComplete} />
         </section>
 
-        {/* Wallet Anchor (advanced, collapsed by default) */}
+        {/* Wallet Anchor (advanced, expanded by default) */}
         <section>
-          <details className="group rounded-[20px] border border-border/50 bg-card/60 backdrop-blur-md overflow-hidden">
+          <details open className="group rounded-[20px] border border-border/50 bg-card/60 backdrop-blur-md overflow-hidden">
             <summary className="list-none cursor-pointer px-5 py-4 flex items-center justify-between active:bg-secondary/40 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-[12px] bg-secondary flex items-center justify-center">
                   <Box className="w-4 h-4 text-foreground" />
                 </div>
                 <div>
-                  <h4 className="text-[14px] font-bold text-foreground leading-tight">链上锚定（高级）</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[14px] font-bold text-foreground leading-tight">链上锚定（高级）</h4>
+                    <span
+                      data-testid="more-wallet-status"
+                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                        isConnected
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${
+                          isConnected ? 'bg-emerald-500' : 'bg-muted-foreground'
+                        }`}
+                      />
+                      {isConnected ? '已连接' : '未连接'}
+                    </span>
+                  </div>
                   <p className="text-[11px] font-medium text-muted-foreground mt-0.5">把本地链摘要存到真实测试网</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" />
             </summary>
             <div className="px-5 pb-5 pt-0">
-              <WalletConnect />
+              {isConnected && address ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-medium text-foreground">
+                    {address.slice(0, 8)}…{address.slice(-6)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => disconnect()}
+                    data-testid="more-wallet-disconnect"
+                    className="tap-target inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1.5 text-[12px] font-semibold text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                  >
+                    断开
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => connectors[0] && connect({ connector: connectors[0] })}
+                  disabled={isConnectPending || !connectors[0]}
+                  data-testid="more-wallet-connect"
+                  className="tap-target inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3.5 py-2 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
+                >
+                  {isConnectPending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      连接中…
+                    </>
+                  ) : (
+                    <>
+                      <Wallet className="h-3.5 w-3.5" />
+                      连接钱包
+                    </>
+                  )}
+                </button>
+              )}
               <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                本地链已记录所有活动 — 连接钱包仅用于把最新区块哈希锚定到 EVM 测试网，作为外部存证。日常使用无需连接。
+                本地链已记录所有活动 — 连接钱包仅用于把最新区块哈希锚定到 EVM 测试网,作为外部存证。日常使用无需连接。
               </p>
             </div>
           </details>
