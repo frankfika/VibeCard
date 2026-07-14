@@ -25,6 +25,7 @@ interface SharedProfile {
   contacts?: { id?: string; platform: string; value: string; url: string }[];
   verified: {
     wallet: string;
+    walletProof?: { address: string; message: string; signature: string; signedAt: number };
     twitter: string;
     discord: string;
     wechat: string;
@@ -261,8 +262,8 @@ function SimpleCardView({
             <div className="text-[14px] font-semibold text-white/55">@{profile.handle}</div>
           )}
 
-          {profile.verified?.wallet && (
-            <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-[11px] font-bold text-emerald-400 border border-emerald-500/25">
+          {profile.verified?.wallet && profile.verified.walletProof && (
+            <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-[11px] font-bold text-emerald-400 border border-emerald-500/25" title="该钱包已通过签名验证">
               <Check className="w-3 h-3" />
               <Wallet className="w-3 h-3" />
               {shortAddress(profile.verified.wallet)}
@@ -366,8 +367,8 @@ function FullCardView({
             <div className="text-[13px] font-semibold text-white/55 mt-1">@{profile.handle}</div>
           )}
 
-          {profile.verified?.wallet && (
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-[11px] font-bold text-emerald-400 border border-emerald-500/25">
+          {profile.verified?.wallet && profile.verified.walletProof && (
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-[11px] font-bold text-emerald-400 border border-emerald-500/25" title="该钱包已通过签名验证">
               <Check className="w-3 h-3" />
               <Wallet className="w-3 h-3" />
               {shortAddress(profile.verified.wallet)}

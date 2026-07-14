@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import {
   Share, MapPin, Twitter, MessageCircle, Wallet,
-  Check, Zap, Coins, QrCode,
+  Check, Zap, Coins, QrCode, ShieldCheck, Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../store';
-import { useAccount } from 'wagmi';
+import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
 import QRCode from 'qrcode';
 import { getSocialIcon, getSocialLabel } from '../lib/social';
 import OnboardingFlow from '../components/card/OnboardingFlow';
 import { useNamecardUrl } from '../hooks/useNamecardUrl';
+import { buildSiweMessage, makeNonce } from '../lib/siwe';
+import { useToast } from '../components/ui/ToastProvider';
 
 const EditProfile = lazy(() => import('../components/card/EditProfile'));
 const ShareDrawer = lazy(() => import('../components/card/ShareDrawer'));
@@ -17,8 +19,12 @@ const ShareDrawer = lazy(() => import('../components/card/ShareDrawer'));
 export default function CardPage() {
   const { profile: myProfile, updateProfile, isSetup } = useProfile();
   const { address } = useAccount();
+  const { signMessageAsync, isPending: isSigning } = useSignMessage();
+  const { disconnect } = useDisconnect();
+  const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showShareDiv, setShowShareDiv] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // Stable short share URL backed by /api/cards; falls back to legacy base64.
   const { url: shareUrl } = useNamecardUrl(myProfile);
@@ -39,10 +45,43 @@ export default function CardPage() {
   useEffect(() => {
     if (address && address !== syncedAddressRef.current) {
       syncedAddressRef.current = address;
+      // Only record the address itself; the verified-with-signature badge
+      // is only granted after the user explicitly signs a SIWE message
+      // (see handleVerifyWallet below). This prevents a casual wallet
+      // connection from showing the green checkmark.
       updateProfile({ verified: { ...myProfile.verified, wallet: address } });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
+
+  const handleVerifyWallet = async () => {
+    if (!address || isVerifying) return;
+    setIsVerifying(true);
+    try {
+      const message = buildSiweMessage({ address, nonce: makeNonce() });
+      const signature = await signMessageAsync({ account: address as `0x${string}`, message });
+      updateProfile({
+        verified: {
+          ...myProfile.verified,
+          wallet: address,
+          walletProof: { address, message, signature, signedAt: Date.now() },
+        },
+      });
+      toast.show({ type: 'success', message: '钱包已签名验证 ✓', duration: 2200 });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message.slice(0, 80) : '用户取消';
+      toast.show({ type: 'error', title: '签名失败', message: reason, duration: 3000 });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleClearVerification = () => {
+    const { walletProof: _drop, ...rest } = myProfile.verified;
+    void _drop;
+    updateProfile({ verified: rest });
+    toast.show({ type: 'info', message: '已清除验证签名', duration: 1800 });
+  };
 
 
   if (!isSetup) {
@@ -65,12 +104,38 @@ export default function CardPage() {
           <div className="flex flex-col items-center mb-8 pt-2">
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }} className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-[32px] mb-5 relative shadow-xl">
               <img src={avatarUrl} loading="lazy" decoding="async" className="w-full h-full rounded-[32px] object-cover bg-gradient-to-br from-secondary to-muted border border-white/10" alt="avatar" />
-              {profile.verified?.wallet && (
-                <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-foreground rounded-full border-[3px] border-background flex items-center justify-center shadow-md">
-                  <Check className="w-3.5 h-3.5 text-background stroke-[3]" />
+              {profile.verified?.walletProof && profile.verified.walletProof.address.toLowerCase() === (profile.verified.wallet || '').toLowerCase() && (
+                <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-emerald-500 rounded-full border-[3px] border-background flex items-center justify-center shadow-md" title="已签名验证">
+                  <ShieldCheck className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                 </div>
               )}
             </motion.div>
+            {profile.verified?.wallet && !profile.verified.walletProof && (
+              <button
+                type="button"
+                onClick={handleVerifyWallet}
+                disabled={isVerifying || isSigning}
+                data-testid="verify-wallet-button"
+                className="tap-target mt-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1.5 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
+              >
+                {isVerifying || isSigning ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                )}
+                {isVerifying || isSigning ? '签名中…' : '签名验证我的钱包'}
+              </button>
+            )}
+            {profile.verified?.walletProof && (
+              <button
+                type="button"
+                onClick={handleClearVerification}
+                data-testid="clear-wallet-proof"
+                className="tap-target mt-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                清除验证签名
+              </button>
+            )}
             <motion.h1 initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-[24px] sm:text-[28px] md:text-[32px] font-black tracking-tight text-foreground mb-1">{profile.name}</motion.h1>
             {profile.handle && <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }} className="text-[15px] font-bold text-muted-foreground">{profile.handle}</motion.div>}
             {(profile.event || profile.lookingFor) && (

@@ -28,6 +28,7 @@ export interface Profile {
   contacts?: Contact[];
   verified: {
     wallet: string;
+    walletProof?: { address: string; message: string; signature: string; signedAt: number };
     twitter: string;
     discord: string;
     wechat: string;
@@ -87,7 +88,7 @@ const DEFAULT_PROFILE: Profile = {
   lookingFor: '',
   highlights: [],
   contacts: [],
-  verified: { wallet: '', twitter: '', discord: '', wechat: '', telegram: '' },
+  verified: { wallet: '', walletProof: undefined, twitter: '', discord: '', wechat: '', telegram: '' },
   event: '',
   threads: [],
 };
