@@ -16,7 +16,10 @@ import artifact from '../../../contracts/artifacts/contracts/VibeCardRegistry.so
 const ABI = artifact.abi as any;
 
 const TEST_PRIVATE_KEY = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
-const RPC_URL = 'http://127.0.0.1:8545';
+// Same-origin path proxied to the local Hardhat node by vite.config.ts
+// (hardhatRpcProxyPlugin). The node's own CORS headers reject browser POSTs,
+// so the page never talks to 127.0.0.1:8545 directly (task 4.1).
+const RPC_URL = '/hardhat-rpc';
 
 export default function E2EChainSyncPage() {
   const [log, setLog] = useState<string[]>([]);

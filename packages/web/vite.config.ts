@@ -60,6 +60,25 @@ function isPortFree(port: number): Promise<boolean> {
   });
 }
 
+/**
+ * Dev-only same-origin proxy for the local Hardhat JSON-RPC, used by the
+ * chain-sync e2e page. The Hardhat node's own CORS headers do not allow
+ * POST from a browser (`Access-Control-Allow-Methods: OPTIONS, GET`), so
+ * browser-side chain calls would fail preflight; going through this proxy
+ * keeps the request same-origin (task 4.1).
+ */
+function hardhatRpcProxyPlugin(): PluginOption {
+  return {
+    name: 'vibecard:hardhat-rpc-proxy',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/hardhat-rpc', (req, res, next) => {
+        proxyHttp(req, res, 'http://127.0.0.1:8545', '', next);
+      });
+    },
+  };
+}
+
 function proxyHttp(
   req: IncomingMessage,
   res: ServerResponse,
@@ -89,6 +108,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       namecardServerPlugin(),
+      hardhatRpcProxyPlugin(),
       compression({ algorithms: ['brotliCompress'], exclude: [/\.(br)$/, /\.(gz)$/] }),
     ],
     define: {

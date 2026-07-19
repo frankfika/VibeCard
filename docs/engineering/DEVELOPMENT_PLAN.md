@@ -565,7 +565,18 @@ Dependencies: Milestones 1 and 2
 
 ## 4.1 Refresh Automated Tests
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. Baseline was 30/38; the suite is now **50/50 pass, 0 fail, 0 skip** (both chromium and mobile-chrome).
+- `chain-test.spec.ts` rewritten: the stale "verified accounts section" assertion (expecting removed `Verified`/`Wallet` labels) is re-pointed at the still-supported advanced area — seeded owner profile with a wallet address → `card-advanced` details opens → theme toggle + `verify-wallet-button` visible; a second case asserts the shortened wallet badge. The two permanently skipped cases (More-page wallet surface, On-Chain Identity/DappRep/Badges) targeted product paths removed in 0.2 and are deleted, not restored.
+- `chain-sync.spec.ts` root-caused instead of skipped — two real defects fixed:
+  1. Playwright's webServer readiness probe for `127.0.0.1:8545` does not actually wait for the Hardhat node/deploy inside `scripts/e2e-hardhat.js`; the spec now waits for real chain state itself (RPC answers, then registry bytecode at the deterministic `0x5FbD…80aa3`).
+  2. The Hardhat node's CORS headers (`Access-Control-Allow-Methods: OPTIONS, GET`) reject browser POST preflights, so page-side viem calls always failed with "Failed to fetch". Added a dev-only same-origin proxy `/hardhat-rpc` in `vite.config.ts` (`hardhatRpcProxyPlugin`, reuses the existing `proxyHttp` helper); `E2EChainSyncPage` now uses the relative path. Full loop verified: balance → deploy check → mock IPFS → publish tx → hash match → `PASS: full chain sync loop verified`.
+- Replacement coverage map: Card/Requests/My Vibe navigation + owner conversation + visitor conversation + private contact gating + request handling + mobile layout are covered by `vibe-mock-story.spec.ts` (14 cases × 2 projects, incl. reduced-motion and agent-disabled); Web3 coverage kept only for the advanced area, embed view, widget, and chain sync.
+- Validation: `npm run lint` (tsc) clean; `npm run build` ok; full Playwright suite 50/50 pass.
+- Note: `scripts/e2e-hardhat.js` deploy writes to `packages/contracts/deployments/` (gitignored).
 
 Owner: Lane D
 
