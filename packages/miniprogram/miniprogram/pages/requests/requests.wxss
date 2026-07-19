@@ -162,6 +162,18 @@
   margin-bottom: 20rpx;
 }
 
+/* 拉黑入口：视觉弱于主操作的小字灰色文字按钮 */
+.block-entry {
+  text-align: center;
+  font-size: 24rpx;
+  color: #b8ab9e;
+  padding: 24rpx 0 8rpx;
+}
+
+.block-entry:active {
+  color: #8a7a68;
+}
+
 /* ---------- 详情 ---------- */
 
 .detail-scroll {

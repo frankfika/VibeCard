@@ -3,6 +3,7 @@
  *
  * 云模式（页面参数带 ownerId，如分享链接场景）：
  *   card.getPublicCard 校验云可用并初始化分身开场 -> 消息走 agent.visitorMessage
+ *   （blocked / rate_limited 闸门返回时，分身温和收尾并结束本次对话）
  *   -> 按 nextAction 流转（invite_connection_reason 引导理由 /
  *      offer_request_review 显示请求预览 / end 收尾）
  *   -> 理由确认后 requests.createRequest；weak_reason 时分身追问补充，
@@ -218,6 +219,27 @@ Page({
         roundCount: this.roundCount,
       });
       if (!res || res.ok !== true) {
+        const code = res && res.error && res.error.code;
+        if (code === 'blocked') {
+          // 主人已拉黑：温和收尾，不指责访客
+          this.appendMessages([{
+            id: nextMessageId('agent'),
+            role: 'agent',
+            text: '他暂时不方便接收新消息，这次就先聊到这里。谢谢你的认真。',
+          }]);
+          this.setData({ ended: true });
+          return;
+        }
+        if (code === 'rate_limited') {
+          // 消息量/新对话超限：直接转达云端的温和提示，明天才能继续
+          this.appendMessages([{
+            id: nextMessageId('agent'),
+            role: 'agent',
+            text: (res.error && res.error.message) || '今天聊得够多了，明天再来吧',
+          }]);
+          this.setData({ ended: true });
+          return;
+        }
         // 模型不可用：不编造回答，给出不确定回复并引导到理由
         this.appendMessages([{ id: nextMessageId('agent'), role: 'agent', text: CLOUD_FALLBACK_REPLY }]);
         this.setData({ guided: true });

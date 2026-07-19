@@ -452,7 +452,17 @@ Dependencies: 2.3
 
 ## 3.2 Add Rate Limits And Abuse Controls
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. Server-side enforcement added in front of the model:
+  - New `agent/lib/limits.js` pure logic (`VISITOR_MESSAGES_PER_DAY=60`, `VISITOR_NEW_CONVERSATIONS_PER_DAY=10`, `checkVisitorActivity`, `activityDocId`, `todayStr`, `isBlocked`); `agent.visitorMessage` now gates blocked visitors (`blocked`) and over-limit visitors (`rate_limited`, distinct copy for message cap vs new-conversation cap) **before any provider call** — tests assert the stub provider is never invoked in those paths. Limits persist in a new `visitor_activity` collection (`_id = visitorId:ownerId:YYYY-MM-DD`, East-8 date); limiter read/upsert failures degrade to allow-with-warn so DB jitter never kills a normal conversation
+  - `requests.blockVisitor({ requestId })` (owner-only, else `forbidden`): addToSet the visitor into `users.blockedUsers` (same field/write style as the legacy `report` function, so existing block tooling stays compatible); pending/later requests become `decline` via `core.applyBlock`; other states untouched (connect-shared contacts are not clawed back)
+  - Existing 2.3 guards already covered connection-request rate (1/24h per pair) and repeated requests after decline (24h cooldown); blocked check now also runs ahead of the agent
+- Mini Program: requests detail gained a de-emphasized 「不再接收 TA 的消息」 entry (pending/later only) → `wx.showModal` confirm → `blockVisitor` → detail refreshes to decline; demo mode simulates locally without cloud. visitor-chat maps `blocked` / `rate_limited` to a gentle agent sign-off (`ended: true`, composer hides); other failures keep the existing fallback
+- Validation: agent 40/40 pass (incl. new limits.test.js), requests 24/24 pass (incl. new block.test.js), page smoke `node --test tests/*.test.js` 12/12 pass (block flow incl. modal/confirm/demo/cancel, visitor gates incl. fallback regression)
+- Not verifiable here: WeChat DevTools compile; first deploy should ensure the `visitor_activity` collection exists (or auto-create on first write)
 
 Owner: Lane B
 

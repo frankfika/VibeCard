@@ -133,6 +133,19 @@ function resolveSharedContacts(request, ownerUser) {
     .map(m => ({ id: m.id, kind: m.kind, label: m.label || '', value: m.value }));
 }
 
+/**
+ * Blocking a visitor (task 3.2) declines the request while it is still
+ * actionable (pending / later). Terminal states (connect / decline) are
+ * returned unchanged so blocking stays idempotent.
+ */
+function applyBlock(request, now) {
+  if (!request) return request;
+  if (request.ownerAction === 'pending' || request.ownerAction === 'later') {
+    return applyOwnerAction(request, 'decline', undefined, now);
+  }
+  return request;
+}
+
 module.exports = {
   DAY_MS,
   MIN_REASON_LENGTH,
@@ -144,5 +157,6 @@ module.exports = {
   checkCreateAllowed,
   canViewRequest,
   applyOwnerAction,
+  applyBlock,
   resolveSharedContacts,
 };

@@ -327,6 +327,67 @@ Page({
     this.setData({ requestsList });
   },
 
+  // ---------- 拉黑：不再接收 TA 的消息（任务 3.2） ----------
+
+  // 仅 pending/later 的请求显示该入口（WXML 侧同样做了条件渲染）
+  onBlockVisitor() {
+    const req = this.data.currentRequest;
+    if (!req) return;
+    if (req.ownerAction !== 'pending' && req.ownerAction !== 'later') return;
+    wx.showModal({
+      title: '不再接收 TA 的消息？',
+      content: '之后 TA 将无法再与你的 Vibe 对话，也无法再向你发送认识请求。',
+      confirmText: '不再接收',
+      success: (res) => {
+        if (res && res.confirm) this.confirmBlockVisitor();
+      },
+    });
+  },
+
+  async confirmBlockVisitor() {
+    const req = this.data.currentRequest;
+    if (!req) return;
+
+    if (this.demoMode) {
+      // demo 模式：本地模拟，不调云
+      this.updateDemoStatus('decline');
+      this.setData({
+        currentRequest: Object.assign({}, req, { ownerAction: 'decline', statusText: STATUS_TEXT.decline }),
+        decidedAction: 'declined',
+      });
+      wx.showToast({ title: '已不再接收 TA 的消息', icon: 'none' });
+      return;
+    }
+
+    if (this.data.acting) return;
+    this.setData({ acting: true });
+    try {
+      const res = await cloud.callFunction('requests', {
+        action: 'blockVisitor',
+        requestId: req.id,
+      });
+      if (!res || res.ok !== true) {
+        wx.showToast({ title: '操作失败，请稍后再试', icon: 'none' });
+        return;
+      }
+      // 拉黑后 pending/later 的请求会被云端置为 decline，详情状态同步刷新
+      const updated = (res.result && res.result.request) || {};
+      const ownerAction = updated.ownerAction || 'decline';
+      this.setData({
+        currentRequest: Object.assign({}, req, {
+          ownerAction,
+          statusText: STATUS_TEXT[ownerAction] || STATUS_TEXT.decline,
+        }),
+      });
+      wx.showToast({ title: '已不再接收 TA 的消息', icon: 'none' });
+    } catch (err) {
+      console.warn('[requests] blockVisitor failed:', err && err.message);
+      wx.showToast({ title: '操作失败，请稍后再试', icon: 'none' });
+    } finally {
+      this.setData({ acting: false });
+    }
+  },
+
   // 重置为待处理，方便重复演示（仅 demo 模式显示）
   onResetDemo() {
     if (!this.demoMode) return;

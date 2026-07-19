@@ -65,6 +65,9 @@
         </block>
       </view>
 
+      <!-- 拉黑入口：弱化的次要操作，仅请求待处理时出现 -->
+      <view wx:if="{{currentRequest.ownerAction === 'pending' || currentRequest.ownerAction === 'later'}}" class="block-entry" bindtap="onBlockVisitor">不再接收 TA 的消息</view>
+
       <view class="detail-spacer"></view>
     </view>
   </scroll-view>

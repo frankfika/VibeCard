@@ -11,6 +11,10 @@
  *                    sharedContactMethodIds? } -> updated request (owner only)
  *                    (`action` is the router field, so the owner decision
  *                    travels as `decision`)
+ *   blockVisitor   { requestId } -> { request } (owner only, task 3.2)
+ *                    adds the visitor to users.blockedUsers (addToSet, same
+ *                    array the legacy report function maintains) and declines
+ *                    the request when it is still pending / later
  *
  * Every action returns { ok:true, result } or { ok:false, error:{code,message} }.
  * Contact details never appear before the owner connects, and only the
@@ -46,6 +50,8 @@ exports.main = async (event) => {
         return ok(await getRequest(openid, event));
       case 'actOnRequest':
         return ok(await actOnRequest(openid, event));
+      case 'blockVisitor':
+        return ok(await blockVisitor(openid, event));
       default:
         return typedError('invalid_action', 'unknown action');
     }
@@ -157,4 +163,31 @@ async function actOnRequest(openid, event) {
     },
   });
   return await withSharedContacts(updated);
+}
+
+/**
+ * Block the visitor behind a request (task 3.2). Owner-only. Writes the
+ * visitor into the same `users.blockedUsers` array the legacy report
+ * function maintains (addToSet, so repeat blocks are harmless), and declines
+ * the request when it is still actionable.
+ */
+async function blockVisitor(openid, event) {
+  const request = await getRequestDoc(event.requestId);
+  if (request.ownerId !== openid) throw core.codedError('forbidden', '只有主人可以拉黑访客');
+
+  await db.collection('users').where({ openid }).update({
+    data: { blockedUsers: db.command.addToSet(request.visitorId) },
+  });
+
+  const blocked = core.applyBlock(request, Date.now());
+  if (blocked.ownerAction !== request.ownerAction) {
+    await db.collection('requests').doc(event.requestId).update({
+      data: {
+        ownerAction: blocked.ownerAction,
+        sharedContactMethodIds: blocked.sharedContactMethodIds,
+        updatedAt: blocked.updatedAt,
+      },
+    });
+  }
+  return { request: blocked };
 }

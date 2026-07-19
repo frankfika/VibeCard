@@ -14,12 +14,17 @@
  * Visitor mode reads memories with visibility filters in the `where` clause:
  * public memories are quotable evidence, agent_only memories may only steer
  * the agent's judgment. connected / private memories are never read here.
+ *
+ * visitorMessage is gated before any model call (task 3.2): blocked owners
+ * (`users.blockedUsers`) and per-day budgets (`visitor_activity` collection,
+ * see lib/limits.js) reject with typed errors and never invoke the provider.
  */
 
 const cloud = require('wx-server-sdk');
 const { getProvider } = require('./lib/providers');
 const { runOwnerAgent, extractMemoryProposal, runCardDraft, runVisitorAgent, runConnectionSummary } = require('./lib/agent');
 const { typedError } = require('./lib/schema');
+const limits = require('./lib/limits');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
@@ -52,6 +57,18 @@ exports.main = async (event) => {
         }
         const owner = await getUserByOpenid(ownerId);
         if (!owner) return typedError('not_found', 'owner not found');
+        // Abuse gates run before any model call (task 3.2): a blocked or
+        // rate-limited visitor never reaches the provider.
+        if (limits.isBlocked(owner, openid)) {
+          return typedError('blocked', '对方暂时无法接收消息');
+        }
+        const gate = await checkAndRecordVisitorActivity(openid, ownerId);
+        if (gate === 'rate_limited_messages') {
+          return typedError('rate_limited', '今天聊得够多了，明天再来吧');
+        }
+        if (gate === 'rate_limited_new') {
+          return typedError('rate_limited', '今天认识的新朋友够多了，明天再来吧');
+        }
         // Permission filtering at query stage: only public + agent_only,
         // confirmed memories are ever read for a visitor conversation.
         const [publicMemories, agentMemories] = await Promise.all([
@@ -104,6 +121,53 @@ async function listMemoriesWithVisibility(ownerId, visibility) {
 async function getUserByOpenid(openid) {
   const result = await db.collection('users').where({ openid }).get();
   return result.data[0] || null;
+}
+
+/**
+ * Check the visitor's per-day budgets and record this message. Returns null
+ * when the conversation may proceed, or a limits.js gate code.
+ *
+ * Failure policy: rate limiting is abuse control, not a hard dependency —
+ * if the check itself fails (db jitter) the visitor is allowed through with
+ * a warning; if only the counter upsert fails, the conversation continues.
+ */
+async function checkAndRecordVisitorActivity(visitorId, ownerId) {
+  const now = Date.now();
+  const dateStr = limits.todayStr(now);
+  const docId = limits.activityDocId(visitorId, ownerId, dateStr);
+  const coll = db.collection('visitor_activity');
+
+  let myDoc = null;
+  let todayOwnerCount = 0;
+  try {
+    const existing = await coll.doc(docId).get().catch(() => null);
+    myDoc = existing && existing.data;
+    if (!myDoc) {
+      // First message to this owner today -> this is a "new conversation";
+      // count how many distinct owners the visitor already contacted today.
+      const today = await coll.where({ visitorId, date: dateStr }).get();
+      todayOwnerCount = today.data.length;
+    }
+  } catch (error) {
+    console.warn('visitor_activity check failed, allowing:', error && error.message);
+    return null;
+  }
+
+  const gate = limits.checkVisitorActivity({ myDoc, todayOwnerCount });
+  if (gate) return gate;
+
+  try {
+    if (myDoc) {
+      await coll.doc(docId).update({ data: { count: (myDoc.count || 0) + 1, updatedAt: now } });
+    } else {
+      await coll.doc(docId).set({
+        data: { visitorId, ownerId, date: dateStr, count: 1, updatedAt: now },
+      });
+    }
+  } catch (error) {
+    console.warn('visitor_activity upsert failed:', error && error.message);
+  }
+  return null;
 }
 
 /**
