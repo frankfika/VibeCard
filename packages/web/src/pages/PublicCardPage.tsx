@@ -20,6 +20,8 @@ interface SharedProfile {
   tags: { label: string; icon: string }[];
   lookingFor: string;
   event: string;
+  /** Task 3.4: absent means enabled (backward compatible with old share links). */
+  agentEnabled?: boolean;
   highlights: { id: number; title: string; type: string; icon: string; link: string }[];
   threads: { id: string; content: string; images?: string[]; tags: string[]; timestamp: number }[];
   contacts?: { id?: string; platform: string; value: string; url: string }[];
@@ -158,6 +160,8 @@ export default function PublicCardPage() {
     !!profile.verified?.wallet &&
     address.toLowerCase() === profile.verified.wallet.toLowerCase();
 
+  const agentEnabled = profile.agentEnabled !== false;
+
   const avatarUrl =
     profile.avatar ||
     `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(profile.name)}&backgroundColor=transparent`;
@@ -195,6 +199,7 @@ export default function PublicCardPage() {
             profile={profile}
             avatarUrl={avatarUrl}
             isOwner={isOwner}
+            agentEnabled={agentEnabled}
             simpleHref={buildUrl(false)}
             onChat={() => setShowVibeChat(true)}
           />
@@ -203,6 +208,7 @@ export default function PublicCardPage() {
             profile={profile}
             avatarUrl={avatarUrl}
             isOwner={isOwner}
+            agentEnabled={agentEnabled}
             fullHref={buildUrl(true)}
             onChat={() => setShowVibeChat(true)}
           />
@@ -232,12 +238,14 @@ function SimpleCardView({
   profile,
   avatarUrl,
   isOwner,
+  agentEnabled,
   fullHref,
   onChat,
 }: {
   profile: SharedProfile;
   avatarUrl: string;
   isOwner: boolean;
+  agentEnabled: boolean;
   fullHref: string;
   onChat: () => void;
 }) {
@@ -306,15 +314,24 @@ function SimpleCardView({
         </div>
 
         <div className="px-5 pb-6 space-y-2.5">
-          <button
-            type="button"
-            onClick={onChat}
-            data-testid="chat-with-vibe"
-            className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <MessageCircle className="w-5 h-5" />
-            先和我的分身聊聊
-          </button>
+          {agentEnabled ? (
+            <button
+              type="button"
+              onClick={onChat}
+              data-testid="chat-with-vibe"
+              className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              <MessageCircle className="w-5 h-5" />
+              先和我的分身聊聊
+            </button>
+          ) : (
+            <div
+              data-testid="vibe-disabled"
+              className="w-full py-4 rounded-2xl border border-white/10 bg-white/[0.04] text-center text-[13px] font-semibold text-white/45"
+            >
+              他的分身暂时在休息，改天再来吧。
+            </div>
+          )}
           <a
             href={fullHref}
             className="tap-target w-full py-3.5 bg-white/10 border border-white/10 rounded-2xl font-bold text-[14px] text-white active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-white/15"
@@ -334,12 +351,14 @@ function FullCardView({
   profile,
   avatarUrl,
   isOwner,
+  agentEnabled,
   simpleHref,
   onChat,
 }: {
   profile: SharedProfile;
   avatarUrl: string;
   isOwner: boolean;
+  agentEnabled: boolean;
   simpleHref: string;
   onChat: () => void;
 }) {
@@ -496,15 +515,24 @@ function FullCardView({
         </div>
 
         <div className="px-5 pb-6 space-y-2.5">
-          <button
-            type="button"
-            onClick={onChat}
-            data-testid="chat-with-vibe-full"
-            className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <MessageCircle className="w-5 h-5" />
-            先和我的分身聊聊
-          </button>
+          {agentEnabled ? (
+            <button
+              type="button"
+              onClick={onChat}
+              data-testid="chat-with-vibe-full"
+              className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              <MessageCircle className="w-5 h-5" />
+              先和我的分身聊聊
+            </button>
+          ) : (
+            <div
+              data-testid="vibe-disabled"
+              className="w-full py-4 rounded-2xl border border-white/10 bg-white/[0.04] text-center text-[13px] font-semibold text-white/45"
+            >
+              他的分身暂时在休息，改天再来吧。
+            </div>
+          )}
           <a
             href={simpleHref}
             className="tap-target w-full py-3.5 bg-white/10 border border-white/10 rounded-2xl font-bold text-[14px] text-white active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-white/15"

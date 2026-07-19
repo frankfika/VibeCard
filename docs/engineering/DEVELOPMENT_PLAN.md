@@ -519,7 +519,24 @@ Dependencies: Milestones 1 and 2
 
 ## 3.4 Add Failure And Empty States
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. The eight states across both clients:
+  - **No memories yet**: Mini Program vibe page had the empty line; Web `MyVibePage` now renders a designed empty block (「还没有记住任何事。聊点什么吧。」) instead of hiding the section.
+  - **No requests yet**: both inboxes already had the empty state with a recovery path (demo reset in demo mode).
+  - **Agent disabled**: visitor-chat cloud init checks `card.agentEnabled === false` (field absent → enabled, backward compatible) and shows a terminal「他的分身暂时在休息」with no composer; Web `PublicCardPage` gained optional `agentEnabled` on SharedProfile and swaps both chat buttons for a quiet `vibe-disabled` note. Cloud projection already carries the field.
+  - **Model unavailable**: pre-existing AI_BEHAVIOR §11 copy on both pages (chat continues, nothing lost) — verified by existing tests.
+  - **Moderation unavailable**: task 3.1 behavior (retry toast, draft preserved) — verified.
+  - **Network timeout / generic cloud failure**: dual-mode pages keep the deliberate fixture-demo fallback so a judge's demo never breaks; `card_deleted` / `not_found` were carved **out** of that fallback (see below).
+  - **Permission denied**: `unauthorized` from any cloud call now maps to「请先登录后再试」with page state and drafts kept (vibe ownerMessage / card draft, requests inbox + actions, visitor-chat init + send + submit). Requests inbox deliberately does **not** fall back to demo data on `unauthorized` — an unlogged owner must never see fixture requests.
+  - **Deleted Card**: visitor-chat init now distinguishes `card_deleted` (「这张名片已被主人收回」) and `not_found` (「这张名片找不到了」) as terminal states with「可以请对方重新分享一次」, no composer, no demo fallback; Web public page already had its recovery actions.
+- Retry-without-duplication: verified guards already in place — vibe `this.sending` lock + persist-before-reply ordering (owner message persisted exactly once; a failed reply never re-appends), visitor-chat `sending` lock on submit, requests `acting` lock on decisions.
+- Bug found and fixed along the way: visitor-chat read `res.result` instead of `res.result.card` from `getPublicCard`, so cloud mode always received an empty card; fixed and pinned by a regression test.
+- No error state exposes error codes, stack traces, function names, prompts, or secrets.
+- Validation: Mini Program page smoke 31/31 pass (8 new: unavailable terminal states, agent-disabled, demo-fallback regression, unauthorized mapping); `npm run lint` (tsc) clean; `npm run build` ok; `vibe-mock-story.spec.ts` 14/14 pass incl. new agent-disabled public-card case.
+- Not verifiable here: WeChat DevTools rendering of the new terminal view (reuses existing dark done-styles, low risk); the owner-side switch that actually sets `agentEnabled=false` is post-MVP backend work.
 
 Owners: Lanes A and D
 

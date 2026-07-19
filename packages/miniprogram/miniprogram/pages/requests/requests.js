@@ -87,6 +87,11 @@ Page({
     try {
       const res = await cloud.callFunction('requests', { action: 'listInbox' });
       if (!res || res.ok !== true) {
+        if (res && res.error && res.error.code === 'unauthorized') {
+          // 未登录：提示并保持当前页面状态，不回退演示（避免给未登录主人展示假数据）
+          wx.showToast({ title: '请先登录后再试', icon: 'none' });
+          return;
+        }
         throw new Error((res && res.error && res.error.message) || 'listInbox failed');
       }
       this.demoMode = false;
@@ -161,6 +166,9 @@ Page({
     try {
       const res = await cloud.callFunction('agent', { action: 'summarizeConnection', requestId });
       if (!res || res.ok !== true) {
+        if (res && res.error && res.error.code === 'unauthorized') {
+          wx.showToast({ title: '请先登录后再试', icon: 'none' });
+        }
         throw new Error((res && res.error && res.error.message) || 'summarizeConnection failed');
       }
       const s = res.result || {};
@@ -264,7 +272,11 @@ Page({
       if (!res || res.ok !== true) {
         const code = res && res.error && res.error.code;
         wx.showToast({
-          title: code === 'invalid_transition' ? '这条请求已经处理过了' : '操作失败，稍后再试',
+          title: code === 'invalid_transition'
+            ? '这条请求已经处理过了'
+            : code === 'unauthorized'
+              ? '请先登录后再试'
+              : '操作失败，稍后再试',
           icon: 'none',
         });
         return;
@@ -307,7 +319,11 @@ Page({
         decision,
       });
       if (!res || res.ok !== true) {
-        wx.showToast({ title: '操作失败，稍后再试', icon: 'none' });
+        const code = res && res.error && res.error.code;
+        wx.showToast({
+          title: code === 'unauthorized' ? '请先登录后再试' : '操作失败，稍后再试',
+          icon: 'none',
+        });
         return;
       }
       this.setData({ view });
@@ -367,7 +383,11 @@ Page({
         requestId: req.id,
       });
       if (!res || res.ok !== true) {
-        wx.showToast({ title: '操作失败，请稍后再试', icon: 'none' });
+        const code = res && res.error && res.error.code;
+        wx.showToast({
+          title: code === 'unauthorized' ? '请先登录后再试' : '操作失败，请稍后再试',
+          icon: 'none',
+        });
         return;
       }
       // 拉黑后 pending/later 的请求会被云端置为 decline，详情状态同步刷新

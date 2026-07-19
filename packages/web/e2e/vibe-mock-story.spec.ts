@@ -114,6 +114,12 @@ test.describe('VibeCard mock story (task 0.4)', () => {
     await expect(page.getByTestId('visitor-vibe-chat')).toContainText('我不想替他猜');
   });
 
+  test('public card with agent disabled offers no chat entry (task 3.4)', async ({ page }) => {
+    await page.goto(`/?c=${encodeProfile({ ...demoProfile, agentEnabled: false })}`);
+    await expect(page.getByTestId('vibe-disabled')).toContainText('他的分身暂时在休息');
+    await expect(page.getByTestId('chat-with-vibe')).toHaveCount(0);
+  });
+
   test('recognition moments still work with reduced motion enabled', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');

@@ -118,8 +118,8 @@ export default function MyVibePage() {
 
       <main className="flex-1 overflow-y-auto px-5 sm:px-6 pt-4 pb-2 no-scrollbar">
         <div className="max-w-md mx-auto w-full space-y-4">
-          {/* Remembered memories */}
-          {remembered.length > 0 && (
+          {/* Remembered memories (task 3.4: the empty state is designed too) */}
+          {remembered.length > 0 ? (
             <div className="rounded-[20px] bg-white/70 border border-amber-900/5 p-4">
               <div className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
                 已记住 · {remembered.length}
@@ -132,6 +132,10 @@ export default function MyVibePage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          ) : (
+            <div className="rounded-[20px] bg-white/50 border border-dashed border-amber-900/10 p-4 text-center">
+              <p className="text-[13px] font-medium text-muted-foreground">还没有记住任何事。聊点什么吧。</p>
             </div>
           )}
 

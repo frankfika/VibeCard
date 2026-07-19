@@ -75,4 +75,11 @@
     <view class="done-desc">{{doneDesc}}</view>
     <view wx:if="{{doneSub}}" class="done-sub">{{doneSub}}</view>
   </view>
+
+  <!-- ========== 终态：名片不可用 / 分身休息（无输入框，不回退演示） ========== -->
+  <view wx:if="{{stage === 'unavailable'}}" class="done-wrap">
+    <view class="done-icon">🌙</view>
+    <view class="done-title">{{unavailableTitle}}</view>
+    <view wx:if="{{unavailableDesc}}" class="done-desc">{{unavailableDesc}}</view>
+  </view>
 </view>

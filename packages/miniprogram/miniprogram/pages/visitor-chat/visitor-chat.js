@@ -73,6 +73,8 @@ Page({
     preview: null,
     latestSharedContext: [], // 分身最近发现的共同点（请求预览的「可能的共同点」来自它）
     scrollIntoId: '',
+    unavailableTitle: '', // stage 'unavailable' 终态标题/描述（名片收回/找不到/分身休息）
+    unavailableDesc: '',
     doneTitle: '已送达',
     doneDesc: '你的理由已经交给他的 Vibe，是否认识由他决定。',
     doneSub: '如果他有兴趣，他会选一种联系方式给你。',
@@ -96,10 +98,28 @@ Page({
     try {
       const res = await cloud.callFunction('card', { action: 'getPublicCard', ownerId: this.ownerId });
       if (!res || res.ok !== true) {
+        const code = res && res.error && res.error.code;
+        if (code === 'card_deleted' || code === 'not_found') {
+          // 名片已删除/不存在：终态，不回退演示（给已删除名片展示假数据是错误的）
+          this.demoMode = false;
+          this.setUnavailable(
+            code === 'card_deleted' ? '这张名片已被主人收回' : '这张名片找不到了',
+            '可以请对方重新分享一次'
+          );
+          return;
+        }
+        if (code === 'unauthorized') {
+          wx.showToast({ title: '请先登录后再试', icon: 'none' });
+        }
         throw new Error((res && res.error && res.error.message) || 'getPublicCard failed');
       }
-      const card = res.result || {};
+      const card = (res.result && res.result.card) || {};
       this.demoMode = false;
+      if (card.agentEnabled === false) {
+        // 分身休息中：终态，无输入框（agentEnabled 字段缺失视为 true，向后兼容）
+        this.setUnavailable('他的分身暂时在休息，改天再来吧。', '');
+        return;
+      }
       // 预设问题只在有对应公开信息时出现；回答由 agent.visitorMessage 生成
       const chips = [];
       if (card.currentFocus) chips.push({ id: 'q-focus', text: '他最近在忙什么？', used: false });
@@ -117,10 +137,15 @@ Page({
         scrollIntoId: opening.id,
       });
     } catch (err) {
-      // 云未部署/调用失败：回退 fixture 演示模式
+      // 云未部署/网络失败：回退 fixture 演示模式
       console.warn('[visitor-chat] cloud unavailable, fallback to fixture demo:', err && err.message);
       this.initDemoMode();
     }
+  },
+
+  // 终态：名片不可用/分身休息。不渲染输入框、不追加任何对话
+  setUnavailable(title, desc) {
+    this.setData({ stage: 'unavailable', unavailableTitle: title, unavailableDesc: desc });
   },
 
   initDemoMode() {
@@ -228,6 +253,10 @@ Page({
       });
       if (!res || res.ok !== true) {
         const code = res && res.error && res.error.code;
+        if (code === 'unauthorized') {
+          wx.showToast({ title: '请先登录后再试', icon: 'none' });
+          return;
+        }
         if (code === 'blocked') {
           // 主人已拉黑：温和收尾，不指责访客
           this.appendMessages([{
@@ -360,7 +389,10 @@ Page({
         return;
       }
       const code = res && res.error && res.error.code;
-      if (code === 'weak_reason') {
+      if (code === 'unauthorized') {
+        // 未登录：停在预览页，草稿不丢
+        wx.showToast({ title: '请先登录后再试', icon: 'none' });
+      } else if (code === 'weak_reason') {
         // 理由不够具体：分身追问，让访客补充后再来
         this.appendMessages([{ id: nextMessageId('agent'), role: 'agent', text: WEAK_REASON_FOLLOW_UP }]);
         this.setData({ stage: 'reason', reasonHint: WEAK_REASON_FOLLOW_UP });

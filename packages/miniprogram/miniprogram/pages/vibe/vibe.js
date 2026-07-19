@@ -235,6 +235,11 @@ Page({
       const res = await cloud.callFunction('agent', { action: 'ownerMessage', messages: history });
 
       if (!res || res.ok !== true) {
+        if (res && res.error && res.error.code === 'unauthorized') {
+          // 未登录：提示并保持当前对话状态，不追加兜底消息
+          wx.showToast({ title: '请先登录后再试', icon: 'none' });
+          return;
+        }
         // 模型不可用：聊天不中断，消息不丢（AI_BEHAVIOR.md 失败文案）
         this.appendVibeMessage('我现在有点连不上，刚才的话不会丢。可以稍后再试。');
         return;
@@ -349,7 +354,11 @@ Page({
         if (!res || res.ok !== true) {
           const code = res && res.error && res.error.code;
           wx.showToast({
-            title: code === 'no_confirmed_memories' ? '先确认几条记忆再生成' : '草稿生成失败，稍后再试',
+            title: code === 'no_confirmed_memories'
+              ? '先确认几条记忆再生成'
+              : code === 'unauthorized'
+                ? '请先登录后再试'
+                : '草稿生成失败，稍后再试',
             icon: 'none',
           });
           return;
