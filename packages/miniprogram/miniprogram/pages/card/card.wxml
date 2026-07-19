@@ -110,7 +110,8 @@
         </view>
 
         <!-- Verified -->
-        <view wx:if="{{profile.verified && (profile.verified.wallet || profile.verified.twitter || profile.verified.discord || profile.verified.wechat)}}" class="verified-card">
+        <!-- 联系方式（含已验证账号）只在连接成功后可见；访客/分享视图一律隐藏，不对外暴露 -->
+        <view wx:if="{{!isSharedView && profile.verified && (profile.verified.wallet || profile.verified.twitter || profile.verified.discord || profile.verified.wechat)}}" class="verified-card">
           <view wx:if="{{profile.verified.wallet}}" class="verified-item">
             <view class="verified-icon">👛</view>
             <view class="verified-label">Wallet</view>
@@ -147,14 +148,16 @@
           <view class="moment-content">{{profile.latestMoment}}</view>
         </view>
       </view>
-      <view class="bottom-space" />
+      <view class="bottom-space {{isSharedView ? 'bottom-space-lg' : ''}}" />
     </scroll-view>
 
     <!-- Actions -->
-    <view class="action-bar" wx:if="{{!isEditing}}">
+    <view class="action-bar {{isSharedView ? 'action-bar-column' : ''}}" wx:if="{{!isEditing}}">
       <button wx:if="{{!isSharedView}}" class="btn-secondary" bindtap="openEdit">编辑名片</button>
       <button wx:if="{{!isSharedView}}" class="btn-primary" open-type="share">分享我的名片</button>
-      <button wx:if="{{isSharedView}}" class="btn-primary btn-cta" bindtap="goHome">✨ 一键创建我的 Web3 社交名片</button>
+      <!-- 访客视图：先和主人的 AI 分身聊聊，再带着具体理由请求认识 -->
+      <button wx:if="{{isSharedView}}" class="btn-primary btn-agent-entry" bindtap="goVisitorChat">💬 先和我的分身聊聊</button>
+      <button wx:if="{{isSharedView}}" class="btn-secondary" bindtap="goHome">✨ 一键创建我的 Web3 社交名片</button>
     </view>
   </view>
 

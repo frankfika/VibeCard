@@ -388,6 +388,11 @@ Page({
     nav.switchTab('/pages/card/card');
   },
 
+  // 访客视图入口：先和主人的 AI 分身聊聊（任务 0.4 mock 故事）
+  goVisitorChat() {
+    nav.navigateTo('/pages/visitor-chat/visitor-chat');
+  },
+
   onShareAppMessage() {
     const profile = this.data.profile;
     if (!profile || !profile.name) {

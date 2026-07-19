@@ -1,0 +1,70 @@
+<view class="page">
+  <navbar title="{{ownerName}}的 AI 分身" showBack dark background="rgba(14,14,18,0.9)" />
+
+  <!-- ========== 对话阶段 ========== -->
+  <view wx:if="{{stage === 'chat' || stage === 'reason'}}" class="chat-stage">
+    <scroll-view scroll-y class="chat" scroll-into-view="{{scrollIntoId}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
+      <view class="chat-inner">
+        <view wx:for="{{messages}}" wx:key="id" id="{{item.id}}" class="msg-row {{item.role === 'visitor' ? 'msg-row-visitor' : ''}}">
+          <view class="msg-bubble {{item.role === 'visitor' ? 'msg-bubble-visitor' : 'msg-bubble-agent'}}">{{item.text}}</view>
+        </view>
+
+        <!-- 预设问题 chips -->
+        <view wx:if="{{stage === 'chat' && !guided}}" class="chips">
+          <view wx:for="{{chips}}" wx:key="id" class="chip {{item.used ? 'chip-used' : ''}}" bindtap="onAskPreset" data-id="{{item.id}}">{{item.text}}</view>
+        </view>
+
+        <!-- 引导后的 CTA -->
+        <view wx:if="{{stage === 'chat' && guided}}" class="guide-cta" bindtap="onStartReason">告诉他，我为什么想认识他 →</view>
+
+        <view class="chat-spacer"></view>
+      </view>
+    </scroll-view>
+
+    <!-- 底部：聊天输入 / 理由输入 -->
+    <view wx:if="{{stage === 'chat'}}" class="input-bar">
+      <input class="input-field" placeholder="问他的分身一个问题…" placeholder-style="color: #5c5c66;" value="{{inputValue}}" bindinput="onInput" bindconfirm="onSend" confirm-type="send" />
+      <view class="send-btn {{inputValue ? 'send-btn-active' : ''}}" bindtap="onSend">发送</view>
+    </view>
+
+    <view wx:if="{{stage === 'reason'}}" class="reason-bar">
+      <view class="reason-hint">一个具体的理由，比「认识一下」更有分量。</view>
+      <textarea class="reason-input" placeholder="例如：我也在做一个类似的东西，最近卡在…" placeholder-style="color: #5c5c66;" value="{{reasonValue}}" bindinput="onReasonInput" maxlength="300" />
+      <view class="reason-actions">
+        <view class="reason-btn" bindtap="onMakePreview">生成请求预览</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 请求预览 ========== -->
+  <view wx:if="{{stage === 'preview'}}" class="preview-wrap">
+    <view class="preview-title">交给{{ownerName}}的 Vibe 之前，再看一眼：</view>
+    <view class="preview-card">
+      <view class="preview-row">
+        <view class="preview-label">我是谁</view>
+        <view class="preview-value">{{preview.visitorName}}</view>
+      </view>
+      <view class="preview-row">
+        <view class="preview-label">我的理由</view>
+        <view class="preview-value">"{{preview.reason}}"</view>
+      </view>
+      <view class="preview-row">
+        <view class="preview-label">可能的共同点</view>
+        <view wx:for="{{preview.possibleSharedContext}}" wx:key="*this" class="preview-shared">· {{item}}</view>
+      </view>
+    </view>
+    <view class="preview-note">他的 Vibe 会先看你的理由，是否认识由他本人决定。</view>
+    <view class="preview-actions">
+      <view class="preview-btn" bindtap="onEditReason">再改改</view>
+      <view class="preview-btn preview-btn-primary" bindtap="onSubmitRequest">确认交给他的 Vibe</view>
+    </view>
+  </view>
+
+  <!-- ========== 提交成功 ========== -->
+  <view wx:if="{{stage === 'done'}}" class="done-wrap">
+    <view class="done-icon">🌙</view>
+    <view class="done-title">已送达</view>
+    <view class="done-desc">你的理由已经交给他的 Vibe，是否认识由他决定。</view>
+    <view class="done-sub">如果他有兴趣，他会选一种联系方式给你。</view>
+  </view>
+</view>

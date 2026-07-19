@@ -1,9 +1,116 @@
 <view class="page">
   <navbar title="联系请求" />
 
-  <view class="empty">
-    <view class="empty-icon">📥</view>
-    <view class="empty-title">还没有人想认识你</view>
-    <view class="empty-desc">分享你的 Card，真正理解你的人会带着具体的理由来找你。是否认识，永远由你决定。</view>
+  <!-- ========== 列表 ========== -->
+  <view wx:if="{{view === 'list'}}" class="list-wrap">
+    <view class="list-hint">带着具体理由来的人，会出现在这里。是否认识，永远由你决定。</view>
+
+    <view class="request-card" bindtap="openDetail">
+      <image class="request-avatar" src="{{request.visitorAvatarUrl}}" mode="aspectFill" />
+      <view class="request-main">
+        <view class="request-top">
+          <view class="request-name">{{request.visitorName}}</view>
+          <view class="request-time">{{request.timeText}}</view>
+        </view>
+        <view class="request-reason">{{request.reason}}</view>
+        <view wx:if="{{decidedAction === 'connected'}}" class="request-badge request-badge-connected">已认识</view>
+        <view wx:elif="{{decidedAction === 'later'}}" class="request-badge">先放一放</view>
+        <view wx:elif="{{decidedAction === 'declined'}}" class="request-badge">已礼貌回绝</view>
+        <view wx:else class="request-badge request-badge-pending">待你决定</view>
+      </view>
+    </view>
+
+    <view wx:if="{{decidedAction}}" class="demo-reset" bindtap="onResetDemo">重置演示状态</view>
+  </view>
+
+  <!-- ========== 详情 ========== -->
+  <scroll-view wx:if="{{view === 'detail'}}" scroll-y class="detail-scroll">
+    <view class="detail-inner">
+      <view class="detail-back" bindtap="backToList">‹ 返回列表</view>
+
+      <view class="detail-section">
+        <view class="detail-label">对方是谁</view>
+        <view class="detail-visitor">
+          <image class="detail-avatar" src="{{request.visitorAvatarUrl}}" mode="aspectFill" />
+          <view class="detail-summary">{{request.visitorSummary}}</view>
+        </view>
+      </view>
+
+      <view class="detail-section">
+        <view class="detail-label">为什么想认识我</view>
+        <view class="detail-reason">"{{request.reason}}"</view>
+      </view>
+
+      <view class="detail-section">
+        <view class="detail-label">可能的共同点</view>
+        <view wx:for="{{request.possibleSharedContext}}" wx:key="*this" class="shared-item">
+          <view class="shared-dot"></view>
+          <view class="shared-text">{{item}}</view>
+        </view>
+      </view>
+
+      <view class="detail-section vibe-take">
+        <view class="detail-label">Vibe 的看法</view>
+        <view class="vibe-take-summary">{{vibeTake.summary}}</view>
+        <view wx:for="{{vibeTake.reasons}}" wx:key="*this" class="vibe-take-item">· {{item}}</view>
+        <view class="vibe-take-uncertain">{{vibeTake.uncertainty}}</view>
+      </view>
+
+      <view class="detail-spacer"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 详情操作栏 -->
+  <view wx:if="{{view === 'detail'}}" class="action-bar">
+    <view class="action-btn action-btn-quiet" bindtap="onDecline">暂不联系</view>
+    <view class="action-btn" bindtap="onLater">以后再说</view>
+    <view class="action-btn action-btn-primary" bindtap="onConnect">认识一下</view>
+  </view>
+
+  <!-- ========== 选择联系方式 ========== -->
+  <view wx:if="{{view === 'share'}}" class="share-wrap">
+    <view class="share-title">选择要交换的联系方式</view>
+    <view class="share-hint">只有你勾选的方式会交给 {{request.visitorName}}。</view>
+
+    <view wx:for="{{contactMethods}}" wx:key="id" class="contact-item {{item.checked ? 'contact-item-checked' : ''}}" bindtap="onToggleContact" data-id="{{item.id}}">
+      <view class="contact-check">{{item.checked ? '✓' : ''}}</view>
+      <view class="contact-info">
+        <view class="contact-label">{{item.label}}</view>
+        <view class="contact-value">{{item.value}}</view>
+      </view>
+    </view>
+
+    <view class="share-actions">
+      <view class="action-btn" bindtap="openDetail">返回</view>
+      <view class="action-btn action-btn-primary {{selectedCount === 0 ? 'action-btn-disabled' : ''}}" bindtap="onConfirmShare">确认交换（{{selectedCount}}）</view>
+    </view>
+  </view>
+
+  <!-- ========== 完成态 ========== -->
+  <view wx:if="{{view === 'connected'}}" class="result-wrap">
+    <view class="result-icon">✨</view>
+    <view class="result-title">Vibe matched.</view>
+    <view class="result-desc">你们因为一个具体的理由认识了彼此。</view>
+    <view class="result-shared">
+      <view class="result-shared-label">已交给对方的联系方式</view>
+      <view wx:for="{{sharedContacts}}" wx:key="id" class="result-shared-item">{{item.label}}：{{item.value}}</view>
+    </view>
+    <view class="result-btn" bindtap="backToList">返回列表</view>
+  </view>
+
+  <!-- ========== 以后再说 ========== -->
+  <view wx:if="{{view === 'later'}}" class="result-wrap">
+    <view class="result-icon">🕊️</view>
+    <view class="result-title">先放一放</view>
+    <view class="result-desc">这条请求会留在列表里。你想好之后，随时可以回来决定。</view>
+    <view class="result-btn" bindtap="backToList">返回列表</view>
+  </view>
+
+  <!-- ========== 暂不联系 ========== -->
+  <view wx:if="{{view === 'declined'}}" class="result-wrap">
+    <view class="result-icon">🌙</view>
+    <view class="result-title">已礼貌回绝</view>
+    <view class="result-desc">对方不会收到尴尬的提醒，只会知道你的 Vibe 现在不方便。</view>
+    <view class="result-btn" bindtap="backToList">返回列表</view>
   </view>
 </view>

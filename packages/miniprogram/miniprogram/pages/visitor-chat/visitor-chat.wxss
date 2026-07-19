@@ -1,0 +1,300 @@
+/* 访客分身对话：深色风格，与主人端浅色温暖风格区分（参考 web 端公开名片暗色基调） */
+
+.page {
+  height: 100vh;
+  background: #0e0e12;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---------- 对话区 ---------- */
+
+.chat {
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-inner {
+  padding: 24rpx 32rpx 0;
+}
+
+.chat-spacer {
+  height: 32rpx;
+}
+
+.msg-row {
+  display: flex;
+  margin-bottom: 24rpx;
+}
+
+.msg-row-visitor {
+  justify-content: flex-end;
+}
+
+.msg-bubble {
+  max-width: 78%;
+  font-size: 28rpx;
+  line-height: 1.6;
+  padding: 20rpx 28rpx;
+  border-radius: 28rpx;
+}
+
+.msg-bubble-agent {
+  background: #1c1c22;
+  color: #ece8e0;
+  border-top-left-radius: 8rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.msg-bubble-visitor {
+  background: #d8b58a;
+  color: #211a12;
+  border-top-right-radius: 8rpx;
+}
+
+/* ---------- 预设问题 chips ---------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 8rpx 0 24rpx;
+}
+
+.chip {
+  font-size: 24rpx;
+  color: #d8b58a;
+  border: 1rpx solid rgba(216, 181, 138, 0.4);
+  border-radius: 100rpx;
+  padding: 14rpx 28rpx;
+}
+
+.chip:active {
+  background: rgba(216, 181, 138, 0.12);
+}
+
+.chip-used {
+  opacity: 0.4;
+}
+
+.guide-cta {
+  margin: 8rpx 0 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0e0e12;
+  background: #d8b58a;
+  border-radius: 100rpx;
+  padding: 22rpx 0;
+}
+
+.guide-cta:active {
+  opacity: 0.85;
+}
+
+/* ---------- 输入栏 ---------- */
+
+.input-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #0e0e12;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.input-field {
+  flex: 1;
+  height: 80rpx;
+  background: #1c1c22;
+  border-radius: 100rpx;
+  padding: 0 32rpx;
+  font-size: 28rpx;
+  color: #ece8e0;
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.send-btn {
+  flex-shrink: 0;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #5c5c66;
+  padding: 16rpx 12rpx;
+}
+
+.send-btn-active {
+  color: #d8b58a;
+}
+
+/* ---------- 理由输入 ---------- */
+
+.reason-bar {
+  flex-shrink: 0;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: #0e0e12;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.reason-hint {
+  font-size: 24rpx;
+  color: #8a8a94;
+  margin-bottom: 20rpx;
+}
+
+.reason-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160rpx;
+  background: #1c1c22;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 24rpx;
+  padding: 24rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #ece8e0;
+  margin-bottom: 24rpx;
+}
+
+.reason-actions {
+  display: flex;
+}
+
+.reason-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0e0e12;
+  background: #d8b58a;
+  border-radius: 100rpx;
+  padding: 22rpx 0;
+}
+
+.reason-btn:active {
+  opacity: 0.85;
+}
+
+/* ---------- 请求预览 ---------- */
+
+.preview-wrap {
+  padding: 48rpx 32rpx;
+}
+
+.preview-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #ece8e0;
+  margin-bottom: 32rpx;
+}
+
+.preview-card {
+  background: #1c1c22;
+  border: 1rpx solid rgba(216, 181, 138, 0.25);
+  border-radius: 28rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+}
+
+.preview-row {
+  margin-bottom: 24rpx;
+}
+
+.preview-row:last-child {
+  margin-bottom: 0;
+}
+
+.preview-label {
+  font-size: 22rpx;
+  color: #8a8a94;
+  letter-spacing: 2rpx;
+  margin-bottom: 10rpx;
+}
+
+.preview-value {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #ece8e0;
+}
+
+.preview-shared {
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #c9c4ba;
+}
+
+.preview-note {
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #8a8a94;
+  margin-bottom: 40rpx;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.preview-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 22rpx 0;
+  border-radius: 100rpx;
+  color: #d8b58a;
+  border: 1rpx solid rgba(216, 181, 138, 0.4);
+}
+
+.preview-btn:active {
+  opacity: 0.85;
+}
+
+.preview-btn-primary {
+  background: #d8b58a;
+  color: #0e0e12;
+  border-color: #d8b58a;
+}
+
+/* ---------- 提交成功 ---------- */
+
+.done-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 200rpx 64rpx 0;
+}
+
+.done-icon {
+  font-size: 80rpx;
+  margin-bottom: 32rpx;
+}
+
+.done-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ece8e0;
+  margin-bottom: 16rpx;
+}
+
+.done-desc {
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #c9c4ba;
+  max-width: 480rpx;
+}
+
+.done-sub {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: #8a8a94;
+}

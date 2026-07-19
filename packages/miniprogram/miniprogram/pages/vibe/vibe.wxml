@@ -1,9 +1,57 @@
 <view class="page">
   <navbar title="我的 Vibe" />
 
-  <view class="empty">
-    <view class="empty-icon">✨</view>
-    <view class="empty-title">你的私有 Vibe</view>
-    <view class="empty-desc">在这里和它随便聊聊：最近在做什么、喜欢什么、不希望别人知道什么。它只会记住你确认过的内容。</view>
+  <!-- 已记住：只有主人确认过的记忆才会出现在这里 -->
+  <view class="memory-bar">
+    <view class="memory-bar-header">
+      <view class="memory-bar-title">已记住</view>
+      <view class="memory-bar-count">{{memories.length}} 条</view>
+    </view>
+    <scroll-view scroll-y class="memory-list">
+      <view wx:for="{{memories}}" wx:key="id" class="memory-item">
+        <view class="memory-tag">{{item.visibilityLabel}}</view>
+        <view class="memory-text">{{item.content}}</view>
+      </view>
+      <view wx:if="{{memories.length === 0}}" class="memory-empty">还没有记住任何事。聊点什么吧。</view>
+    </scroll-view>
+  </view>
+
+  <!-- 对话区 -->
+  <scroll-view scroll-y class="chat" scroll-into-view="{{scrollIntoId}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
+    <view class="chat-inner">
+      <view wx:for="{{messages}}" wx:key="id" id="{{item.id}}" class="msg-row {{item.role === 'owner' ? 'msg-row-owner' : ''}}">
+        <view class="msg-bubble {{item.role === 'owner' ? 'msg-bubble-owner' : 'msg-bubble-vibe'}}">{{item.text}}</view>
+      </view>
+
+      <!-- 记忆提议卡片：Vibe 可以提议，但只有主人确认后才算数 -->
+      <view wx:if="{{proposal}}" id="proposal-card" class="proposal {{proposal.state === 'confirmed' ? 'proposal-confirmed' : ''}}">
+        <view class="proposal-label">我记住了：</view>
+        <view wx:if="{{proposal.state !== 'editing'}}" class="proposal-text">{{proposal.text}}</view>
+
+        <view wx:if="{{proposal.state === 'pending'}}" class="proposal-actions">
+          <view class="proposal-btn proposal-btn-primary" bindtap="onRememberProposal">记住</view>
+          <view class="proposal-btn" bindtap="onEditProposal">改一下</view>
+          <view class="proposal-btn proposal-btn-quiet" bindtap="onDismissProposal">别记这个</view>
+        </view>
+
+        <view wx:if="{{proposal.state === 'editing'}}" class="proposal-edit">
+          <textarea class="proposal-edit-input" value="{{proposal.editText}}" bindinput="onProposalEditInput" auto-height maxlength="200" />
+          <view class="proposal-actions">
+            <view class="proposal-btn proposal-btn-primary" bindtap="onSaveEditedProposal">确认记住</view>
+            <view class="proposal-btn proposal-btn-quiet" bindtap="onCancelEditProposal">取消</view>
+          </view>
+        </view>
+
+        <view wx:if="{{proposal.state === 'confirmed'}}" class="proposal-done">✓ 已记住，可以在上面「已记住」里看到</view>
+      </view>
+
+      <view class="chat-spacer"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部输入栏（位于 tabBar 之上） -->
+  <view class="input-bar">
+    <input class="input-field" placeholder="和你的 Vibe 聊聊…" placeholder-style="color: #b8ab9e;" value="{{inputValue}}" bindinput="onInput" bindconfirm="onSend" confirm-type="send" />
+    <view class="send-btn {{inputValue ? 'send-btn-active' : ''}}" bindtap="onSend">发送</view>
   </view>
 </view>

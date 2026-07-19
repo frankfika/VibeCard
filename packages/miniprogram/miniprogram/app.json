@@ -3,6 +3,7 @@
     "pages/card/card",
     "pages/requests/requests",
     "pages/vibe/vibe",
+    "pages/visitor-chat/visitor-chat",
     "pages/threads/threads",
     "pages/more/more",
     "pages/discover/discover",

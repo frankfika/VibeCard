@@ -30,8 +30,8 @@ test.describe('Cross-browser compatibility', () => {
 
   test('tab switching works', async ({ page }) => {
     await page.getByRole('tab', { name: '请求' }).click();
-    await expect(page.locator('text=还没有人想认识你').first()).toBeVisible();
+    await expect(page.getByTestId('request-item')).toBeVisible();
     await page.getByRole('tab', { name: 'Vibe' }).click();
-    await expect(page.locator('text=你的私有 Vibe').first()).toBeVisible();
+    await expect(page.getByTestId('memory-proposal')).toBeVisible();
   });
 });

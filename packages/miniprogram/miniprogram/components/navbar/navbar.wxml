@@ -3,7 +3,7 @@
 ></view>
 
 <view
-  class="navbar-wrapper"
+  class="navbar-wrapper {{dark ? 'navbar-dark' : ''}}"
   style="padding-top: {{statusBarHeight}}px; height: {{statusBarHeight + navBarHeight}}px; background: {{background}}; backdrop-filter: blur({{blur}}); -webkit-backdrop-filter: blur({{blur}});"
 >
   <view class="navbar-inner" style="height: {{navBarHeight}}px;"

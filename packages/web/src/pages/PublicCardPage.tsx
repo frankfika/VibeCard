@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   MapPin, Zap, Sparkles, Check, Wallet,
-  ArrowRight, User,
+  ArrowRight, User, MessageCircle,
 } from 'lucide-react';
 import { useAccount } from 'wagmi';
 
-import { getSocialIcon, getSocialLabel } from '../lib/social';
+import VisitorVibeChat from '../components/vibe/VisitorVibeChat';
 
 interface SharedProfile {
   name: string;
@@ -115,6 +115,7 @@ function useSharedProfile() {
 export default function PublicCardPage() {
   const { profile, raw, isFull, buildUrl, loadError } = useSharedProfile();
   const { address } = useAccount();
+  const [showVibeChat, setShowVibeChat] = useState(false);
 
   if (!profile) {
     return (
@@ -195,6 +196,7 @@ export default function PublicCardPage() {
             avatarUrl={avatarUrl}
             isOwner={isOwner}
             simpleHref={buildUrl(false)}
+            onChat={() => setShowVibeChat(true)}
           />
         ) : (
           <SimpleCardView
@@ -202,9 +204,16 @@ export default function PublicCardPage() {
             avatarUrl={avatarUrl}
             isOwner={isOwner}
             fullHref={buildUrl(true)}
+            onChat={() => setShowVibeChat(true)}
           />
         )}
       </main>
+
+      <AnimatePresence>
+        {showVibeChat && (
+          <VisitorVibeChat ownerName={profile.name || '他'} onClose={() => setShowVibeChat(false)} />
+        )}
+      </AnimatePresence>
 
       <footer className="relative z-10 shrink-0 px-5 sm:px-6 py-5">
         <a
@@ -224,11 +233,13 @@ function SimpleCardView({
   avatarUrl,
   isOwner,
   fullHref,
+  onChat,
 }: {
   profile: SharedProfile;
   avatarUrl: string;
   isOwner: boolean;
   fullHref: string;
+  onChat: () => void;
 }) {
   const tags = profile.tags?.slice(0, 4) ?? [];
 
@@ -270,27 +281,9 @@ function SimpleCardView({
             </div>
           )}
 
-          {profile.contacts && profile.contacts.length > 0 && (
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {profile.contacts.map(contact => {
-                const Icon = getSocialIcon(contact.platform);
-                const label = getSocialLabel(contact.platform);
-                return (
-                  <a
-                    key={contact.id || contact.platform}
-                    href={contact.url || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/15 transition-colors border border-white/10 text-white/90 text-[12px] font-medium"
-                    onClick={(e) => { if (!contact.url) e.preventDefault(); }}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{contact.value || label}</span>
-                  </a>
-                );
-              })}
-            </div>
-          )}
+          {/* Task 0.4 privacy: contact details are never shown on the public
+              card. They unlock only after the owner accepts a connection
+              (the server-side public projection lands in task 2.1). */}
 
           {tags.length > 0 && (
             <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -312,13 +305,22 @@ function SimpleCardView({
           )}
         </div>
 
-        <div className="px-5 pb-6">
-          <a
-            href={fullHref}
+        <div className="px-5 pb-6 space-y-2.5">
+          <button
+            type="button"
+            onClick={onChat}
+            data-testid="chat-with-vibe"
             className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
-            {isOwner ? '查看完整名片' : '查看完整名片'}
-            <ArrowRight className="w-5 h-5" />
+            <MessageCircle className="w-5 h-5" />
+            先和我的分身聊聊
+          </button>
+          <a
+            href={fullHref}
+            className="tap-target w-full py-3.5 bg-white/10 border border-white/10 rounded-2xl font-bold text-[14px] text-white active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-white/15"
+          >
+            查看完整名片
+            <ArrowRight className="w-4 h-4" />
           </a>
         </div>
       </div>
@@ -333,11 +335,13 @@ function FullCardView({
   avatarUrl,
   isOwner,
   simpleHref,
+  onChat,
 }: {
   profile: SharedProfile;
   avatarUrl: string;
   isOwner: boolean;
   simpleHref: string;
+  onChat: () => void;
 }) {
   return (
     <motion.div
@@ -382,27 +386,8 @@ function FullCardView({
             </div>
           )}
 
-          {profile.contacts && profile.contacts.length > 0 && (
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              {profile.contacts.map(contact => {
-                const Icon = getSocialIcon(contact.platform);
-                const label = getSocialLabel(contact.platform);
-                return (
-                  <a
-                    key={contact.id || contact.platform}
-                    href={contact.url || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/15 transition-colors border border-white/10 text-white/90 text-[12px] font-medium"
-                    onClick={(e) => { if (!contact.url) e.preventDefault(); }}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{contact.value || label}</span>
-                  </a>
-                );
-              })}
-            </div>
-          )}
+          {/* Task 0.4 privacy: no contact details on the public card; see
+              SimpleCardView note. */}
 
           {profile.bio && (
             <p className="mt-4 text-[14px] font-medium text-white/65 leading-relaxed">{profile.bio}</p>
@@ -510,7 +495,16 @@ function FullCardView({
           )}
         </div>
 
-        <div className="px-5 pb-6">
+        <div className="px-5 pb-6 space-y-2.5">
+          <button
+            type="button"
+            onClick={onChat}
+            data-testid="chat-with-vibe-full"
+            className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <MessageCircle className="w-5 h-5" />
+            先和我的分身聊聊
+          </button>
           <a
             href={simpleHref}
             className="tap-target w-full py-3.5 bg-white/10 border border-white/10 rounded-2xl font-bold text-[14px] text-white active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:bg-white/15"

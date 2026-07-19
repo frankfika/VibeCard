@@ -145,7 +145,16 @@ Dependencies: 0.1
 
 ## 0.4 Build The Four-Screen Mock Story
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. Driven by `vibeFixtures` (web) and `miniprogram/data/vibe-fixtures.js` mirror; no real model calls
+- Web: `MyVibePage` owner chat with memory proposal (记住 / 改一下 / 别记这个 → confirmed list); `RequestsPage` inbox → detail (visitor / reason / shared context / Vibe take + uncertainty) → 认识一下 / 以后再说 / 暂不联系 → contact picker → `Vibe matched.`; `VisitorVibeChat` dark overlay on `PublicCardPage` (AI-representation identity, grounded fixture answers, honest uncertainty for unknowns, reason → preview → confirmed submission); public card no longer renders contact details (privacy rule; server-side projection lands in 2.1); owner and visitor visual states differ (light warm vs dark)
+- Mini Program: `pages/vibe` owner chat + proposal actions; `pages/requests` inbox → detail → matched; new `pages/visitor-chat` (registered in `app.json`); card shared view gained the "先和我的分身聊聊" entry and hides verified/contact info from visitors; navbar gained optional `dark` prop
+- Validation: `npm run lint` ✅, `npm run build` ✅, new `e2e/vibe-mock-story.spec.ts` + cross-browser + pwa-theme = 26 passed (desktop + mobile-chrome projects cover 390x844); im-browser 10 passed; chain-test unchanged (2 known-stale verified-accounts failures, 4 skipped Web3)
+- Mini Program smoke-tested via node stubs (proposal paths, request loop, visitor flow, no agent_only/contact leakage); WeChat DevTools compile + device check still pending owner (same note as 0.3)
+- Demo path: owner tabs 名片/Vibe/请求 walk the loop to Vibe matched; visitor opens a shared `?c=` link → 先和我的分身聊聊 → submits reason. RequestsPage has 重置演示状态 for repeated demos
 
 Owners: Lane A and Lane D
 

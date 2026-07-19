@@ -1,35 +1,242 @@
-import { Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sparkles, Send, Check, Pencil, X } from 'lucide-react';
+import { vibeFixtures } from '@shared';
+import type { Memory } from '@shared';
 
 /**
- * 我的 Vibe（owner conversation）。
+ * 我的 Vibe — owner conversation (task 0.4 mock story).
  *
- * Task 0.2 placeholder: the owner chat with memory proposals is built in
- * Milestone 1 on top of the shared `Memory` contract. For now this page owns
- * the navigation destination and explains what Vibe is, with an empty state.
+ * Everything here runs on shared fixtures; no real model is called. The flow
+ * mirrors AI_BEHAVIOR.md: the Vibe proposes at most one memory, and only an
+ * explicit owner action (记住 / 改一下 / 别记这个) decides what becomes
+ * durable memory.
  */
+
+interface ChatMessage {
+  id: string;
+  role: 'owner' | 'vibe';
+  text: string;
+}
+
+interface Proposal {
+  content: string;
+  state: 'pending' | 'editing' | 'confirmed' | 'rejected';
+  draft: string;
+}
+
+const cannedReplies = [
+  '嗯，我听着。说得多一点，我就更懂你一点。',
+  '这个挺重要的，我记在心上了。',
+  '明白了。还有别的想让我知道的吗？',
+];
+
+const initialMessages: ChatMessage[] = [
+  { id: 'm1', role: 'owner', text: '我最近想认识真正做过 AI 社交产品的人。' },
+  {
+    id: 'm2',
+    role: 'vibe',
+    text: '这句话值得被记住。和你之前聊的方向放在一起看，你关心的其实是「AI 怎么改变人和人的关系」。',
+  },
+];
+
 export default function MyVibePage() {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [input, setInput] = useState('');
+  const [replyIndex, setReplyIndex] = useState(0);
+  const [proposal, setProposal] = useState<Proposal>({
+    content: '你最近更想认识真正做过 AI 社交产品的人。',
+    state: 'pending',
+    draft: '你最近更想认识真正做过 AI 社交产品的人。',
+  });
+  const [remembered, setRemembered] = useState<Memory[]>(() =>
+    vibeFixtures.fixtureOwnerMemories.filter(m => m.status === 'confirmed'),
+  );
+
+  const send = () => {
+    const text = input.trim();
+    if (!text) return;
+    const reply = cannedReplies[replyIndex % cannedReplies.length];
+    setReplyIndex(i => i + 1);
+    setMessages(prev => [
+      ...prev,
+      { id: `u-${Date.now()}`, role: 'owner', text },
+      { id: `v-${Date.now()}`, role: 'vibe', text: reply },
+    ]);
+    setInput('');
+  };
+
+  const confirmProposal = (content: string) => {
+    const memory: Memory = {
+      id: `fixture-memory-confirmed-${Date.now()}`,
+      schemaVersion: 1,
+      ownerId: vibeFixtures.fixtureOwner.id,
+      kind: 'preference',
+      content,
+      visibility: 'public',
+      status: 'confirmed',
+      sourceConversationId: 'fixture-conversation-owner-mock',
+      sourceMessageIds: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setRemembered(prev => [...prev, memory]);
+    setProposal(p => ({ ...p, state: 'confirmed' }));
+    setMessages(prev => [
+      ...prev,
+      { id: `v-remember-${Date.now()}`, role: 'vibe', text: `我记住了：${content}` },
+    ]);
+  };
+
+  const rejectProposal = () => {
+    setProposal(p => ({ ...p, state: 'rejected' }));
+    setMessages(prev => [
+      ...prev,
+      { id: `v-forget-${Date.now()}`, role: 'vibe', text: '好的，这条我不会记住。' },
+    ]);
+  };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#fbf7f2]">
       <header className="hidden md:flex px-6 py-4 justify-center items-center z-20 shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground tracking-widest uppercase">
           我的 Vibe
         </span>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-6 no-scrollbar">
-        <div className="h-full flex flex-col items-center justify-center text-center gap-4 pb-24">
-          <div className="w-16 h-16 rounded-[22px] bg-foreground flex items-center justify-center shadow-lg">
-            <Sparkles className="w-7 h-7 text-background" />
-          </div>
-          <div className="space-y-2 max-w-[280px]">
-            <h2 className="text-[17px] font-bold text-foreground">你的私有 Vibe</h2>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              在这里和它随便聊聊：最近在做什么、喜欢什么、不希望别人知道什么。
-              它只会记住你确认过的内容。
-            </p>
-          </div>
+      <main className="flex-1 overflow-y-auto px-5 sm:px-6 pt-4 pb-2 no-scrollbar">
+        <div className="max-w-md mx-auto w-full space-y-4">
+          {/* Remembered memories */}
+          {remembered.length > 0 && (
+            <div className="rounded-[20px] bg-white/70 border border-amber-900/5 p-4">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                已记住 · {remembered.length}
+              </div>
+              <ul className="space-y-1.5">
+                {remembered.map(m => (
+                  <li key={m.id} className="text-[13px] font-medium text-foreground/80 flex gap-2">
+                    <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-700" />
+                    <span>{m.content}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Chat messages */}
+          {messages.map(m => (
+            <div key={m.id} className={`flex ${m.role === 'owner' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-[85%] rounded-[20px] px-4 py-3 text-[14px] leading-relaxed font-medium ${
+                  m.role === 'owner'
+                    ? 'bg-foreground text-background rounded-br-md'
+                    : 'bg-white border border-amber-900/5 text-foreground rounded-bl-md'
+                }`}
+              >
+                {m.role === 'vibe' && (
+                  <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-amber-700/70 uppercase tracking-widest">
+                    <Sparkles className="w-3 h-3" />
+                    你的 Vibe
+                  </div>
+                )}
+                {m.text}
+              </div>
+            </div>
+          ))}
+
+          {/* Memory proposal */}
+          <AnimatePresence>
+            {(proposal.state === 'pending' || proposal.state === 'editing') && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="rounded-[20px] border border-amber-700/15 bg-amber-50/80 p-4"
+                data-testid="memory-proposal"
+              >
+                <div className="text-[11px] font-bold uppercase tracking-widest text-amber-800/70 mb-2">
+                  Vibe 提议记住
+                </div>
+                {proposal.state === 'editing' ? (
+                  <input
+                    value={proposal.draft}
+                    onChange={e => setProposal(p => ({ ...p, draft: e.target.value }))}
+                    className="w-full rounded-xl border border-amber-700/20 bg-white px-3 py-2 text-[14px] font-medium outline-none focus:border-amber-700/40"
+                  />
+                ) : (
+                  <p className="text-[14px] font-semibold text-foreground mb-1">我记住了：{proposal.content}</p>
+                )}
+                <div className="flex gap-2 mt-3">
+                  {proposal.state === 'editing' ? (
+                    <>
+                      <button
+                        onClick={() => proposal.draft.trim() && confirmProposal(proposal.draft.trim())}
+                        className="tap-target flex-1 py-2 rounded-xl bg-foreground text-background text-[13px] font-bold"
+                      >
+                        确认
+                      </button>
+                      <button
+                        onClick={() => setProposal(p => ({ ...p, state: 'pending', draft: p.content }))}
+                        className="tap-target px-4 py-2 rounded-xl bg-white text-foreground text-[13px] font-bold border border-amber-700/15"
+                      >
+                        取消
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => confirmProposal(proposal.content)}
+                        data-testid="proposal-remember"
+                        className="tap-target flex-1 py-2 rounded-xl bg-foreground text-background text-[13px] font-bold"
+                      >
+                        记住
+                      </button>
+                      <button
+                        onClick={() => setProposal(p => ({ ...p, state: 'editing' }))}
+                        data-testid="proposal-edit"
+                        className="tap-target px-3 py-2 rounded-xl bg-white text-foreground text-[13px] font-bold border border-amber-700/15 flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        改一下
+                      </button>
+                      <button
+                        onClick={rejectProposal}
+                        data-testid="proposal-reject"
+                        className="tap-target px-3 py-2 rounded-xl bg-white text-muted-foreground text-[13px] font-bold border border-amber-700/15 flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" />
+                        别记这个
+                      </button>
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
+
+      {/* Input bar */}
+      <div className="shrink-0 px-5 sm:px-6 pb-3 pt-1">
+        <div className="max-w-md mx-auto flex gap-2">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') send(); }}
+            placeholder="和你的 Vibe 说点什么…"
+            className="flex-1 rounded-2xl border border-amber-900/10 bg-white px-4 py-3 text-[14px] font-medium outline-none focus:border-amber-700/30"
+          />
+          <button
+            onClick={send}
+            disabled={!input.trim()}
+            data-testid="vibe-send"
+            className="tap-target w-12 rounded-2xl bg-foreground text-background flex items-center justify-center disabled:opacity-40"
+            aria-label="发送"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
