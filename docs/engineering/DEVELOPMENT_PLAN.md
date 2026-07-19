@@ -641,7 +641,18 @@ Dependencies: Milestone 3
 
 ## 4.3 Prepare Demo Data
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. The demo cast (all fictional, no real contact details anywhere):
+  - **Owner with authentic project context**: 林舟, whose card/memories revolve around building VibeCard itself (existing fixtures since 0.1).
+  - **Visitor with a strong shared reason**: 苏晴, independent dev building a WeChat AI bookkeeping app, stuck on the exact private-memory/public-identity boundary the owner is working on (existing).
+  - **One weak request to demonstrate boundaries**: new `fixtureWeakVisitor` 王拓 + `fixtureWeakConnectionRequest` (「想认识一下，多个朋友多条路。」— the AI_BEHAVIOR §7 anti-pattern, no shared context) added to `packages/shared/fixtures/vibe.ts` and mirrored in `miniprogram/data/vibe-fixtures.js`. Both demo inboxes now show strong + weak side by side: Mini Program `requests.loadFixtureDemo` picks a per-request Vibe take (weak → 「我还判断不好，信息不太够。」 with reasons grounded in what's missing); Web `RequestsPage` was refactored from a single request to a requests array with per-request visitor/take mapping (`request-item-weak` testid; strong keeps `request-item` so older assertions still hold). Empty shared-context sections render nothing — no invented common ground.
+  - **One confirmed memory used later**: `fixture-memory-public-focus` (confirmed) is the memory the Vibe calls back to in the task-3.3 recognition moment on both clients.
+- Real-AI vs fixtures: cloud mode uses only live data (fixtures never leak into cloud paths — dual-mode pages fall back to fixtures only when the cloud is unreachable, by design); deterministic fixture demo works fully offline.
+- Reset under one minute: Web RequestsPage「重置演示状态」restores both requests instantly; My Vibe state resets on page reload; Mini Program demo exposes「重置演示状态」in demo mode. Full reset procedure is scripted in the 4.4 walkthrough.
+- Validation: Mini Program page tests 34/34 pass (3 new weak-request cases); `npm run lint` clean; `npm run build` ok; `vibe-mock-story.spec.ts` 16/16 pass (new weak-request boundary case).
 
 Owner: coordinating agent
 

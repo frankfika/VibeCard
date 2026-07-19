@@ -20,17 +20,40 @@ const vibeTake = {
   suggestedTopic: '私人记忆与公开身份的权限设计',
 };
 
+// Task 4.3: the weak request gets an honest "not enough information" take —
+// a boundary shown through evidence, never a score or a gate.
+const weakVibeTake = {
+  headline: '我还判断不好，信息不太够。',
+  why: ['理由比较泛泛，没有说出具体想一起做什么', '也没有留下可以了解的背景或作品'],
+  uncertainty: '对方是否真的了解过你在做的事',
+  suggestedTopic: '先请对方补充一个具体的理由',
+};
+
 type View = 'inbox' | 'detail' | 'pick-contact' | 'matched';
 
 export default function RequestsPage() {
   const [view, setView] = useState<View>('inbox');
-  const [request, setRequest] = useState<ConnectionRequest>(vibeFixtures.fixtureConnectionRequest);
+  const [requests, setRequests] = useState<ConnectionRequest[]>([
+    vibeFixtures.fixtureConnectionRequest,
+    vibeFixtures.fixtureWeakConnectionRequest,
+  ]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
 
   const contacts = vibeFixtures.fixtureOwnerContactMethods;
+  const visitors = [vibeFixtures.fixtureVisitor, vibeFixtures.fixtureWeakVisitor];
+  const request = requests.find(r => r.id === selectedId) ?? null;
+  const visitorOf = (r: ConnectionRequest) =>
+    visitors.find(v => v.id === r.visitorId) ?? vibeFixtures.fixtureVisitor;
+  const takeOf = (r: ConnectionRequest) =>
+    r.id === vibeFixtures.fixtureWeakConnectionRequest.id ? weakVibeTake : vibeTake;
+
+  const updateRequest = (id: string, patch: Partial<ConnectionRequest>) => {
+    setRequests(prev => prev.map(r => (r.id === id ? { ...r, ...patch, updatedAt: Date.now() } : r)));
+  };
 
   const act = (action: ConnectionAction) => {
-    setRequest(r => ({ ...r, ownerAction: action, updatedAt: Date.now() }));
+    if (request) updateRequest(request.id, { ownerAction: action });
   };
 
   const toggleContact = (id: string) => {
@@ -40,15 +63,19 @@ export default function RequestsPage() {
   };
 
   const confirmConnect = () => {
-    setRequest(r => ({ ...r, ownerAction: 'connect', sharedContactMethodIds: selectedContactIds, updatedAt: Date.now() }));
+    if (!request) return;
+    updateRequest(request.id, { ownerAction: 'connect', sharedContactMethodIds: selectedContactIds });
     setView('matched');
   };
 
   const resetDemo = () => {
-    setRequest(vibeFixtures.fixtureConnectionRequest);
+    setRequests([vibeFixtures.fixtureConnectionRequest, vibeFixtures.fixtureWeakConnectionRequest]);
+    setSelectedId(null);
     setSelectedContactIds([]);
     setView('inbox');
   };
+
+  const pendingRequests = requests.filter(r => r.ownerAction === 'pending');
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -63,45 +90,50 @@ export default function RequestsPage() {
           <AnimatePresence mode="wait" initial={false}>
             {view === 'inbox' && (
               <motion.div key="inbox" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                {request.ownerAction !== 'pending' ? (
+                {pendingRequests.length === 0 ? (
                   <div className="flex flex-col items-center text-center gap-4 pt-24">
                     <div className="w-16 h-16 rounded-[22px] bg-secondary flex items-center justify-center">
                       <Inbox className="w-7 h-7 text-muted-foreground" />
                     </div>
-                    <p className="text-[13px] text-muted-foreground">
-                      {request.ownerAction === 'connect' && '这个请求已经变成一次新的认识。'}
-                      {request.ownerAction === 'later' && '已标记为以后再说。'}
-                      {request.ownerAction === 'decline' && '已暂不联系。'}
-                    </p>
+                    <p className="text-[13px] text-muted-foreground">都处理完了。新的认识会出现在这里。</p>
                     <button onClick={resetDemo} className="text-[12px] font-bold text-muted-foreground underline underline-offset-4">
                       重置演示状态
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setView('detail')}
-                    data-testid="request-item"
-                    className="w-full text-left rounded-[20px] border border-border/60 bg-card p-5 flex items-center gap-4 hover:bg-secondary/40 transition-colors"
-                  >
-                    <img
-                      src={vibeFixtures.fixtureVisitor.avatarUrl}
-                      alt=""
-                      className="w-12 h-12 rounded-[16px] bg-secondary"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[15px] font-bold text-foreground">{vibeFixtures.fixtureVisitor.name}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">新请求</span>
-                      </div>
-                      <p className="text-[13px] text-muted-foreground truncate mt-0.5">{request.reason}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                  </button>
+                  <div className="space-y-3">
+                    {pendingRequests.map(r => {
+                      const visitor = visitorOf(r);
+                      const isWeak = r.id === vibeFixtures.fixtureWeakConnectionRequest.id;
+                      return (
+                        <button
+                          key={r.id}
+                          onClick={() => { setSelectedId(r.id); setView('detail'); }}
+                          data-testid={isWeak ? 'request-item-weak' : 'request-item'}
+                          className="w-full text-left rounded-[20px] border border-border/60 bg-card p-5 flex items-center gap-4 hover:bg-secondary/40 transition-colors"
+                        >
+                          <img
+                            src={visitor.avatarUrl}
+                            alt=""
+                            className="w-12 h-12 rounded-[16px] bg-secondary"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[15px] font-bold text-foreground">{visitor.name}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">新请求</span>
+                            </div>
+                            <p className="text-[13px] text-muted-foreground truncate mt-0.5">{r.reason}</p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </motion.div>
             )}
 
-            {view === 'detail' && (
+            {view === 'detail' && request && (
               <motion.div key="detail" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
                 <button onClick={() => setView('inbox')} className="flex items-center gap-1 text-[13px] font-semibold text-muted-foreground">
                   <ChevronLeft className="w-4 h-4" /> 返回
@@ -109,9 +141,9 @@ export default function RequestsPage() {
 
                 <div className="rounded-[20px] border border-border/60 bg-card p-5 space-y-4" data-testid="request-detail">
                   <div className="flex items-center gap-3">
-                    <img src={vibeFixtures.fixtureVisitor.avatarUrl} alt="" className="w-12 h-12 rounded-[16px] bg-secondary" />
+                    <img src={visitorOf(request).avatarUrl} alt="" className="w-12 h-12 rounded-[16px] bg-secondary" />
                     <div>
-                      <div className="text-[16px] font-bold text-foreground">{vibeFixtures.fixtureVisitor.name}</div>
+                      <div className="text-[16px] font-bold text-foreground">{visitorOf(request).name}</div>
                       <div className="text-[12px] text-muted-foreground">{request.visitorSummary}</div>
                     </div>
                   </div>
@@ -121,31 +153,33 @@ export default function RequestsPage() {
                     <p className="text-[14px] font-medium text-foreground leading-relaxed">{request.reason}</p>
                   </section>
 
-                  <section>
-                    <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">可能的共同点</h3>
-                    <ul className="space-y-1">
-                      {request.possibleSharedContext.map(c => (
-                        <li key={c} className="text-[13px] font-medium text-foreground/80 flex gap-2">
-                          <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-600" />
-                          <span>{c}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
+                  {request.possibleSharedContext.length > 0 && (
+                    <section>
+                      <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">可能的共同点</h3>
+                      <ul className="space-y-1">
+                        {request.possibleSharedContext.map(c => (
+                          <li key={c} className="text-[13px] font-medium text-foreground/80 flex gap-2">
+                            <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-600" />
+                            <span>{c}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
 
-                  <section className="rounded-[16px] bg-amber-50/80 border border-amber-700/10 p-4">
+                  <section className="rounded-[16px] bg-amber-50/80 border border-amber-700/10 p-4" data-testid="vibe-take">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-800/70 mb-2">
                       <Sparkles className="w-3 h-3" />
                       你的 Vibe 的看法
                     </div>
-                    <p className="text-[15px] font-bold text-foreground mb-2">{vibeTake.headline}</p>
+                    <p className="text-[15px] font-bold text-foreground mb-2">{takeOf(request).headline}</p>
                     <ul className="space-y-1 mb-2">
-                      {vibeTake.why.map(w => (
+                      {takeOf(request).why.map(w => (
                         <li key={w} className="text-[13px] font-medium text-foreground/80">· {w}</li>
                       ))}
                     </ul>
-                    <p className="text-[12px] text-muted-foreground">仍不确定：{vibeTake.uncertainty}</p>
-                    <p className="text-[12px] text-muted-foreground mt-1">建议开场话题：{vibeTake.suggestedTopic}</p>
+                    <p className="text-[12px] text-muted-foreground">仍不确定：{takeOf(request).uncertainty}</p>
+                    <p className="text-[12px] text-muted-foreground mt-1">建议开场话题：{takeOf(request).suggestedTopic}</p>
                   </section>
                 </div>
 
@@ -175,7 +209,7 @@ export default function RequestsPage() {
               </motion.div>
             )}
 
-            {view === 'pick-contact' && (
+            {view === 'pick-contact' && request && (
               <motion.div key="pick" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
                 <button onClick={() => setView('detail')} className="flex items-center gap-1 text-[13px] font-semibold text-muted-foreground">
                   <ChevronLeft className="w-4 h-4" /> 返回
@@ -216,7 +250,7 @@ export default function RequestsPage() {
               </motion.div>
             )}
 
-            {view === 'matched' && (
+            {view === 'matched' && request && (
               <motion.div
                 key="matched"
                 initial={{ opacity: 0, scale: 0.96 }}

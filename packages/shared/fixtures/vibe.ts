@@ -1,8 +1,8 @@
 /**
  * Deterministic fixtures for the VibeCard 2.0 mock story (task 0.1).
  *
- * One owner, one visitor, one connection request — used to click through the
- * four-screen demo before any real model or cloud data exists.
+ * One owner, two visitors, two connection requests (one strong, one weak) —
+ * used to click through the demo before any real model or cloud data exists.
  *
  * Privacy rule: every person, handle, URL, and contact value here is
  * fictional. Never commit real personal contact details in fixtures.
@@ -168,4 +168,30 @@ export const fixtureConnectionRequest: ConnectionRequest = {
   sharedContactMethodIds: [],
   createdAt: T0 - hour,
   updatedAt: T0 - hour,
+};
+
+/**
+ * Task 4.3 demo data: a second visitor whose request is deliberately weak
+ * (the exact "想认识一下" anti-pattern from AI_BEHAVIOR.md §7). The owner
+ * inbox shows it next to 苏晴's strong request so the demo can contrast the
+ * Vibe's evidence-based takes — and show the boundary, not a gate.
+ */
+export const fixtureWeakVisitor: FixturePerson = {
+  id: 'fixture-visitor-wangtuo',
+  name: '王拓',
+  avatarUrl: 'https://api.dicebear.com/9.x/thumbs/svg?seed=fixture-visitor-wangtuo',
+};
+
+export const fixtureWeakConnectionRequest: ConnectionRequest = {
+  id: 'fixture-request-wangtuo-to-linzhou',
+  schemaVersion: 1,
+  ownerId: fixtureOwner.id,
+  visitorId: fixtureWeakVisitor.id,
+  visitorSummary: '王拓，资料不详，没有留下作品或背景。',
+  reason: '想认识一下，多个朋友多条路。',
+  possibleSharedContext: [],
+  ownerAction: 'pending',
+  sharedContactMethodIds: [],
+  createdAt: T0 - 3 * hour,
+  updatedAt: T0 - 3 * hour,
 };

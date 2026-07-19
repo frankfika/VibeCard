@@ -38,6 +38,16 @@ const FIXTURE_VIBE_TAKE = {
   uncertainty: '仍不确定：你们最近的时间是否都对得上一次二十分钟的语音。',
 };
 
+// 任务 4.3：弱理由请求的 Vibe 看法——温和地说信息不够，而不是替主人挡人
+const FIXTURE_WEAK_VIBE_TAKE = {
+  summary: '我还判断不好，信息不太够。',
+  reasons: [
+    '理由比较泛泛，没有说出具体想一起做什么。',
+    '也没有留下可以了解的背景或作品。',
+  ],
+  uncertainty: '仍不确定：对方是否真的了解过你在做的事。',
+};
+
 function formatTime(ts) {
   if (!ts) return '';
   const diff = Date.now() - ts;
@@ -125,6 +135,7 @@ Page({
 
   loadFixtureDemo() {
     const r = fixtures.fixtureConnectionRequest;
+    const weak = fixtures.fixtureWeakConnectionRequest;
     this.setData({
       demoMode: true,
       requestsList: [
@@ -137,6 +148,18 @@ Page({
           possibleSharedContext: r.possibleSharedContext,
           // fixture 时间戳固定为演示用，这里展示固定的相对时间
           timeText: '1 小时前',
+          ownerAction: 'pending',
+          statusText: STATUS_TEXT.pending,
+        },
+        {
+          // 任务 4.3：弱理由请求，演示 Vibe 的边界表达
+          id: weak.id,
+          visitorName: fixtures.fixtureWeakVisitor.name,
+          visitorAvatarUrl: fixtures.fixtureWeakVisitor.avatarUrl,
+          visitorSummary: weak.visitorSummary,
+          reason: weak.reason,
+          possibleSharedContext: weak.possibleSharedContext,
+          timeText: '3 小时前',
           ownerAction: 'pending',
           statusText: STATUS_TEXT.pending,
         },
@@ -154,7 +177,10 @@ Page({
     this.setData({ currentRequest: found, view: 'detail', vibeTake: null });
 
     if (this.demoMode) {
-      this.setData({ vibeTake: FIXTURE_VIBE_TAKE });
+      const take = found.id === fixtures.fixtureWeakConnectionRequest.id
+        ? FIXTURE_WEAK_VIBE_TAKE
+        : FIXTURE_VIBE_TAKE;
+      this.setData({ vibeTake: take });
       return;
     }
     this.loadSummary(found.id);

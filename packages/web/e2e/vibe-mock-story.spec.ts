@@ -106,6 +106,28 @@ test.describe('VibeCard mock story (task 0.4)', () => {
     await expect(page.locator('text=secret-wechat-id')).toHaveCount(0);
   });
 
+  test('a weak request gets an honest not-enough-information take (task 4.3)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('tab', { name: '请求' }).click();
+
+    // The demo inbox carries one strong and one deliberately weak request
+    await expect(page.getByTestId('request-item')).toBeVisible();
+    await expect(page.getByTestId('request-item-weak')).toBeVisible();
+
+    await page.getByTestId('request-item-weak').click();
+    const detail = page.getByTestId('request-detail');
+    await expect(detail).toContainText('想认识一下，多个朋友多条路。');
+    await expect(page.getByTestId('vibe-take')).toContainText('我还判断不好，信息不太够。');
+    // No shared context is shown when none exists — no invented common ground
+    await expect(detail).not.toContainText('可能的共同点');
+
+    // Declining the weak one leaves the strong one actionable
+    await page.getByTestId('request-decline').click();
+    await page.getByText('返回').click();
+    await expect(page.getByTestId('request-item-weak')).toHaveCount(0);
+    await expect(page.getByTestId('request-item')).toBeVisible();
+  });
+
   test('visitor free-form questions get honest uncertainty, not invention', async ({ page }) => {
     await page.goto(`/?c=${encodeProfile(demoProfile)}`);
     await page.getByTestId('chat-with-vibe').click();

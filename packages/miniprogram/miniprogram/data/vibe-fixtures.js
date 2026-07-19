@@ -21,6 +21,13 @@ var fixtureVisitor = {
   avatarUrl: 'https://api.dicebear.com/9.x/thumbs/svg?seed=fixture-visitor-suqing',
 };
 
+// 任务 4.3：第二位访客，刻意弱理由，用来演示「边界」而非「门槛」
+var fixtureWeakVisitor = {
+  id: 'fixture-visitor-wangtuo',
+  name: '王拓',
+  avatarUrl: 'https://api.dicebear.com/9.x/thumbs/svg?seed=fixture-visitor-wangtuo',
+};
+
 var T0 = 1752000000000; // 固定时间戳，保证 fixture 确定性
 var hour = 3600000;
 
@@ -155,11 +162,28 @@ var fixtureConnectionRequest = {
   updatedAt: T0 - hour,
 };
 
+// 弱理由请求：与 AI_BEHAVIOR §7 的反例一致，演示 Vibe 如何温和地表达「信息不够」
+var fixtureWeakConnectionRequest = {
+  id: 'fixture-request-wangtuo-to-linzhou',
+  schemaVersion: 1,
+  ownerId: fixtureOwner.id,
+  visitorId: fixtureWeakVisitor.id,
+  visitorSummary: '王拓，资料不详，没有留下作品或背景。',
+  reason: '想认识一下，多个朋友多条路。',
+  possibleSharedContext: [],
+  ownerAction: 'pending',
+  sharedContactMethodIds: [],
+  createdAt: T0 - 3 * hour,
+  updatedAt: T0 - 3 * hour,
+};
+
 module.exports = {
   fixtureOwner: fixtureOwner,
   fixtureVisitor: fixtureVisitor,
+  fixtureWeakVisitor: fixtureWeakVisitor,
   fixtureOwnerCard: fixtureOwnerCard,
   fixtureOwnerMemories: fixtureOwnerMemories,
   fixtureOwnerContactMethods: fixtureOwnerContactMethods,
   fixtureConnectionRequest: fixtureConnectionRequest,
+  fixtureWeakConnectionRequest: fixtureWeakConnectionRequest,
 };
