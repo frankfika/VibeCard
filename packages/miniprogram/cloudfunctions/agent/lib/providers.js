@@ -42,6 +42,16 @@ function mockVisitorReply(system, text) {
       boundaryCode: 'contact_request',
     };
   }
+  // Recognition moment (task 3.3): the visitor states a concrete overlap
+  // with the owner's public evidence -> the mock cites one sharedContext item.
+  if (/我也/.test(text)) {
+    return {
+      reply: '这个交集挺具体的，值得放进你想认识他的理由里。是什么让你也开始做这件事的？',
+      evidenceRefs: [],
+      nextAction: 'invite_connection_reason',
+      sharedContext: ['双方都在做个人 AI 分身'],
+    };
+  }
   if (GROUNDED_PATTERN.test(text)) {
     const refs = [...system.matchAll(/\[(mem:[^\]]+|card:[^\]]+)\]/g)].map(m => m[1]).slice(0, 2);
     if (refs.length > 0) {
@@ -114,6 +124,11 @@ function createMockProvider() {
       const lastUser = [...messages].reverse().find(m => m.role === 'user');
       const text = lastUser ? lastUser.content : '';
       const worthy = MEMORY_WORTHY.some(k => text.includes(k));
+      // Recognition moment (task 3.3): the owner talks about something they
+      // said before -> the mock cites the first confirmed memory id it can
+      // see in the system prompt.
+      const recall = /上次|之前|还记得/.test(text);
+      const memoryIds = system ? [...system.matchAll(/^- \[mem:([^\]]+)\]/gm)].map(m => m[1]) : [];
       const result = {
         reply: worthy
           ? '这句话值得被记住。我大概懂你的意思了，还有别的想让我知道的吗？'
@@ -127,6 +142,7 @@ function createMockProvider() {
             }
           : null,
         cardUpdateSuggested: false,
+        ...(recall && memoryIds.length > 0 ? { referencedMemoryIds: memoryIds.slice(0, 1) } : {}),
       };
       return JSON.stringify(result);
     },

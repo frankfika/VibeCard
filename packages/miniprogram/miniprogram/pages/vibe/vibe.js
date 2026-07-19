@@ -77,15 +77,25 @@ Page({
           content: m.content,
           visibilityLabel: VISIBILITY_LABELS[m.visibility] || m.visibility,
         }));
+      // demo 的记忆回调时刻：fixture 回复自然引用真实存在的 fixture 记忆
+      const focusMemory = fixtures.fixtureOwnerMemories.find((m) => m.id === 'fixture-memory-public-focus');
+      const fixtureVibeMsg = {
+        id: 'fixture-msg-vibe-1',
+        role: 'vibe',
+        text: '我听到了。比起「认识更多人」，你更在意对方是不是真的做过——这和你最近在打磨的访客对话是同一件事：先理解，再认识。',
+      };
+      if (focusMemory) {
+        fixtureVibeMsg.memoryRefs = [{
+          id: focusMemory.id,
+          content: focusMemory.content,
+          short: focusMemory.content.length > 40 ? focusMemory.content.slice(0, 40) + '…' : focusMemory.content,
+        }];
+      }
       this.setData({
         memories,
         messages: [
           { id: 'fixture-msg-owner-1', role: 'owner', text: '我最近想认识真正做过 AI 社交产品的人。' },
-          {
-            id: 'fixture-msg-vibe-1',
-            role: 'vibe',
-            text: '我听到了。比起「认识更多人」，你更在意对方是不是真的做过，并且和你一样在意边界。',
-          },
+          fixtureVibeMsg,
         ],
         proposal: {
           id: 'fixture-proposal-1',
@@ -154,7 +164,8 @@ Page({
     });
   },
 
-  // 确认记忆：confirmMemory（可带修改后的内容），成功后刷新「已记住」列表。
+  // 确认记忆：confirmMemory（可带修改后的内容），成功后刷新「已记住」列表，
+  // 并在对话里追加一条「我记住了：…」的确认消息（AI_BEHAVIOR §5 确认时刻）。
   // 失败时提示并可重试，提议卡片保持 pending。
   async confirmMemoryOnServer(memoryId, { content }) {
     if (this.demoMode || !memoryId) {
@@ -164,13 +175,13 @@ Page({
         visibilityLabel: VISIBILITY_LABELS.private,
       };
       this.setData({ memories: this.data.memories.concat(memory) });
-      wx.showToast({ title: '已记住', icon: 'none' });
+      this.appendVibeMessage('我记住了：' + content);
       return true;
     }
     try {
       await cloud.callFunction('memory', { action: 'confirmMemory', memoryId, content });
       await this.loadMemories();
-      wx.showToast({ title: '已记住', icon: 'none' });
+      this.appendVibeMessage('我记住了：' + content);
       return true;
     } catch (err) {
       console.warn('[vibe] confirmMemory failed:', err && err.message);
@@ -230,7 +241,7 @@ Page({
       }
 
       const result = res.result;
-      this.appendVibeMessage(result.reply);
+      this.appendVibeMessage(result.reply, this.resolveMemoryRefs(result.referencedMemoryIds));
       await this.persistMessage('vibe', result.reply);
 
       // 记忆提议：先存 proposed（不可检索），主人确认后才生效
@@ -265,12 +276,29 @@ Page({
     }
   },
 
-  appendVibeMessage(text) {
+  appendVibeMessage(text, memoryRefs) {
     const reply = { id: nextMessageId('vibe'), role: 'vibe', text };
+    // 记忆回调时刻：这条回复引用了主人之前确认过的记忆
+    if (Array.isArray(memoryRefs) && memoryRefs.length > 0) reply.memoryRefs = memoryRefs;
     this.setData({
       messages: this.data.messages.concat(reply),
       scrollIntoId: reply.id,
     });
+  },
+
+  // ownerMessage 返回的 referencedMemoryIds -> [{ id, content, short }]
+  // content 从已加载的已确认记忆列表查出；查不到的 id 跳过，全查不到返回 undefined
+  resolveMemoryRefs(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return undefined;
+    const refs = ids
+      .map((id) => this.data.memories.find((m) => m.id === id))
+      .filter(Boolean)
+      .map((m) => ({
+        id: m.id,
+        content: m.content,
+        short: m.content.length > 40 ? m.content.slice(0, 40) + '…' : m.content,
+      }));
+    return refs.length > 0 ? refs : undefined;
   },
 
   async persistMessage(role, text) {

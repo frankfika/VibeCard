@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { MotionConfig } from 'motion/react';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
@@ -19,7 +20,10 @@ createRoot(document.getElementById('root')!).render(
         <RainbowKitProvider>
           <ThemeProvider>
             <ToastProvider>
-              <App />
+              {/* Respect the OS reduced-motion setting for every recognition moment (task 3.3) */}
+              <MotionConfig reducedMotion="user">
+                <App />
+              </MotionConfig>
             </ToastProvider>
           </ThemeProvider>
         </RainbowKitProvider>

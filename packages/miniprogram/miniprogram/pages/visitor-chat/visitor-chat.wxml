@@ -6,7 +6,13 @@
     <scroll-view scroll-y class="chat" scroll-into-view="{{scrollIntoId}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
       <view class="chat-inner">
         <view wx:for="{{messages}}" wx:key="id" id="{{item.id}}" class="msg-row {{item.role === 'visitor' ? 'msg-row-visitor' : ''}}">
-          <view class="msg-bubble {{item.role === 'visitor' ? 'msg-bubble-visitor' : 'msg-bubble-agent'}}">{{item.text}}</view>
+          <view class="msg-bubble {{item.role === 'visitor' ? 'msg-bubble-visitor' : 'msg-bubble-agent'}} {{item.sharedContext ? 'msg-bubble-discovery' : ''}}">
+            <view wx:if="{{item.sharedContext}}" class="discovery-label">发现共同点</view>
+            <view class="msg-text">{{item.text}}</view>
+            <view wx:if="{{item.sharedContext}}" class="discovery-tags">
+              <view wx:for="{{item.sharedContext}}" wx:for-item="ctx" wx:key="*this" class="discovery-tag">{{ctx}}</view>
+            </view>
+          </view>
         </view>
 
         <!-- 预设问题 chips -->

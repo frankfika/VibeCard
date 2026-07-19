@@ -18,6 +18,13 @@ interface ChatMessage {
   id: string;
   role: 'visitor' | 'vibe';
   text: string;
+  /**
+   * Task 3.3 recognition moment: concrete shared context the Vibe found
+   * between the visitor's own words and the owner's public Card/memories.
+   * Rendered as a warm discovery block, never invented — fixture state here,
+   * server-validated `sharedContext` once the cloud chain reaches Web.
+   */
+  sharedContext?: string[];
 }
 
 type Stage = 'chat' | 'preview' | 'done';
@@ -54,8 +61,8 @@ export default function VisitorVibeChat({ ownerName, onClose }: { ownerName: str
   const pushVisitor = (text: string) => {
     setMessages(prev => [...prev, { id: `v-${Date.now()}-${Math.random()}`, role: 'visitor', text }]);
   };
-  const pushVibe = (text: string) => {
-    setMessages(prev => [...prev, { id: `b-${Date.now()}-${Math.random()}`, role: 'vibe', text }]);
+  const pushVibe = (text: string, sharedContext?: string[]) => {
+    setMessages(prev => [...prev, { id: `b-${Date.now()}-${Math.random()}`, role: 'vibe', text, sharedContext }]);
   };
 
   const inviteReason = () => {
@@ -81,8 +88,13 @@ export default function VisitorVibeChat({ ownerName, onClose }: { ownerName: str
       setTimeout(inviteReason, 350);
     } else {
       // Treat the message as the connection reason and move to confirmation.
+      // The discovery moment: the Vibe surfaces the concrete overlap it found
+      // (fixture state in this mock; server-validated sharedContext later).
       setReason(text);
-      pushVibe('我大概懂了。在交给他之前，先看看我理解的有没有错。');
+      pushVibe(
+        '我大概懂了。在交给他之前，先看看我理解的有没有错。',
+        vibeFixtures.fixtureConnectionRequest.possibleSharedContext,
+      );
       setStage('preview');
     }
   };
@@ -128,6 +140,23 @@ export default function VisitorVibeChat({ ownerName, onClose }: { ownerName: str
                   </div>
                 )}
                 {m.text}
+                {m.role === 'vibe' && m.sharedContext && m.sharedContext.length > 0 && (
+                  <div
+                    className="mt-2.5 rounded-xl border border-amber-200/25 bg-amber-200/10 px-3 py-2"
+                    data-testid="shared-context-discovery"
+                  >
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-amber-200/70 mb-1">
+                      发现共同点
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.sharedContext.map(c => (
+                        <span key={c} className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

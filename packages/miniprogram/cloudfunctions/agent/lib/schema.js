@@ -25,6 +25,13 @@ function validateOwnerAgentResult(value) {
     if (p.sourceMessageIds !== undefined && !Array.isArray(p.sourceMessageIds)) return 'invalid_proposal_sources';
   }
   if (typeof value.cardUpdateSuggested !== 'boolean') return 'invalid_card_update_flag';
+  // referencedMemoryIds (task 3.3): optional; shape-only check here. The
+  // caller filters the ids down to memories that actually exist.
+  if (value.referencedMemoryIds !== undefined && value.referencedMemoryIds !== null) {
+    if (!Array.isArray(value.referencedMemoryIds) || !value.referencedMemoryIds.every(id => typeof id === 'string')) {
+      return 'invalid_referenced_memory_ids';
+    }
+  }
   return null;
 }
 
@@ -40,6 +47,22 @@ function validateVisitorAgentResult(value) {
   if (!VISITOR_NEXT_ACTIONS.includes(value.nextAction)) return 'invalid_next_action';
   if (value.boundaryCode !== undefined && value.boundaryCode !== null && typeof value.boundaryCode !== 'string') {
     return 'invalid_boundary_code';
+  }
+  // sharedContext (task 3.3): optional overlap between what the visitor said
+  // and the public evidence. Shape-checked, then normalized in place: trim,
+  // drop empties, cap each item at 60 chars and the list at 3; an empty
+  // result deletes the field so the UI never renders an empty block.
+  if (value.sharedContext !== undefined && value.sharedContext !== null) {
+    if (!Array.isArray(value.sharedContext) || !value.sharedContext.every(s => typeof s === 'string')) {
+      return 'invalid_shared_context';
+    }
+    const normalized = value.sharedContext
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => s.slice(0, 60))
+      .slice(0, 3);
+    if (normalized.length > 0) value.sharedContext = normalized;
+    else delete value.sharedContext;
   }
   return null;
 }

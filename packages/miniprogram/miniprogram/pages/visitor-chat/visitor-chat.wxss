@@ -60,6 +60,37 @@
   border-top-right-radius: 8rpx;
 }
 
+/* 共同点发现：分身找到了访客与主人的真实交集，淡金暖色区别于普通气泡 */
+.msg-bubble-discovery {
+  background: rgba(216, 181, 138, 0.12);
+  border: 1rpx solid rgba(216, 181, 138, 0.3);
+}
+
+.discovery-label {
+  font-size: 20rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  color: #d8b58a;
+  margin-bottom: 12rpx;
+}
+
+.discovery-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.discovery-tag {
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: #d8b58a;
+  background: rgba(216, 181, 138, 0.14);
+  border-radius: 100rpx;
+  padding: 6rpx 18rpx;
+  max-width: 100%;
+}
+
 /* ---------- 预设问题 chips ---------- */
 
 .chips {

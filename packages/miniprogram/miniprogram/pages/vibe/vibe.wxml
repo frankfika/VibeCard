@@ -23,7 +23,13 @@
   <scroll-view scroll-y class="chat" scroll-into-view="{{scrollIntoId}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
     <view class="chat-inner">
       <view wx:for="{{messages}}" wx:key="id" id="{{item.id}}" class="msg-row {{item.role === 'owner' ? 'msg-row-owner' : ''}}">
-        <view class="msg-bubble {{item.role === 'owner' ? 'msg-bubble-owner' : 'msg-bubble-vibe'}}">{{item.text}}</view>
+        <view class="msg-bubble {{item.role === 'owner' ? 'msg-bubble-owner' : 'msg-bubble-vibe'}}">
+          <view class="msg-text">{{item.text}}</view>
+          <!-- 记忆回调：这条回复来自你之前告诉我的事 -->
+          <view wx:if="{{item.memoryRefs}}" class="memory-refs">
+            <view wx:for="{{item.memoryRefs}}" wx:for-item="ref" wx:key="id" class="memory-ref-chip">↩ {{ref.short}}</view>
+          </view>
+        </view>
       </view>
 
       <!-- 记忆提议卡片：Vibe 可以提议，但只有主人确认后才算数 -->

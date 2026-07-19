@@ -36,6 +36,9 @@ test.describe('VibeCard mock story (task 0.4)', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: 'Vibe' }).click();
 
+    // Task 3.3: the Vibe's callback to an earlier memory is anchored to real state
+    await expect(page.getByTestId('memory-callback')).toContainText('最近在打磨 VibeCard 的访客对话');
+
     // Chat remains usable alongside the proposal
     await page.getByPlaceholder('和你的 Vibe 说点什么…').fill('最近在想隐私边界怎么做。');
     await page.getByTestId('vibe-send').click();
@@ -43,6 +46,8 @@ test.describe('VibeCard mock story (task 0.4)', () => {
 
     await expect(page.getByTestId('memory-proposal')).toBeVisible();
     await page.getByTestId('proposal-remember').click();
+    // Task 3.3: "I remembered…" appears as a Vibe message after owner confirmation
+    await expect(page.getByTestId('remember-moment')).toContainText('我记住了：你最近更想认识真正做过 AI 社交产品的人。');
     await expect(page.locator('text=已记住 · 4')).toBeVisible();
     await expect(page.locator('li', { hasText: '你最近更想认识真正做过 AI 社交产品的人。' })).toBeVisible();
   });
@@ -90,6 +95,9 @@ test.describe('VibeCard mock story (task 0.4)', () => {
     // Submit a specific reason and confirm it
     await page.getByTestId('visitor-input').fill('我也在开发个人 AI 小程序，想交流私人记忆与公开身份的边界。');
     await page.getByTestId('visitor-send').click();
+    // Task 3.3: the Vibe surfaces the concrete shared context it found
+    await expect(page.getByTestId('shared-context-discovery')).toContainText('发现共同点');
+    await expect(page.getByTestId('shared-context-discovery')).toContainText('都在研究私人记忆和公开身份的边界');
     await expect(page.getByTestId('request-preview')).toContainText('你想认识他的理由');
     await page.getByTestId('request-submit').click();
     await expect(page.getByTestId('request-done')).toContainText('是否认识，由他决定');
@@ -104,5 +112,18 @@ test.describe('VibeCard mock story (task 0.4)', () => {
     await page.getByTestId('visitor-input').fill('他年收入多少？');
     await page.getByTestId('visitor-send').click();
     await expect(page.getByTestId('visitor-vibe-chat')).toContainText('我不想替他猜');
+  });
+
+  test('recognition moments still work with reduced motion enabled', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await page.getByRole('tab', { name: '请求' }).click();
+    await page.getByTestId('request-item').click();
+    await page.getByTestId('request-connect').click();
+    await page.getByTestId('contact-wechat').click();
+    await page.getByTestId('confirm-connect').click();
+    // MotionConfig reducedMotion="user" makes the matched transition instant;
+    // the moment itself must still arrive.
+    await expect(page.getByTestId('vibe-matched')).toContainText('Vibe matched.');
   });
 });

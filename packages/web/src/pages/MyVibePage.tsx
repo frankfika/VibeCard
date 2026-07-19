@@ -17,6 +17,14 @@ interface ChatMessage {
   id: string;
   role: 'owner' | 'vibe';
   text: string;
+  /**
+   * Task 3.3 recognition moment: when a Vibe reply calls back to an earlier
+   * confirmed memory, the real memory content rides along so the UI anchors
+   * the callback to actual state instead of a canned claim.
+   */
+  memoryRefs?: { id: string; content: string }[];
+  /** Task 3.3: marks the "I remembered…" confirmation moment for anchoring. */
+  moment?: 'remember';
 }
 
 interface Proposal {
@@ -36,7 +44,11 @@ const initialMessages: ChatMessage[] = [
   {
     id: 'm2',
     role: 'vibe',
-    text: '这句话值得被记住。和你之前聊的方向放在一起看，你关心的其实是「AI 怎么改变人和人的关系」。',
+    text: '这句话值得被记住。也和你上次说的那件正在打磨的事是同一件——先理解，再认识。',
+    // Real fixture state: the reply above genuinely calls back to this memory.
+    memoryRefs: vibeFixtures.fixtureOwnerMemories
+      .filter(m => m.id === 'fixture-memory-public-focus' && m.status === 'confirmed')
+      .map(m => ({ id: m.id, content: m.content })),
   },
 ];
 
@@ -84,7 +96,7 @@ export default function MyVibePage() {
     setProposal(p => ({ ...p, state: 'confirmed' }));
     setMessages(prev => [
       ...prev,
-      { id: `v-remember-${Date.now()}`, role: 'vibe', text: `我记住了：${content}` },
+      { id: `v-remember-${Date.now()}`, role: 'vibe', text: `我记住了：${content}`, moment: 'remember' },
     ]);
   };
 
@@ -127,6 +139,7 @@ export default function MyVibePage() {
           {messages.map(m => (
             <div key={m.id} className={`flex ${m.role === 'owner' ? 'justify-end' : 'justify-start'}`}>
               <div
+                data-testid={m.moment === 'remember' ? 'remember-moment' : undefined}
                 className={`max-w-[85%] rounded-[20px] px-4 py-3 text-[14px] leading-relaxed font-medium ${
                   m.role === 'owner'
                     ? 'bg-foreground text-background rounded-br-md'
@@ -140,6 +153,19 @@ export default function MyVibePage() {
                   </div>
                 )}
                 {m.text}
+                {m.role === 'vibe' && m.memoryRefs && m.memoryRefs.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5" data-testid="memory-callback">
+                    {m.memoryRefs.map(ref => (
+                      <span
+                        key={ref.id}
+                        title={ref.content}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-700/10 px-2.5 py-1 text-[11px] font-medium text-amber-900/70"
+                      >
+                        ↩ {ref.content.length > 40 ? `${ref.content.slice(0, 40)}…` : ref.content}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}

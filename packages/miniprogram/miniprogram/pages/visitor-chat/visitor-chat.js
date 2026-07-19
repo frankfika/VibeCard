@@ -71,6 +71,7 @@ Page({
     reasonValue: '',
     reasonHint: DEFAULT_REASON_HINT,
     preview: null,
+    latestSharedContext: [], // 分身最近发现的共同点（请求预览的「可能的共同点」来自它）
     scrollIntoId: '',
     doneTitle: '已送达',
     doneDesc: '你的理由已经交给他的 Vibe，是否认识由他决定。',
@@ -150,7 +151,14 @@ Page({
     this.setData(update);
     if (update.guided) {
       setTimeout(() => {
-        this.appendMessages([{ id: nextMessageId('agent'), role: 'agent', text: GUIDE_TEXT }]);
+        // demo 的共同点发现时刻：引导消息带上 fixture 中真实的共同点
+        const sharedContext = fixtures.fixtureConnectionRequest.possibleSharedContext.slice(0, 3);
+        const guideMsg = { id: nextMessageId('agent'), role: 'agent', text: GUIDE_TEXT };
+        if (sharedContext.length > 0) {
+          guideMsg.sharedContext = sharedContext;
+          this.setData({ latestSharedContext: sharedContext });
+        }
+        this.appendMessages([guideMsg]);
       }, 350);
     }
   },
@@ -247,7 +255,16 @@ Page({
       }
       this.roundCount += 1;
       const result = res.result || {};
-      this.appendMessages([{ id: nextMessageId('agent'), role: 'agent', text: result.reply || CLOUD_FALLBACK_REPLY }]);
+      const replyMsg = { id: nextMessageId('agent'), role: 'agent', text: result.reply || CLOUD_FALLBACK_REPLY };
+      // 共同点发现时刻：分身发现了访客与主人的真实交集（最多 3 条）
+      const sharedContext = Array.isArray(result.sharedContext)
+        ? result.sharedContext.filter((s) => typeof s === 'string' && s.trim()).slice(0, 3)
+        : [];
+      if (sharedContext.length > 0) {
+        replyMsg.sharedContext = sharedContext;
+        this.setData({ latestSharedContext: sharedContext });
+      }
+      this.appendMessages([replyMsg]);
       this.handleNextAction(result.nextAction);
     } catch (err) {
       console.warn('[visitor-chat] visitorMessage failed:', err && err.message);
@@ -306,10 +323,14 @@ Page({
       });
       return;
     }
-    // 云模式：请求不携带访客昵称，共同点由主人侧的 Vibe 在 summarize 时补全
+    // 云模式：请求不携带访客昵称；「可能的共同点」来自对话中分身发现的真实交集
     this.setData({
       stage: 'preview',
-      preview: { visitorName: '一位访客', reason, possibleSharedContext: [] },
+      preview: {
+        visitorName: '一位访客',
+        reason,
+        possibleSharedContext: this.data.latestSharedContext || [],
+      },
     });
   },
 

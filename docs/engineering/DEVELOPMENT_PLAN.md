@@ -484,7 +484,19 @@ Dependencies: 2.3
 
 ## 3.3 Add The Recognition Moments
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. All four moments exist and are anchored to real state:
+  - **“I remembered…” after owner confirmation**: Mini Program vibe page now appends the agent message `我记住了：…` (edited content when the owner edited first) instead of a bare toast; Web `MyVibePage` already did and the moment is now tagged `data-testid="remember-moment"`. Copy follows AI_BEHAVIOR §5.
+  - **Accurate callback to an earlier memory**: `OwnerAgentResult.referencedMemoryIds?: string[]` added to the contract (AI_BEHAVIOR §5); the owner prompt lists memories with `[mem:id]`, and the server filters returned ids to the owner's actual confirmed memories (unknown ids silently dropped, max 3) so a callback can only anchor to real memory. Mini Program vibe page renders the referenced memory as quiet `↩` chips under the reply (`resolveMemoryRefs` looks content up from the loaded confirmed list); Web demo references the real `fixture-memory-public-focus`.
+  - **Concrete shared-context discovery for a visitor**: `VisitorAgentResult.sharedContext?: string[]` added to the contract (AI_BEHAVIOR §6; ≤3 items, ≤60 chars, validator-normalized, omitted when no real overlap — prompt forbids forcing one). Mini Program visitor-chat renders a warm 「发现共同点」 block on that reply and feeds it into the request preview's 可能的共同点 (previously hard-coded `[]`); Web `VisitorVibeChat` does the same from fixture state.
+  - **Vibe matched after mutual connection**: already present on both clients since 0.4/2.5; now also verified under reduced motion.
+- Reduced motion on Web: app wrapped in `MotionConfig reducedMotion="user"` (motion/react drives the matched/proposal/chat animations; the pre-existing CSS media query could not stop JS-driven motion). New e2e runs the matched flow with `reducedMotion: 'reduce'`.
+- No points, confetti loops, streaks, or random rewards were added.
+- Validation: agent 51/51 pass (11 new recognition tests); Mini Program page smoke 23/23 pass (11 new); `npm run lint` (tsc) clean; `npm run build` ok; `vibe-mock-story.spec.ts` 12/12 pass across chromium + mobile-chrome incl. the new moment assertions.
+- Not verifiable here: WeChat DevTools rendering of the new chips/discovery styles (Mini Program side).
 
 Owners: Lanes A, C, and D
 

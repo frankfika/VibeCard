@@ -119,6 +119,24 @@
   border-top-right-radius: 8rpx;
 }
 
+/* 记忆回调 chips：这条回复来自主人之前确认过的记忆，样式温和低调 */
+.memory-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.memory-ref-chip {
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: #a08a72;
+  background: rgba(176, 102, 63, 0.08);
+  border-radius: 100rpx;
+  padding: 6rpx 18rpx;
+  max-width: 100%;
+}
+
 /* ---------- 记忆提议卡片 ---------- */
 
 .proposal {
