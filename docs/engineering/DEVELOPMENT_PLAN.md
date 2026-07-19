@@ -608,7 +608,15 @@ Dependencies: Milestone 3
 
 ## 4.2 WeChat DevTools And Device Verification
 
-Status: `[ ]`
+Status: `[!]`
+
+Blocked (recorded 2026-07-19, on `main`):
+
+- Blocker: WeChat DevTools on this machine is **not logged in** (`cli islogin` → `{"login":false}`). Opening any project fails with `Login is required (code 10)`, and login requires scanning a QR code with the owner's WeChat — not something an agent can do autonomously. The automation port also refuses connections (`target project window is opened with automation enabled` fails) for the same reason.
+- Attempted: `cli islogin` (found running IDE, connected on its actual port, confirmed logged-out); `cli open --project` → code 10; installed `miniprogram-automator@0.12.1` in isolated `/tmp/mp-auto` and tried `automator.connect` → refused.
+- Verified instead (static compile-equivalent, all pass): every JSON under `miniprogram/` parses; all 9 declared pages have their `.js/.wxml/.json` files; every `usingComponents` reference resolves; `node --check` passes for all 84 page/util JS files and every cloudfunction `index.js`; plus the 31 committed page-logic smoke tests and the cloudfunction unit tests.
+- Current code state: Mini Program side is feature-complete through Milestone 3 (navigation, vibe/requests/visitor-chat dual-mode, recognition moments, failure states) but has **never been compiled in DevTools**.
+- Next step (needs the user): log into WeChat DevTools, open `packages/miniprogram`, confirm compile, then run the checklist below. Also covers the still-open 0.3 acceptance (tab bar compile check).
 
 Owner: Lane A
 
