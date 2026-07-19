@@ -1,0 +1,12 @@
+{
+  "name": "agent",
+  "version": "1.0.0",
+  "description": "VibeCard AI boundary: provider-independent, schema-validated",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

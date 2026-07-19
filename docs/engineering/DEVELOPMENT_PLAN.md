@@ -234,7 +234,16 @@ Dependencies: 0.1
 
 ## 1.2 Add AI Provider Boundary
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. New `cloudfunctions/agent` function with a provider-independent boundary (`complete({system, messages}) -> raw text`)
+- Actions: `ownerMessage`, `extractMemoryProposal`; provider secret (AI_API_BASE/AI_API_KEY/AI_MODEL) lives only in cloud env vars — no key falls back to the deterministic mock provider
+- Model output is JSON-parsed and schema-validated (`OwnerAgentResult`: reply / optional single memoryProposal / cardUpdateSuggested); one retry on invalid output, then typed error (`invalid_model_output`); provider/network failures return `provider_unavailable`; raw model text never reaches clients
+- Confirmed memories are injected into the owner-mode system prompt (only status=confirmed)
+- Validation: 10 node:test cases pass, covering mock determinism, no-proposal-for-greetings, invalid JSON retry, bad-kind rejection, memory context injection, provider selection, entry-level typed errors
+- Notes: the suite is provider-injectable, so the identical cases run against a configured real provider (needs owner's credentials, not available here). Known legacy issue: `packages/web/src/lib/genai.ts` still bundles a Gemini key client-side for avatar generation (pre-existing); flagged for Milestone 3/4 cleanup, out of 1.2 scope
 
 Owner: Lane C
 
