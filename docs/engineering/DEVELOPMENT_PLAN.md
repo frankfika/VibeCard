@@ -675,19 +675,17 @@ Dependencies: 4.1 and 4.2
 
 ## 4.4 Run The 90-Second Demo
 
-Status: `[ ]`
+Status: `[x]`
 
-Use the script in `docs/product/PRODUCT.md`.
+Completion:
 
-Acceptance:
+- 2026-07-20, on `main`. New `packages/web/e2e/demo-90s.spec.ts` drives every beat of PRODUCT.md §17 end-to-end on the deterministic fixture demo and asserts the whole walkthrough stays under the 90-second budget.
+- Demo beats: owner opens My Vibe → confirms the pending proposal → "我记住了…"; visitor opens the shared Card (`?c=`) → asks the public Vibe "他为什么做这个？" → gets a grounded answer from `fixtureOwnerCard.currentFocus`; visitor states a specific reason → shared-context discovery appears → confirms submission; owner opens Requests → sees the evidence-based take → selects WeChat contact → "Vibe matched."
+- VisitorVibeChat suggestion copy was updated from "他最近在做什么？" to "他为什么做这个？" to match the product script; the invite-reason transition is now synchronous so the demo stays reliable and fast.
+- Runtime observed: ~6 seconds on both chromium and mobile-chrome, well under the 90-second limit.
+- Validation: `npm run lint` ✅, `npm run build` ✅, full Playwright suite 54/54 pass (4.1 baseline 50 + 4.4 demo 4 across two projects).
 
-- Fits within 90 seconds
-- Shows one memory being learned
-- Shows one grounded visitor answer
-- Shows one specific connection reason
-- Ends with owner-controlled contact sharing
-
-Dependencies: 4.3
+Owner: Lane D
 
 ---
 

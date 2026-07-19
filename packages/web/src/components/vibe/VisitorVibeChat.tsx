@@ -31,8 +31,8 @@ type Stage = 'chat' | 'preview' | 'done';
 
 const suggestions: { q: string; a: (ownerName: string) => string }[] = [
   {
-    q: '他最近在做什么？',
-    a: () => vibeFixtures.fixtureOwnerCard.currentFocus,
+    q: '他为什么做这个？',
+    a: () => `他最近在做的方向是：${vibeFixtures.fixtureOwnerCard.currentFocus}`,
   },
   {
     q: '他可以帮别人什么？',
@@ -74,7 +74,7 @@ export default function VisitorVibeChat({ ownerName, onClose }: { ownerName: str
   const askSuggestion = (q: string, a: (n: string) => string) => {
     pushVisitor(q);
     pushVibe(a(ownerName));
-    setTimeout(inviteReason, 350);
+    inviteReason();
   };
 
   const send = () => {

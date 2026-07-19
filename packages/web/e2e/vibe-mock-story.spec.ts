@@ -89,8 +89,8 @@ test.describe('VibeCard mock story (task 0.4)', () => {
     await expect(chat).toContainText('的 AI 分身');
 
     // A grounded question gets a grounded answer
-    await page.getByRole('button', { name: '他最近在做什么？' }).click();
-    await expect(chat).toContainText('你为什么偏偏想在现在认识他？');
+    await page.getByRole('button', { name: '他为什么做这个？' }).click();
+    await expect(chat).toContainText('他最近在做的方向是');
 
     // Submit a specific reason and confirm it
     await page.getByTestId('visitor-input').fill('我也在开发个人 AI 小程序，想交流私人记忆与公开身份的边界。');
