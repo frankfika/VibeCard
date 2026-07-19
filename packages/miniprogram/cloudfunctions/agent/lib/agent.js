@@ -7,7 +7,7 @@
  * never reach the client.
  */
 
-const { validateOwnerAgentResult, typedError, ok } = require('./schema');
+const { validateOwnerAgentResult, validateCardDraft, typedError, ok } = require('./schema');
 
 const OWNER_SYSTEM_PROMPT = [
   '你是用户的私有 Vibe：温暖、敏锐、简洁，从不谄媚。',
@@ -77,4 +77,49 @@ async function extractMemoryProposal({ provider, memories, messages }) {
   return ok({ proposal: outcome.result.memoryProposal || null });
 }
 
-module.exports = { runOwnerAgent, extractMemoryProposal, OWNER_SYSTEM_PROMPT };
+const CARD_DRAFT_SYSTEM_PROMPT = [
+  '你在为主人的 VibeCard 起草更新建议。规则：',
+  '- 只能使用「已确认的记忆」，不得编造；没有依据的部分留空，由下游剔除。',
+  '- 主人自己写过的内容如果更具体，保留主人的原文（在 keptFields 里列出字段名）。',
+  '- 不得包含任何联系方式（微信号、手机号、邮箱等）。',
+  '- 每个列表最多 3-5 条，宁缺毋滥；亮点 highlights 最多 3 条。',
+  '只输出 JSON：{"headline": string, "currentFocus": string, "canHelpWith": string[], "wantsToMeet": string[], "topics": string[], "highlights": [{"title","url?"}], "keptFields": string[]}。',
+].join('\n');
+
+/**
+ * Generate a Card draft from confirmed memories only. The draft is a
+ * suggestion — publishing is always a separate owner action.
+ */
+async function runCardDraft({ provider, memories, currentCard }) {
+  const confirmed = (memories || []).filter(m => m.status === 'confirmed');
+  if (confirmed.length === 0) {
+    return typedError('no_confirmed_memories', '还没有已确认的记忆，先和 Vibe 聊几句吧');
+  }
+
+  const memoryContext = confirmed.map(m => `- [${m.kind}] ${m.content}`).join('\n');
+  const currentContext = currentCard
+    ? `\n\n主人当前 Card（已写的内容优先保留）：\n${JSON.stringify(currentCard).slice(0, 2000)}`
+    : '';
+  const system = `${CARD_DRAFT_SYSTEM_PROMPT}\n\n已确认的记忆：\n${memoryContext}${currentContext}`;
+  const messages = [{ role: 'user', content: '请基于这些记忆，为我的 Card 起草一份更新建议。' }];
+
+  let raw;
+  try {
+    raw = await provider.complete({ system, messages });
+  } catch (error) {
+    return typedError('provider_unavailable', 'the model is temporarily unavailable');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return typedError('invalid_model_output', 'model output failed schema validation');
+  }
+
+  const { draft, error } = validateCardDraft(parsed);
+  if (error) return typedError('invalid_model_output', `card draft rejected: ${error}`);
+  return ok({ draft, keptFields: Array.isArray(parsed.keptFields) ? parsed.keptFields : [] });
+}
+
+module.exports = { runOwnerAgent, extractMemoryProposal, runCardDraft, OWNER_SYSTEM_PROMPT };

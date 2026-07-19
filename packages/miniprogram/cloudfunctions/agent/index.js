@@ -11,7 +11,7 @@
 
 const cloud = require('wx-server-sdk');
 const { getProvider } = require('./lib/providers');
-const { runOwnerAgent, extractMemoryProposal } = require('./lib/agent');
+const { runOwnerAgent, extractMemoryProposal, runCardDraft } = require('./lib/agent');
 const { typedError } = require('./lib/schema');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -33,6 +33,10 @@ exports.main = async (event) => {
       case 'extractMemoryProposal': {
         const memories = await listConfirmedMemories(openid);
         return await extractMemoryProposal({ provider, memories, messages: event.messages });
+      }
+      case 'generateCardDraft': {
+        const memories = await listConfirmedMemories(openid);
+        return await runCardDraft({ provider, memories, currentCard: event.currentCard });
       }
       default:
         return typedError('invalid_action', 'unknown action');

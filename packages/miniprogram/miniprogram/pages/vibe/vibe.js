@@ -13,6 +13,7 @@
  */
 const fixtures = require('../../data/vibe-fixtures.js');
 const cloud = require('../../utils/cloud.js');
+const store = require('../../utils/store.js');
 
 const VISIBILITY_LABELS = {
   public: '已公开',
@@ -34,6 +35,8 @@ Page({
     proposal: null,    // 记忆提议卡片 { id, memoryId, text, state, editText }
     inputValue: '',
     scrollIntoId: '',
+    cardDraft: null,   // Card 草稿预览 { rows: [{ key, label, oldText, newText }], raw }
+    cardDraftLoading: false,
   },
 
   onLoad() {
@@ -284,5 +287,110 @@ Page({
       // 持久化失败不阻塞聊天
       console.warn('[vibe] appendMessage failed:', err && err.message);
     }
+  },
+
+  // ---------- Card 草稿（任务 1.4） ----------
+
+  // 只用已确认的记忆生成草稿；Vibe 只建议，主人决定是否采用。
+  async onGenerateCardDraft() {
+    if (this.data.cardDraftLoading) return;
+    this.setData({ cardDraftLoading: true });
+    try {
+      let draft;
+      if (this.demoMode) {
+        const f = fixtures.fixtureOwnerCard;
+        draft = {
+          headline: f.headline,
+          currentFocus: f.currentFocus,
+          canHelpWith: f.canHelpWith,
+          wantsToMeet: f.wantsToMeet,
+          topics: f.topics,
+          highlights: f.highlights,
+        };
+      } else {
+        const profile = store.getProfile() || {};
+        const res = await cloud.callFunction('agent', {
+          action: 'generateCardDraft',
+          currentCard: {
+            bio: profile.bio || '',
+            lookingFor: profile.lookingFor || '',
+            tags: (profile.tags || []).map((t) => t.label),
+            highlights: (profile.highlights || []).map((h) => ({ title: h.title, url: h.link })),
+          },
+        });
+        if (!res || res.ok !== true) {
+          const code = res && res.error && res.error.code;
+          wx.showToast({
+            title: code === 'no_confirmed_memories' ? '先确认几条记忆再生成' : '草稿生成失败，稍后再试',
+            icon: 'none',
+          });
+          return;
+        }
+        draft = res.result.draft;
+      }
+      const rows = this.buildDraftRows(draft);
+      if (rows.length === 0) {
+        wx.showToast({ title: '草稿和现在的 Card 一样，没有新变化', icon: 'none' });
+        return;
+      }
+      this.setData({ cardDraft: { rows, raw: draft }, scrollIntoId: 'card-draft-panel' });
+    } catch (err) {
+      console.warn('[vibe] generateCardDraft failed:', err && err.message);
+      wx.showToast({ title: '草稿生成失败，稍后再试', icon: 'none' });
+    } finally {
+      this.setData({ cardDraftLoading: false });
+    }
+  },
+
+  // 把草稿映射到现有 v1 profile 字段，并计算与当前 Card 的差异行。
+  buildDraftRows(draft) {
+    const profile = store.getProfile() || {};
+    const current = {
+      bio: profile.bio || '',
+      lookingFor: profile.lookingFor || '',
+      tags: (profile.tags || []).map((t) => t.label).join('、'),
+      highlights: (profile.highlights || []).map((h) => h.title).join('、'),
+    };
+    const next = {
+      bio: draft.currentFocus || draft.headline || '',
+      lookingFor: (draft.wantsToMeet || []).join('、'),
+      tags: (draft.topics || []).join('、'),
+      highlights: (draft.highlights || []).map((h) => h.title).join('、'),
+    };
+    const labels = { bio: '此刻的我', lookingFor: '想遇见谁', tags: '话题标签', highlights: '代表内容' };
+    const rows = [];
+    for (const key of Object.keys(labels)) {
+      // 草稿为空的部分不覆盖主人原文（不产生空版块）
+      if (next[key] && next[key] !== current[key]) {
+        rows.push({ key, label: labels[key], oldText: current[key] || '（空）', newText: next[key] });
+      }
+    }
+    return rows;
+  },
+
+  onAcceptCardDraft() {
+    const panel = this.data.cardDraft;
+    if (!panel) return;
+    const draft = panel.raw;
+    const updates = {};
+    if (panel.rows.some((r) => r.key === 'bio')) updates.bio = draft.currentFocus || draft.headline;
+    if (panel.rows.some((r) => r.key === 'lookingFor')) updates.lookingFor = (draft.wantsToMeet || []).join('、');
+    if (panel.rows.some((r) => r.key === 'tags')) updates.tags = (draft.topics || []).map((t) => ({ label: t, icon: '' }));
+    if (panel.rows.some((r) => r.key === 'highlights')) {
+      updates.highlights = (draft.highlights || []).map((h, i) => ({
+        id: h.id || 'draft-' + i,
+        title: h.title,
+        icon: '✨',
+        link: h.url || '',
+      }));
+    }
+    store.setProfile(updates);
+    this.setData({ cardDraft: null });
+    wx.showToast({ title: '已更新你的 Card', icon: 'none' });
+  },
+
+  onRejectCardDraft() {
+    // 放弃草稿：已发布的 Card 保持原样
+    this.setData({ cardDraft: null });
   },
 });

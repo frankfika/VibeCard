@@ -18,7 +18,19 @@ const MEMORY_WORTHY = ['想认识', '最近', '喜欢', '不喜欢', '不希望'
 function createMockProvider() {
   return {
     name: 'mock',
-    async complete({ messages }) {
+    async complete({ system, messages }) {
+      // Deterministic Card draft for the draft-generation path.
+      if (system && system.includes('VibeCard 起草更新建议')) {
+        return JSON.stringify({
+          headline: '在做一张会越来越懂你的 AI 名片',
+          currentFocus: '打磨访客和分身的前六轮对话，让「先理解，再认识」真的成立。',
+          canHelpWith: ['AI 社交产品的取舍', '微信小程序从 0 到 1'],
+          wantsToMeet: ['真正做过 AI 社交产品的人'],
+          topics: ['个人 AI 分身', '隐私边界'],
+          highlights: [{ title: 'VibeCard：一张会越来越懂你的 AI 名片' }],
+          keptFields: [],
+        });
+      }
       const lastUser = [...messages].reverse().find(m => m.role === 'user');
       const text = lastUser ? lastUser.content : '';
       const worthy = MEMORY_WORTHY.some(k => text.includes(k));

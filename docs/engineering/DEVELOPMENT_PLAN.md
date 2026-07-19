@@ -305,7 +305,15 @@ Dependencies: 1.1 and 1.2
 
 ## 1.4 Generate Or Update Card From Memory
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. New agent action `generateCardDraft`: uses only status=confirmed memories (zero confirmed → typed `no_confirmed_memories`); output schema-validated with empty sections stripped; draft never carries name/avatar/contact fields; provider failure → typed error
+- Mini Program vibe page: "✨ 让 Vibe 更新我的 Card" → draft preview panel with per-field old→new diff (此刻的我 / 想遇见谁 / 话题标签 / 代表内容) → 采用 writes mapped fields into the v1 profile via `store.setProfile` (name/avatar/contacts untouched, backward compatible); 放弃 discards and the published Card stays unchanged; empty-diff drafts show a toast instead of a blank panel
+- Demo mode (cloud down) generates the fixture draft so the flow is always demoable
+- Validation: agent suite 16/16 pass (incl. draft validity, empty-section stripping, contact-field rejection, typed errors); node stub smoke tests pass for demo-accept, real-reject-unchanged, and no-diff paths
+- Not verifiable here: real-model draft quality + DevTools run (owner's env). Web integration deferred with the same HTTP-API constraint as 1.3
 
 Owner: Lane C, integrated by Lanes A and D
 

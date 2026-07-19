@@ -14,6 +14,9 @@
       </view>
       <view wx:if="{{memories.length === 0}}" class="memory-empty">还没有记住任何事。聊点什么吧。</view>
     </scroll-view>
+    <view class="card-draft-entry {{cardDraftLoading ? 'card-draft-entry-loading' : ''}}" bindtap="onGenerateCardDraft">
+      {{cardDraftLoading ? 'Vibe 正在起草…' : '✨ 让 Vibe 更新我的 Card'}}
+    </view>
   </view>
 
   <!-- 对话区 -->
@@ -43,6 +46,22 @@
         </view>
 
         <view wx:if="{{proposal.state === 'confirmed'}}" class="proposal-done">✓ 已记住，可以在上面「已记住」里看到</view>
+      </view>
+
+      <!-- Card 草稿预览：Vibe 只建议，主人决定是否采用 -->
+      <view wx:if="{{cardDraft}}" id="card-draft-panel" class="card-draft">
+        <view class="card-draft-title">Vibe 起草的 Card 更新</view>
+        <view class="card-draft-sub">只基于你已确认的记忆；采用前可以先对比。</view>
+        <view wx:for="{{cardDraft.rows}}" wx:key="key" class="card-draft-row">
+          <view class="card-draft-label">{{item.label}}</view>
+          <view class="card-draft-old">{{item.oldText}}</view>
+          <view class="card-draft-arrow">↓</view>
+          <view class="card-draft-new">{{item.newText}}</view>
+        </view>
+        <view class="proposal-actions">
+          <view class="proposal-btn proposal-btn-primary" bindtap="onAcceptCardDraft">采用</view>
+          <view class="proposal-btn proposal-btn-quiet" bindtap="onRejectCardDraft">放弃</view>
+        </view>
       </view>
 
       <view class="chat-spacer"></view>
