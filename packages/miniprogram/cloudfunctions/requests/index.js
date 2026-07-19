@@ -61,6 +61,26 @@ async function getUserByOpenid(openid) {
   return result.data[0] || null;
 }
 
+/**
+ * Moderate stranger-generated text via content-check. Any failure of the
+ * moderation path itself becomes `moderation_unavailable` — stranger content
+ * never defaults to safe.
+ */
+async function moderateStrangerText(content) {
+  try {
+    const res = await cloud.callFunction({
+      name: 'content-check',
+      data: { action: 'gateText', content },
+    });
+    const gate = res && res.result && res.result.gate;
+    if (gate) return gate;
+    return { allowed: false, code: 'moderation_unavailable', message: '内容安全检查暂时不可用，请稍后重试，内容已保留' };
+  } catch (error) {
+    console.error('moderation call failed:', error && error.message);
+    return { allowed: false, code: 'moderation_unavailable', message: '内容安全检查暂时不可用，请稍后重试，内容已保留' };
+  }
+}
+
 async function getRequestDoc(requestId) {
   if (typeof requestId !== 'string' || !requestId.trim()) {
     throw core.codedError('invalid_request', 'requestId is required');
@@ -97,6 +117,11 @@ async function createRequest(openid, event) {
   const gate = core.checkCreateAllowed({ requests: existing.data, ownerId, visitorId: openid, now: Date.now() });
   if (gate === 'declined_cooldown') throw core.codedError('declined_cooldown', '对方刚作出过决定，请 24 小时后再试');
   if (gate === 'rate_limited') throw core.codedError('rate_limited', '24 小时内只能向同一个人发送一条请求');
+
+  // Stranger-generated content must pass moderation; a moderation failure
+  // blocks submission (never defaults to safe) so the visitor can retry.
+  const moderation = await moderateStrangerText(`${event.visitorSummary || ''}\n${event.reason}`);
+  if (!moderation.allowed) throw core.codedError(moderation.code, moderation.message);
 
   const request = core.buildRequest({ ...event, visitorId: openid }, Date.now());
   const result = await db.collection('requests').add({ data: request });

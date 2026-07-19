@@ -1,120 +1,56 @@
 const cloud = require('wx-server-sdk');
+const { checkTextWithRetry, gateStrangerContent, UNSAFE_ERRCODE } = require('./lib/core');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
-exports.main = async (event, context) => {
-  const { action } = event;
+/**
+ * content-check (task 3.1).
+ *
+ * checkText / checkImage now return a typed three-state result:
+ *   { status: 'safe' | 'unsafe' | 'unavailable', safe: true|false|null, message }
+ * Transient failures are retried; on persistent failure nothing defaults to
+ * safe. `gateStrangerContent` is what publishing flows should consult.
+ */
+exports.main = async (event) => {
+  const { action } = event || {};
 
   try {
     switch (action) {
-      case 'checkText':
-        return await checkText(event);
+      case 'checkText': {
+        const result = await checkTextWithRetry(cloud.openapi, event.content);
+        return result;
+      }
 
-      case 'checkImage':
-        return await checkImage(event);
+      case 'checkImage': {
+        const { fileID } = event;
+        if (!fileID) throw new Error('FileID is required');
+        try {
+          const res = await cloud.downloadFile({ fileID });
+          const check = await cloud.openapi.security.imgSecCheck({
+            media: { contentType: 'image/png', value: res.fileContent },
+          });
+          if (check.errCode === 0) return { status: 'safe', safe: true, message: 'Image is safe' };
+          return { status: 'unsafe', safe: false, message: 'Image contains illegal or sensitive content' };
+        } catch (err) {
+          if (err && err.errCode === UNSAFE_ERRCODE) {
+            return { status: 'unsafe', safe: false, message: 'Image contains illegal or sensitive content' };
+          }
+          return { status: 'unavailable', safe: null, message: 'Image check is temporarily unavailable' };
+        }
+      }
+
+      // Server-to-server gate used by stranger-content flows (e.g. requests).
+      case 'gateText': {
+        const result = await checkTextWithRetry(cloud.openapi, event.content);
+        const gate = gateStrangerContent(result);
+        return { ...result, gate };
+      }
 
       default:
         throw new Error('Invalid action');
     }
   } catch (error) {
-    console.error('Content check error:', error);
+    console.error('Content check error:', error && error.message);
     throw error;
   }
 };
-
-async function checkText(event) {
-  const { content } = event;
-
-  if (!content) {
-    throw new Error('Content is required');
-  }
-
-  try {
-    const result = await cloud.openapi.security.msgSecCheck({
-      content: content
-    });
-
-    // result.errCode === 0 means content is safe
-    // result.errCode === 87014 means content contains illegal information
-    if (result.errCode === 0) {
-      return {
-        safe: true,
-        message: 'Content is safe'
-      };
-    } else {
-      return {
-        safe: false,
-        message: 'Content contains illegal or sensitive information'
-      };
-    }
-  } catch (err) {
-    // If error code is 87014, content is unsafe
-    if (err.errCode === 87014) {
-      return {
-        safe: false,
-        message: 'Content contains illegal or sensitive information'
-      };
-    }
-
-    // For other errors, log and return safe to avoid blocking legitimate content
-    console.error('Text check error:', err);
-    return {
-      safe: true,
-      message: 'Content check failed, defaulting to safe'
-    };
-  }
-}
-
-async function checkImage(event) {
-  const { fileID } = event;
-
-  if (!fileID) {
-    throw new Error('FileID is required');
-  }
-
-  try {
-    // Download the image from cloud storage
-    const res = await cloud.downloadFile({
-      fileID: fileID
-    });
-
-    const buffer = res.fileContent;
-
-    // Check image content
-    const result = await cloud.openapi.security.imgSecCheck({
-      media: {
-        contentType: 'image/png',
-        value: buffer
-      }
-    });
-
-    // result.errCode === 0 means image is safe
-    // result.errCode === 87014 means image contains illegal content
-    if (result.errCode === 0) {
-      return {
-        safe: true,
-        message: 'Image is safe'
-      };
-    } else {
-      return {
-        safe: false,
-        message: 'Image contains illegal or sensitive content'
-      };
-    }
-  } catch (err) {
-    // If error code is 87014, content is unsafe
-    if (err.errCode === 87014) {
-      return {
-        safe: false,
-        message: 'Image contains illegal or sensitive content'
-      };
-    }
-
-    // For other errors, log and return safe to avoid blocking legitimate content
-    console.error('Image check error:', err);
-    return {
-      safe: true,
-      message: 'Image check failed, defaulting to safe'
-    };
-  }
-}

@@ -16,6 +16,8 @@ const STRANGER = 'stranger-openid';
 const BLOCKED = 'blocked-openid';
 
 let currentOpenid = VISITOR;
+// Controls the fake content-check gate: 'allow' | 'blocked' | 'unavailable' | 'down'
+let moderationBehavior = 'allow';
 
 function createFakeCloud() {
   const store = {
@@ -77,6 +79,16 @@ function createFakeCloud() {
     init() {},
     database() { return db; },
     getWXContext() { return { OPENID: currentOpenid }; },
+    async callFunction({ name, data }) {
+      if (name !== 'content-check') throw new Error('unexpected function: ' + name);
+      if (moderationBehavior === 'down') throw new Error('function not found');
+      const gates = {
+        allow: { allowed: true },
+        blocked: { allowed: false, code: 'moderation_blocked', message: '内容未通过安全审核，请修改后再试' },
+        unavailable: { allowed: false, code: 'moderation_unavailable', message: '内容安全检查暂时不可用，请稍后重试，内容已保留' },
+      };
+      return { result: { status: moderationBehavior, gate: gates[moderationBehavior], action: data.action } };
+    },
   };
 }
 
@@ -251,4 +263,33 @@ test('unauthenticated callers and unknown actions get typed errors', async () =>
 
   const bad = await call({ action: 'nope' });
   assert.equal(bad.error.code, 'invalid_action');
+});
+
+test('moderation: unsafe stranger content is blocked, nothing is created', async () => {
+  moderationBehavior = 'blocked';
+  const res = await createPending('visitor-mod-blocked');
+  moderationBehavior = 'allow';
+  assert.equal(res.ok, false);
+  assert.equal(res.error.code, 'moderation_blocked');
+
+  // and the blocked attempt does not consume the rate-limit slot
+  const retry = await createPending('visitor-mod-blocked');
+  assert.equal(retry.ok, true);
+});
+
+test('moderation unavailable: submission is rejected retryably, never defaults to safe', async () => {
+  moderationBehavior = 'unavailable';
+  const res = await createPending('visitor-mod-unavailable');
+  assert.equal(res.ok, false);
+  assert.equal(res.error.code, 'moderation_unavailable');
+
+  moderationBehavior = 'down'; // content-check itself unreachable
+  const down = await createPending('visitor-mod-down');
+  moderationBehavior = 'allow';
+  assert.equal(down.ok, false);
+  assert.equal(down.error.code, 'moderation_unavailable');
+
+  // after the service recovers, the same visitor can submit successfully
+  const recovered = await createPending('visitor-mod-unavailable');
+  assert.equal(recovered.ok, true);
 });

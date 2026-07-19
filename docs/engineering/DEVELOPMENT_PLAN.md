@@ -419,7 +419,16 @@ Goal:
 
 ## 3.1 Fix Moderation Failure Behavior
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. New `content-check/lib/core.js`: `checkTextWithRetry` retries transient failures once, treats errCode 87014 as unsafe, and — per AGENTS.md — moderation failure never defaults to safe: persistent failure returns `{ status: 'unavailable', safe: null }`; `gateStrangerContent` maps to `allowed` / `blocked` / `unavailable`
+- content-check cloud function rewritten: `checkText` / `checkImage` return the three-state result; new `gateText` action; 7 unit tests cover retry, 87014, unavailable, invalid input
+- `requests.createRequest` now gates `visitorName`+`reason` through it: unsafe → `moderation_blocked`, service down → `moderation_unavailable` (retry later), invalid text → `invalid_input`
+- UI retry preserved: Mini Program `visitor-chat` maps `moderation_blocked` back to the reason editor and `moderation_unavailable` to a retry toast; the typed reason stays in `reasonValue` either way, so retry never loses typed content
+- New committed smoke tests `packages/miniprogram/tests/visitor-chat.moderation.test.js` (node stub harness) assert both moderation branches preserve the draft, plus a weak_reason regression
+- Validation: `npm test` in content-check 7/7 pass; requests 18/18 pass incl. both new moderation paths; page smoke 3/3 pass
 
 Owner: Lane B
 

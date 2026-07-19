@@ -6,7 +6,8 @@
  *   -> 按 nextAction 流转（invite_connection_reason 引导理由 /
  *      offer_request_review 显示请求预览 / end 收尾）
  *   -> 理由确认后 requests.createRequest；weak_reason 时分身追问补充，
- *      blocked / rate_limited / declined_cooldown 给温和提示。
+ *      blocked / rate_limited / declined_cooldown 给温和提示；
+ *      moderation_blocked 退回理由编辑（草稿保留），moderation_unavailable 可重试。
  *
  * 云不可用（无 ownerId / 调用失败）回退任务 0.4 的 fixture 演示流程。
  *
@@ -326,6 +327,15 @@ Page({
         this.setDone('暂时送不到', '他暂时不方便接收新的认识请求。谢谢你的认真。', '');
       } else if (code === 'declined_cooldown') {
         this.setDone('先等一等', '他最近刚作出过决定，过一天再来试试吧。', '');
+      } else if (code === 'moderation_blocked') {
+        // 内容安全判断不通过：退回理由编辑，已写内容保留在 reasonValue 中
+        this.setData({
+          stage: 'reason',
+          reasonHint: '这句话可能不方便转达，换一种说法试试？你写的内容还在。',
+        });
+      } else if (code === 'moderation_unavailable') {
+        // 审核服务暂时不可用：停在预览页，草稿不丢，可稍后重试
+        wx.showToast({ title: '内容检查暂时不可用，请稍后重试', icon: 'none' });
       } else {
         wx.showToast({ title: '提交失败，稍后再试', icon: 'none' });
       }
