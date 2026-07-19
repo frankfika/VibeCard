@@ -3,18 +3,19 @@ import { test, expect } from '@playwright/test';
 test.describe('Blockchain integration', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('tab', { name: '更多' })).toBeVisible();
-    await page.getByRole('tab', { name: '更多' }).click();
-    await expect(page.locator('text=On-Chain Identity')).toBeVisible();
   });
 
-  test('wallet connect surface is visible on More page', async ({ page }) => {
+  // Task 0.2 removed the More page from main navigation, so the wallet and
+  // chain-identity surfaces it hosted are no longer reachable. These two
+  // cases stay skipped until Milestone 4.1 re-points them at the advanced
+  // area; do not restore the legacy More tab to satisfy them.
+  test.skip('wallet connect surface is visible on More page', async ({ page }) => {
     await page.locator('details:has-text("链上锚定") summary').click();
     const walletBtn = page.locator('[data-testid="wallet-connect"], [data-testid="wallet-unconfigured"]');
     await expect(walletBtn).toBeVisible();
   });
 
-  test('chain identity card is visible', async ({ page }) => {
+  test.skip('chain identity card is visible', async ({ page }) => {
     await expect(page.locator('text=On-Chain Identity').first()).toBeVisible();
     await expect(page.getByText('DappRep', { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Badges/)).toBeVisible();

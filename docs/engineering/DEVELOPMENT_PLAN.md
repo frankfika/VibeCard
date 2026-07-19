@@ -70,7 +70,17 @@ Dependencies: none
 
 ## 0.2 Focus Web Navigation
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, committed directly on `main` (no task branches per owner instruction)
+- `App.tsx`: main navigation is now 名片 / 请求 / Vibe (`card` / `requests` / `vibe`); Threads and More removed from routing; legacy page files kept in place; persisted legacy tab values (`threads` / `more`) fall back to `card`
+- New placeholder pages with real empty states: `pages/RequestsPage.tsx` (还没有人想认识你) and `pages/MyVibePage.tsx` (你的私有 Vibe); actual screens arrive in 0.4 / Milestone 1
+- `CardPage.tsx`: theme toggle and wallet SIWE verify/clear controls moved into a collapsed `card-advanced` details area, off the MVP path; existing v1 profile data (incl. verified badges) still renders
+- E2E: `cross-browser.spec.ts` asserts the three new destinations on mobile + desktop and that 动态/更多 tabs are gone; `pwa-theme.spec.ts` Theme cases re-pointed at the advanced area (seeds a profile so CardPage renders); `chain-test.spec.ts` beforeEach no longer depends on the removed More tab and its two MorePage Web3 cases are `test.skip` pending Milestone 4.1
+- Validation: `npm run lint` ✅, `npm run build` ✅, `playwright test cross-browser pwa-theme chain-test` → 20 passed / 4 skipped / 2 failed (both are the documented stale 'verified accounts' assertions, part of the known legacy baseline), `im-browser.spec.ts` 10 passed
+- Notes for next tasks: RequestsPage / MyVibePage are the 0.4 mock-story hosts; `vibeFixtures` from `@shared` is available for that work
 
 Owner: Lane D
 

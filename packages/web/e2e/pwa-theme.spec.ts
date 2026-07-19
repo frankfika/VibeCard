@@ -41,14 +41,28 @@ test.describe('Theme', () => {
     await page.evaluate(() => {
       localStorage.removeItem('vibecard_theme');
       document.documentElement.classList.remove('light', 'dark');
+      // The theme toggle lives in the Card page advanced area since task 0.2,
+      // and the Card page renders only once a profile exists.
+      const profile = {
+        name: 'Theme Tester',
+        handle: 'themetester',
+        avatar: '',
+        bio: '',
+        tags: [],
+        lookingFor: '',
+        highlights: [],
+        verified: { wallet: '', twitter: '', discord: '', wechat: '' },
+        event: '',
+      };
+      localStorage.setItem('vibecard_profile', JSON.stringify(profile));
+      localStorage.setItem('vibecard_tab', 'card');
     });
     await page.reload();
-    await expect(page.getByRole('tab', { name: '更多' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '名片' })).toBeVisible();
+    await page.locator('[data-testid="card-advanced"] summary').click();
   });
 
   test('theme toggle cycles system -> light -> dark', async ({ page }) => {
-    await page.getByRole('tab', { name: '更多' }).click();
-
     const getTheme = () => page.evaluate(() => localStorage.getItem('vibecard_theme'));
     const getHtmlClass = () => page.evaluate(() => {
       const cls = document.documentElement.classList;
@@ -86,12 +100,11 @@ test.describe('Theme', () => {
   });
 
   test('theme persists across reloads', async ({ page }) => {
-    await page.getByRole('tab', { name: '更多' }).click();
     await page.locator('button:has-text("点击切换主题")').first().click();
     await expect(page.locator('text=浅色模式').first()).toBeVisible();
 
     await page.reload();
-    await page.getByRole('tab', { name: '更多' }).click();
+    await page.locator('[data-testid="card-advanced"] summary').click();
     await expect(page.locator('text=浅色模式').first()).toBeVisible();
 
     const theme = await page.evaluate(() => localStorage.getItem('vibecard_theme'));

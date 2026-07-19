@@ -1,34 +1,42 @@
 import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Layers, Menu, ChevronLeft } from 'lucide-react';
+import { User, Inbox, Sparkles, ChevronLeft } from 'lucide-react';
 import CardPage from './pages/CardPage';
 import EmbedCardPage from './pages/EmbedCardPage';
 import PublicCardPage from './pages/PublicCardPage';
 import IMBrowserNotice from './components/IMBrowserNotice';
 import { useProfile } from './store';
 
-const ThreadsPage = lazy(() => import('./pages/ThreadsPage'));
-const MorePage = lazy(() => import('./pages/MorePage'));
+const RequestsPage = lazy(() => import('./pages/RequestsPage'));
+const MyVibePage = lazy(() => import('./pages/MyVibePage'));
 
 const E2EChainSyncPage = import.meta.env.DEV
   ? lazy(() => import('./pages/E2EChainSyncPage'))
   : null;
 
-type Tab = 'card' | 'threads' | 'more';
+type Tab = 'card' | 'requests' | 'vibe';
+
+const TAB_IDS: Tab[] = ['card', 'requests', 'vibe'];
 
 const TAB_CONFIG: { id: Tab; icon: ReactNode; label: string }[] = [
   { id: 'card', icon: <User className="w-5 h-5" />, label: '名片' },
-  { id: 'threads', icon: <Layers className="w-5 h-5" />, label: '动态' },
-  { id: 'more', icon: <Menu className="w-5 h-5" />, label: '更多' },
+  { id: 'requests', icon: <Inbox className="w-5 h-5" />, label: '请求' },
+  { id: 'vibe', icon: <Sparkles className="w-5 h-5" />, label: 'Vibe' },
 ];
+
+function readStoredTab(): Tab {
+  const stored = localStorage.getItem('vibecard_tab') as Tab | null;
+  // Legacy installs may have 'threads' or 'more' persisted; fall back to card.
+  return stored && TAB_IDS.includes(stored) ? stored : 'card';
+}
 
 function MobileHeader({ activeTab, onBack, hidden, onboarding }: { activeTab: string; onBack?: () => void; hidden?: boolean; onboarding?: boolean }) {
   const getTitle = () => {
     if (onboarding) return '创建你的名片';
     switch (activeTab) {
       case 'card': return '我的名片';
-      case 'threads': return '动态';
-      case 'more': return '发现与工具';
+      case 'requests': return '联系请求';
+      case 'vibe': return '我的 Vibe';
       default: return 'vibecard';
     }
   };
@@ -63,9 +71,7 @@ function MobileHeader({ activeTab, onBack, hidden, onboarding }: { activeTab: st
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
-    return (localStorage.getItem('vibecard_tab') as Tab) || 'card';
-  });
+  const [activeTab, setActiveTab] = useState<Tab>(readStoredTab);
   const { isSetup } = useProfile();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -153,14 +159,14 @@ export default function App() {
                 className="flex-1 flex flex-col overflow-hidden"
               >
                 {activeTab === 'card' && <CardPage />}
-                {activeTab === 'threads' && (
+                {activeTab === 'requests' && (
                   <Suspense fallback={<PageSkeleton />}>
-                    <ThreadsPage />
+                    <RequestsPage />
                   </Suspense>
                 )}
-                {activeTab === 'more' && (
+                {activeTab === 'vibe' && (
                   <Suspense fallback={<PageSkeleton />}>
-                    <MorePage />
+                    <MyVibePage />
                   </Suspense>
                 )}
               </motion.div>

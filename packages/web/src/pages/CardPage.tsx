@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import {
   Share, MapPin, Twitter, MessageCircle, Wallet,
   Check, Zap, Coins, QrCode, ShieldCheck, Loader2,
+  Sun, Moon, ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../store';
@@ -12,6 +13,7 @@ import OnboardingFlow from '../components/card/OnboardingFlow';
 import { useNamecardUrl } from '../hooks/useNamecardUrl';
 import { buildSiweMessage, makeNonce } from '../lib/siwe';
 import { useToast } from '../components/ui/ToastProvider';
+import { useTheme } from '../components/ThemeProvider';
 
 const EditProfile = lazy(() => import('../components/card/EditProfile'));
 const ShareDrawer = lazy(() => import('../components/card/ShareDrawer'));
@@ -21,6 +23,7 @@ export default function CardPage() {
   const { address } = useAccount();
   const { signMessageAsync, isPending: isSigning } = useSignMessage();
   const { disconnect } = useDisconnect();
+  const { theme, resolved, toggle } = useTheme();
   const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showShareDiv, setShowShareDiv] = useState(false);
@@ -110,32 +113,6 @@ export default function CardPage() {
                 </div>
               )}
             </motion.div>
-            {profile.verified?.wallet && !profile.verified.walletProof && (
-              <button
-                type="button"
-                onClick={handleVerifyWallet}
-                disabled={isVerifying || isSigning}
-                data-testid="verify-wallet-button"
-                className="tap-target mt-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1.5 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
-              >
-                {isVerifying || isSigning ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                )}
-                {isVerifying || isSigning ? '签名中…' : '签名验证我的钱包'}
-              </button>
-            )}
-            {profile.verified?.walletProof && (
-              <button
-                type="button"
-                onClick={handleClearVerification}
-                data-testid="clear-wallet-proof"
-                className="tap-target mt-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                清除验证签名
-              </button>
-            )}
             <motion.h1 initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-[24px] sm:text-[28px] md:text-[32px] font-black tracking-tight text-foreground mb-1">{profile.name}</motion.h1>
             {profile.handle && <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }} className="text-[15px] font-bold text-muted-foreground">{profile.handle}</motion.div>}
             {(profile.event || profile.lookingFor) && (
@@ -257,6 +234,57 @@ export default function CardPage() {
               </div>
             </motion.div>
           )}
+          {/* Advanced area (task 0.2): theme switching and legacy Web3 wallet
+              verification live here, collapsed, outside the MVP path. */}
+          <details data-testid="card-advanced" className="group w-full mb-8 rounded-[20px] border border-border/50 bg-card/60 backdrop-blur-md overflow-hidden">
+            <summary className="list-none cursor-pointer px-5 py-3.5 flex items-center justify-between active:bg-secondary/40 transition-colors">
+              <span className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">高级选项</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" />
+            </summary>
+            <div className="px-5 pb-5 pt-1 space-y-4">
+              <button
+                type="button"
+                onClick={toggle}
+                className="w-full flex items-center justify-between gap-3 rounded-[14px] bg-secondary/60 px-4 py-3 text-left hover:bg-secondary transition-colors"
+              >
+                <span className="flex items-center gap-2.5">
+                  {resolved === 'dark' ? <Moon className="w-4 h-4 text-foreground" /> : <Sun className="w-4 h-4 text-foreground" />}
+                  <span className="text-[13px] font-bold text-foreground">
+                    {theme === 'system' ? '跟随系统' : theme === 'dark' ? '深色模式' : '浅色模式'}
+                  </span>
+                </span>
+                <span className="text-[11px] font-medium text-muted-foreground">点击切换主题：系统 / 浅色 / 深色</span>
+              </button>
+
+              {profile.verified?.wallet && !profile.verified.walletProof && (
+                <button
+                  type="button"
+                  onClick={handleVerifyWallet}
+                  disabled={isVerifying || isSigning}
+                  data-testid="verify-wallet-button"
+                  className="tap-target inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1.5 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
+                >
+                  {isVerifying || isSigning ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                  )}
+                  {isVerifying || isSigning ? '签名中…' : '签名验证我的钱包'}
+                </button>
+              )}
+              {profile.verified?.walletProof && (
+                <button
+                  type="button"
+                  onClick={handleClearVerification}
+                  data-testid="clear-wallet-proof"
+                  className="tap-target text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  清除验证签名
+                </button>
+              )}
+            </div>
+          </details>
+
           {/* Note: an inline QR card used to live here, but the fixed
               bottom action bar covered it on mobile. Use the share drawer
               ("面对面扫码") to view the QR — that path is the only one
