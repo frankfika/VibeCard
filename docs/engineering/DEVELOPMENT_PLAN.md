@@ -193,7 +193,16 @@ Goal:
 
 ## 1.1 Add Memory Storage
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. New `cloudfunctions/memory` function: `memories` + `conversations` collections
+- Actions: `listMemories` (status/visibility/retrievableOnly filters), `createMemoryProposal`, `confirmMemory` (proposed→confirmed only, optional owner override), `editMemory`, `deleteMemory` (soft delete), plus `appendMessage` / `getConversation` conversation persistence needed by 1.3
+- `lib/core.js` holds the pure domain logic (validation, transitions, retrieval filters) so it is unit-testable without the cloud; every handler is scoped to caller OPENID — strangers get empty lists and `not_found`
+- Permission semantics: retrieval = confirmed only; visitor-quotable = public+confirmed; agent-usable = public/agent_only+confirmed; private/connected never leave the owner session
+- Validation: 17 node:test cases pass (`npm test` in the function dir), covering all four visibility levels, cross-owner denial, invalid transitions, delete-from-retrieval, conversation owner scoping
+- Not verifiable here: actual deployment + invocation from the Mini Program (needs the owner's cloud env; wire-up happens in 1.3)
 
 Owner: Lane B
 
