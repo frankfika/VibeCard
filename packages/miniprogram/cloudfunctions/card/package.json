@@ -1,0 +1,12 @@
+{
+  "name": "card",
+  "version": "1.0.0",
+  "description": "VibeCard public Card projection: visitor-safe, contact-free",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

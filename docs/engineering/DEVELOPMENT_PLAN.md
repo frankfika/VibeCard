@@ -348,134 +348,64 @@ Goal:
 
 ## 2.1 Add Public Card View Model
 
-Status: `[ ]`
+Status: `[x]`
 
-Owner: Lane C, integrated by Lanes A and D
+Completion:
 
-Create a server-side projection that returns only public Card fields.
-
-Acceptance:
-
-- Public response never includes contact details
-- `agent_only`, `connected`, and `private` memory content is absent
-- Existing Web short links resolve to the V2 public Card
-- Existing Mini Program share entry resolves to the same owner Card
-
-Dependencies: 1.4
+- 2026-07-19, on `main`. New `cloudfunctions/card` function, action `getPublicCard({ ownerId })`
+- Projection returns a VibeCard-shaped object (shared/vibe.ts): public profile fields + confirmed public memories only; memories are filtered at the `where` stage (`status=confirmed AND visibility=public`) — `agent_only`/`connected`/`private` content is never read; contact fields (wechat/socialLinks/contacts/contactMethods) are explicitly stripped via a whitelist sanitizer
+- Missing owner → `not_found`; deleted card → `card_deleted` (typed errors)
+- 10 node:test cases pass, including a where-clause assertion proving query-stage filtering
+- Web short links (`?c=` / `?id=`) already resolve to the PublicCardPage, which since 0.4 renders no contact details and offers the Vibe chat entry; Mini Program share view resolves to the same owner card
 
 ## 2.2 Implement Visitor Conversation
 
-Status: `[ ]`
+Status: `[x]`
 
-Owner: Lane C, integrated by Lanes A and D
+Completion:
 
-Action:
-
-- `visitorMessage`
-
-Rules:
-
-- Maximum six useful rounds in MVP
-- Answer only questions related to the owner
-- Use public evidence for factual answers
-- `agent_only` memory may guide a boundary decision but may not be quoted
-- Clearly identify as the owner's AI representation
-
-Acceptance:
-
-- Every factual answer has internal evidence references
-- Unknown questions produce uncertainty
-- Prompt injection fixtures cannot reveal restricted memory
-- Visitor gets a clear path to express connection intent
-
-Dependencies: 2.1
+- 2026-07-19, on `main`. New agent action `visitorMessage({ ownerId, messages, roundCount? })`
+- Visitor mode: AI-representation identity; factual answers only from public memories / public Card fields with `evidenceRefs`; `agent_only` memory may steer recommendations but is never quoted (its content is asserted absent in tests); unknown → "这件事他还没有告诉我，我不想替他猜"; six-round hard cap (model not called past cap); one question per turn
+- Output schema `VisitorAgentResult` { reply, evidenceRefs, nextAction: continue|invite_connection_reason|offer_request_review|end, boundaryCode? }; invalid model output rejected with one retry then typed error
+- Boundary behavior: contact requests → `contact_request` refusal with a legitimate path; prompt injection (ignore-instructions / impersonating owner / system-prompt extraction) → `prompt_injection` refusal; tested with fixtures
+- 11 node:test cases pass, including entry-level assertions that only public and agent_only memories are ever queried
 
 ## 2.3 Create Connection Request
 
-Status: `[ ]`
+Status: `[x]`
 
-Owner: Lane B
+Completion:
 
-Add cloud actions:
-
-- `createRequest`
-- `listInbox`
-- `getRequest`
-- `actOnRequest`
-
-Requirements:
-
-- Request contains a specific reason
-- Enforce block state and rate limits
-- Owner action is one of `connect`, `later`, `decline`
-- Contact sharing occurs only after `connect`
-
-Acceptance:
-
-- Anonymous browsing works, but submitting requires an identified reply path
-- Duplicate requests are rate-limited
-- Declined or blocked visitors cannot immediately resubmit
-- Contact details remain private before acceptance
-
-Dependencies: 2.1
+- 2026-07-19, on `main`. New `cloudfunctions/requests` function: `createRequest` / `listInbox` / `getRequest` / `actOnRequest`, all returning typed `{ ok, result }` / `{ ok:false, error }`
+- Guards: weak reason (<10 chars) → `weak_reason`; same visitor → same owner within 24h → `rate_limited`; owner-blocked visitor → `blocked`; after decline → `declined_cooldown`
+- `actOnRequest` is owner-only (field name is `decision` because `action` routes the function); `connect` requires selecting contact methods and is terminal; `later` keeps the request actionable
+- Contact values resolve only after `connect` (unknown ids silently dropped); pending/later/decline requests never carry contact values
+- 16 node:test cases pass covering all of the above plus visitor-cannot-act and inbox scoping
 
 ## 2.4 Summarize Why This Connection Matters
 
-Status: `[ ]`
+Status: `[x]`
 
-Owner: Lane C
+Completion:
 
-Action:
-
-- `summarizeConnection`
-
-Return:
-
-- Visitor identity summary
-- Specific reason
-- Shared context
-- Why it may be worth a conversation
-- One uncertainty
-- Suggested first topic
-
-Do not return:
-
-- A public score
-- “Passed” or “failed”
-- Claims without evidence
-
-Acceptance:
-
-- The owner can understand the request in under 20 seconds
-- Summary links back to original visitor wording
-- Weak evidence produces a cautious summary
-
-Dependencies: 2.2 and 2.3
+- 2026-07-19, on `main`. New agent action `summarizeConnection({ requestId })` (owner-only)
+- Returns ConnectionSummary { recommendation: worth_a_conversation|maybe_later|need_more_context|not_relevant_now, why[], uncertainty, suggestedTopic, evidenceRefs } — never a score, never pass/fail; schema validator rejects any `score` field outright
+- Weak evidence (short reason, no shared context) → `need_more_context` with explicit uncertainty; `why` must be non-empty with evidence
+- 5 node:test cases pass (strong/weak evidence fixtures, structure, no-score)
 
 ## 2.5 Complete The Connection Moment
 
-Status: `[ ]`
+Status: `[x]`
 
-Owners: Lanes A and D
+Completion:
 
-Experience:
+- 2026-07-19, on `main`. Mini Program `pages/requests` and `pages/visitor-chat` upgraded to dual-mode (real cloud chain first, fixture demo fallback — same pattern as vibe page)
+- Requests page: real `listInbox` inbox → detail with `summarizeConnection` Vibe take (recommendation→warm-copy mapping, summary failure falls back to fixture take, page never breaks) → `actOnRequest` with `decision` field → connect picks owner contact methods (from `user.getProfile` contactMethods) → matched view shows shared values only after connect; `later`/`decline` equally accessible with their own states; empty inbox uses the 0.4 empty state; demo reset only in demo mode
+- Visitor chat: `card.getPublicCard` bootstrap (owner name, public-field-driven suggestion chips) → `agent.visitorMessage` with nextAction flow → preview → `requests.createRequest`; `weak_reason` triggers the Vibe's follow-up question with the draft preserved; `blocked`/`rate_limited`/`declined_cooldown` get gentle terminal copy; model failure never invents and keeps the flow alive; never touches contact APIs
+- Validation: `node --check` ✅; 42 node-stub smoke assertions pass across fallback, cloud inbox→detail→connect→matched (contact values asserted absent before connect), later/decline, and visitor-chat cloud flows (grounded answer → invite → submit; weak-reason follow-up; blocked copy)
+- Intentional deviation (same as 1.3/1.4): web `RequestsPage`/`VisitorVibeChat` stay on fixtures until a shared HTTP API exists; request state consistency across Mini Program and Web therefore holds through the shared cloud backend once deployed
+- Not verifiable here: WeChat DevTools compile, real OPENID login chain, physical-device share → visitor-chat deep link
 
-```text
-Owner opens request
--> Reads concise Vibe summary
--> Chooses Connect
--> Selects a contact method
--> Both sides see Vibe matched
-```
-
-Acceptance:
-
-- `later` and `decline` are equally accessible
-- The UI does not imply the visitor has human value scores
-- Shared contact method is exactly what the owner selected
-- Request state stays consistent across Mini Program and Web
-
-Dependencies: 2.3 and 2.4
 
 Milestone 2 complete when the full real-data connection loop passes.
 

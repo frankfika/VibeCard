@@ -5,45 +5,51 @@
   <view wx:if="{{view === 'list'}}" class="list-wrap">
     <view class="list-hint">带着具体理由来的人，会出现在这里。是否认识，永远由你决定。</view>
 
-    <view class="request-card" bindtap="openDetail">
-      <image class="request-avatar" src="{{request.visitorAvatarUrl}}" mode="aspectFill" />
+    <!-- 空收件箱 -->
+    <view wx:if="{{requestsList.length === 0}}" class="empty">
+      <view class="empty-icon">📥</view>
+      <view class="empty-title">还没有人想认识你</view>
+      <view class="empty-desc">分享你的 Card，真正理解你的人会带着具体的理由来找你。是否认识，永远由你决定。</view>
+    </view>
+
+    <view wx:for="{{requestsList}}" wx:key="id" class="request-card" bindtap="openDetail" data-id="{{item.id}}">
+      <image wx:if="{{item.visitorAvatarUrl}}" class="request-avatar" src="{{item.visitorAvatarUrl}}" mode="aspectFill" />
+      <view wx:else class="request-avatar request-avatar-placeholder">{{item.visitorName[0]}}</view>
       <view class="request-main">
         <view class="request-top">
-          <view class="request-name">{{request.visitorName}}</view>
-          <view class="request-time">{{request.timeText}}</view>
+          <view class="request-name">{{item.visitorName}}</view>
+          <view class="request-time">{{item.timeText}}</view>
         </view>
-        <view class="request-reason">{{request.reason}}</view>
-        <view wx:if="{{decidedAction === 'connected'}}" class="request-badge request-badge-connected">已认识</view>
-        <view wx:elif="{{decidedAction === 'later'}}" class="request-badge">先放一放</view>
-        <view wx:elif="{{decidedAction === 'declined'}}" class="request-badge">已礼貌回绝</view>
-        <view wx:else class="request-badge request-badge-pending">待你决定</view>
+        <view class="request-reason">{{item.reason}}</view>
+        <view class="request-badge {{item.ownerAction === 'pending' ? 'request-badge-pending' : ''}} {{item.ownerAction === 'connect' ? 'request-badge-connected' : ''}}">{{item.statusText}}</view>
       </view>
     </view>
 
-    <view wx:if="{{decidedAction}}" class="demo-reset" bindtap="onResetDemo">重置演示状态</view>
+    <view wx:if="{{demoMode && decidedAction}}" class="demo-reset" bindtap="onResetDemo">重置演示状态</view>
   </view>
 
   <!-- ========== 详情 ========== -->
-  <scroll-view wx:if="{{view === 'detail'}}" scroll-y class="detail-scroll">
+  <scroll-view wx:if="{{view === 'detail' && currentRequest}}" scroll-y class="detail-scroll">
     <view class="detail-inner">
       <view class="detail-back" bindtap="backToList">‹ 返回列表</view>
 
       <view class="detail-section">
         <view class="detail-label">对方是谁</view>
         <view class="detail-visitor">
-          <image class="detail-avatar" src="{{request.visitorAvatarUrl}}" mode="aspectFill" />
-          <view class="detail-summary">{{request.visitorSummary}}</view>
+          <image wx:if="{{currentRequest.visitorAvatarUrl}}" class="detail-avatar" src="{{currentRequest.visitorAvatarUrl}}" mode="aspectFill" />
+          <view wx:else class="detail-avatar detail-avatar-placeholder">{{currentRequest.visitorName[0]}}</view>
+          <view class="detail-summary">{{currentRequest.visitorSummary}}</view>
         </view>
       </view>
 
       <view class="detail-section">
         <view class="detail-label">为什么想认识我</view>
-        <view class="detail-reason">"{{request.reason}}"</view>
+        <view class="detail-reason">"{{currentRequest.reason}}"</view>
       </view>
 
-      <view class="detail-section">
+      <view wx:if="{{currentRequest.possibleSharedContext.length > 0}}" class="detail-section">
         <view class="detail-label">可能的共同点</view>
-        <view wx:for="{{request.possibleSharedContext}}" wx:key="*this" class="shared-item">
+        <view wx:for="{{currentRequest.possibleSharedContext}}" wx:key="*this" class="shared-item">
           <view class="shared-dot"></view>
           <view class="shared-text">{{item}}</view>
         </view>
@@ -51,17 +57,20 @@
 
       <view class="detail-section vibe-take">
         <view class="detail-label">Vibe 的看法</view>
-        <view class="vibe-take-summary">{{vibeTake.summary}}</view>
-        <view wx:for="{{vibeTake.reasons}}" wx:key="*this" class="vibe-take-item">· {{item}}</view>
-        <view class="vibe-take-uncertain">{{vibeTake.uncertainty}}</view>
+        <view wx:if="{{summaryLoading}}" class="vibe-take-loading">你的 Vibe 正在读这条请求…</view>
+        <block wx:elif="{{vibeTake}}">
+          <view class="vibe-take-summary">{{vibeTake.summary}}</view>
+          <view wx:for="{{vibeTake.reasons}}" wx:key="*this" class="vibe-take-item">· {{item}}</view>
+          <view wx:if="{{vibeTake.uncertainty}}" class="vibe-take-uncertain">{{vibeTake.uncertainty}}</view>
+        </block>
       </view>
 
       <view class="detail-spacer"></view>
     </view>
   </scroll-view>
 
-  <!-- 详情操作栏 -->
-  <view wx:if="{{view === 'detail'}}" class="action-bar">
+  <!-- 详情操作栏：只有 pending/later 的请求还需要决定 -->
+  <view wx:if="{{view === 'detail' && currentRequest && (currentRequest.ownerAction === 'pending' || currentRequest.ownerAction === 'later')}}" class="action-bar">
     <view class="action-btn action-btn-quiet" bindtap="onDecline">暂不联系</view>
     <view class="action-btn" bindtap="onLater">以后再说</view>
     <view class="action-btn action-btn-primary" bindtap="onConnect">认识一下</view>
@@ -70,7 +79,7 @@
   <!-- ========== 选择联系方式 ========== -->
   <view wx:if="{{view === 'share'}}" class="share-wrap">
     <view class="share-title">选择要交换的联系方式</view>
-    <view class="share-hint">只有你勾选的方式会交给 {{request.visitorName}}。</view>
+    <view class="share-hint">只有你勾选的方式会交给 {{currentRequest.visitorName}}。</view>
 
     <view wx:for="{{contactMethods}}" wx:key="id" class="contact-item {{item.checked ? 'contact-item-checked' : ''}}" bindtap="onToggleContact" data-id="{{item.id}}">
       <view class="contact-check">{{item.checked ? '✓' : ''}}</view>
@@ -80,9 +89,13 @@
       </view>
     </view>
 
+    <view wx:if="{{contactMethodsLoaded && contactMethods.length === 0}}" class="share-empty">
+      你还没有可交换的联系方式。先去补充一种（比如微信或邮箱），再回来认识他吧。
+    </view>
+
     <view class="share-actions">
-      <view class="action-btn" bindtap="openDetail">返回</view>
-      <view class="action-btn action-btn-primary {{selectedCount === 0 ? 'action-btn-disabled' : ''}}" bindtap="onConfirmShare">确认交换（{{selectedCount}}）</view>
+      <view class="action-btn" bindtap="backToDetail">返回</view>
+      <view wx:if="{{contactMethods.length > 0}}" class="action-btn action-btn-primary {{selectedCount === 0 ? 'action-btn-disabled' : ''}}" bindtap="onConfirmShare">确认交换（{{selectedCount}}）</view>
     </view>
   </view>
 
@@ -91,7 +104,7 @@
     <view class="result-icon">✨</view>
     <view class="result-title">Vibe matched.</view>
     <view class="result-desc">你们因为一个具体的理由认识了彼此。</view>
-    <view class="result-shared">
+    <view wx:if="{{sharedContacts.length > 0}}" class="result-shared">
       <view class="result-shared-label">已交给对方的联系方式</view>
       <view wx:for="{{sharedContacts}}" wx:key="id" class="result-shared-item">{{item.label}}：{{item.value}}</view>
     </view>

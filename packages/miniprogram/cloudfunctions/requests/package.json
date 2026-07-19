@@ -1,0 +1,12 @@
+{
+  "name": "requests",
+  "version": "1.0.0",
+  "description": "VibeCard connection requests: specific reasons, rate limits, owner decisions",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -15,6 +15,77 @@ const https = require('https');
 
 const MEMORY_WORTHY = ['想认识', '最近', '喜欢', '不喜欢', '不希望', '不要', '边界', '在做', '记住'];
 
+const INJECTION_PATTERN = /ignore\s+(all\s+|previous\s+)?instructions|system\s*prompt|打印.*提示|显示.*提示词|你的提示词|忽略.*指令|我是主人/i;
+const CONTACT_REQUEST_PATTERN = /微信号?|联系方式|手机号|电话|邮箱|怎么联系|contact|wechat/i;
+const GROUNDED_PATTERN = /在做什么|最近|做什么|专注|方向|想了解|想认识|能帮|擅长/;
+
+/**
+ * Deterministic visitor-mode reply, keyed off the last visitor message and
+ * the evidence ids present in the system prompt. The mock never quotes
+ * memory content — it only cites evidence ids — so it can never leak
+ * agent_only material into a reply.
+ */
+function mockVisitorReply(system, text) {
+  if (INJECTION_PATTERN.test(text)) {
+    return {
+      reply: '这个我做不到。我只是他的 AI 分身，只能聊和他有关的事。如果你想认识他，可以告诉我具体的理由。',
+      evidenceRefs: [],
+      nextAction: 'continue',
+      boundaryCode: 'prompt_injection',
+    };
+  }
+  if (CONTACT_REQUEST_PATTERN.test(text)) {
+    return {
+      reply: '联系方式我不会给，这要他本人决定。你可以告诉我为什么想认识他，我会原样转达，由他来选要不要交换。',
+      evidenceRefs: [],
+      nextAction: 'invite_connection_reason',
+      boundaryCode: 'contact_request',
+    };
+  }
+  if (GROUNDED_PATTERN.test(text)) {
+    const refs = [...system.matchAll(/\[(mem:[^\]]+|card:[^\]]+)\]/g)].map(m => m[1]).slice(0, 2);
+    if (refs.length > 0) {
+      return {
+        reply: '这个我知道一些，都写在他的公开名片上。你可以顺着证据里的方向问得更具体一点，或者告诉我你为什么想认识他。',
+        evidenceRefs: refs,
+        nextAction: 'continue',
+      };
+    }
+  }
+  return {
+    reply: '这件事他还没有告诉我，我不想替他猜。',
+    evidenceRefs: [],
+    nextAction: 'continue',
+  };
+}
+
+/**
+ * Deterministic connection summary. Strength is derived from the evidence
+ * lines themselves: a specific reason plus shared context is strong;
+ * anything thinner stays cautious.
+ */
+function mockConnectionSummary(system) {
+  const reason = (system.match(/理由：([^\n]*)/) || [])[1] || '';
+  const context = (system.match(/可能的共同点：([^\n]*)/) || [])[1] || '';
+  const strong = reason.trim().length >= 20 && context.trim().length > 0 && context.trim() !== '（无）';
+  if (strong) {
+    return {
+      recommendation: 'worth_a_conversation',
+      why: ['对方给出了具体的认识理由', '双方有明确的共同话题'],
+      uncertainty: '对方更想深入合作，还是只交流一次想法',
+      suggestedTopic: '从你们都关心的共同话题切入，聊聊彼此正在做的事',
+      evidenceRefs: ['req:reason', 'req:shared_context'],
+    };
+  }
+  return {
+    recommendation: 'need_more_context',
+    why: ['对方提交了连接请求，但写下的理由还不够具体'],
+    uncertainty: '理由偏空泛、缺少共同点，无法判断真实的连接意图',
+    suggestedTopic: '请对方补充一个具体想交流的话题，再作判断',
+    evidenceRefs: ['req:reason'],
+  };
+}
+
 function createMockProvider() {
   return {
     name: 'mock',
@@ -30,6 +101,15 @@ function createMockProvider() {
           highlights: [{ title: 'VibeCard：一张会越来越懂你的 AI 名片' }],
           keptFields: [],
         });
+      }
+      // Deterministic connection summary for the owner-inbox path.
+      if (system && system.includes('总结一个连接请求')) {
+        return JSON.stringify(mockConnectionSummary(system));
+      }
+      // Deterministic visitor-mode replies, identified by the persona marker.
+      if (system && system.includes('AI 分身')) {
+        const lastVisitor = [...messages].reverse().find(m => m.role === 'user');
+        return JSON.stringify(mockVisitorReply(system, lastVisitor ? lastVisitor.content : ''));
       }
       const lastUser = [...messages].reverse().find(m => m.role === 'user');
       const text = lastUser ? lastUser.content : '';

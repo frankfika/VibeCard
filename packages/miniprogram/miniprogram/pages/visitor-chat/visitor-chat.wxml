@@ -10,25 +10,27 @@
         </view>
 
         <!-- 预设问题 chips -->
-        <view wx:if="{{stage === 'chat' && !guided}}" class="chips">
+        <view wx:if="{{stage === 'chat' && !guided && !ended && chips.length > 0}}" class="chips">
           <view wx:for="{{chips}}" wx:key="id" class="chip {{item.used ? 'chip-used' : ''}}" bindtap="onAskPreset" data-id="{{item.id}}">{{item.text}}</view>
         </view>
 
         <!-- 引导后的 CTA -->
-        <view wx:if="{{stage === 'chat' && guided}}" class="guide-cta" bindtap="onStartReason">告诉他，我为什么想认识他 →</view>
+        <view wx:if="{{stage === 'chat' && guided && !ended}}" class="guide-cta" bindtap="onStartReason">告诉他，我为什么想认识他 →</view>
 
         <view class="chat-spacer"></view>
       </view>
     </scroll-view>
 
-    <!-- 底部：聊天输入 / 理由输入 -->
-    <view wx:if="{{stage === 'chat'}}" class="input-bar">
+    <!-- 底部：聊天输入 / 理由输入 / 收尾 -->
+    <view wx:if="{{stage === 'chat' && !ended}}" class="input-bar">
       <input class="input-field" placeholder="问他的分身一个问题…" placeholder-style="color: #5c5c66;" value="{{inputValue}}" bindinput="onInput" bindconfirm="onSend" confirm-type="send" />
       <view class="send-btn {{inputValue ? 'send-btn-active' : ''}}" bindtap="onSend">发送</view>
     </view>
 
+    <view wx:if="{{ended}}" class="end-note">这次先聊到这里，谢谢你认真地来。</view>
+
     <view wx:if="{{stage === 'reason'}}" class="reason-bar">
-      <view class="reason-hint">一个具体的理由，比「认识一下」更有分量。</view>
+      <view class="reason-hint">{{reasonHint}}</view>
       <textarea class="reason-input" placeholder="例如：我也在做一个类似的东西，最近卡在…" placeholder-style="color: #5c5c66;" value="{{reasonValue}}" bindinput="onReasonInput" maxlength="300" />
       <view class="reason-actions">
         <view class="reason-btn" bindtap="onMakePreview">生成请求预览</view>
@@ -48,7 +50,7 @@
         <view class="preview-label">我的理由</view>
         <view class="preview-value">"{{preview.reason}}"</view>
       </view>
-      <view class="preview-row">
+      <view wx:if="{{preview.possibleSharedContext.length > 0}}" class="preview-row">
         <view class="preview-label">可能的共同点</view>
         <view wx:for="{{preview.possibleSharedContext}}" wx:key="*this" class="preview-shared">· {{item}}</view>
       </view>
@@ -60,11 +62,11 @@
     </view>
   </view>
 
-  <!-- ========== 提交成功 ========== -->
+  <!-- ========== 提交结果 ========== -->
   <view wx:if="{{stage === 'done'}}" class="done-wrap">
     <view class="done-icon">🌙</view>
-    <view class="done-title">已送达</view>
-    <view class="done-desc">你的理由已经交给他的 Vibe，是否认识由他决定。</view>
-    <view class="done-sub">如果他有兴趣，他会选一种联系方式给你。</view>
+    <view class="done-title">{{doneTitle}}</view>
+    <view class="done-desc">{{doneDesc}}</view>
+    <view wx:if="{{doneSub}}" class="done-sub">{{doneSub}}</view>
   </view>
 </view>

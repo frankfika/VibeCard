@@ -28,6 +28,49 @@ function validateOwnerAgentResult(value) {
   return null;
 }
 
+const VISITOR_NEXT_ACTIONS = ['continue', 'invite_connection_reason', 'offer_request_review', 'end'];
+
+/** Mirrors AI_BEHAVIOR.md §6 VisitorAgentResult. Returns error string or null. */
+function validateVisitorAgentResult(value) {
+  if (!value || typeof value !== 'object') return 'not_an_object';
+  if (!isNonEmptyString(value.reply)) return 'invalid_reply';
+  if (!Array.isArray(value.evidenceRefs) || !value.evidenceRefs.every(r => typeof r === 'string')) {
+    return 'invalid_evidence_refs';
+  }
+  if (!VISITOR_NEXT_ACTIONS.includes(value.nextAction)) return 'invalid_next_action';
+  if (value.boundaryCode !== undefined && value.boundaryCode !== null && typeof value.boundaryCode !== 'string') {
+    return 'invalid_boundary_code';
+  }
+  return null;
+}
+
+const SUMMARY_RECOMMENDATIONS = [
+  'worth_a_conversation',
+  'maybe_later',
+  'need_more_context',
+  'not_relevant_now',
+];
+
+/**
+ * Mirrors AI_BEHAVIOR.md §8 ConnectionSummary. The summary is not a score:
+ * any `score` field is rejected outright, and `why` must be non-empty
+ * whenever evidence is cited. Returns error string or null.
+ */
+function validateConnectionSummary(value) {
+  if (!value || typeof value !== 'object') return 'not_an_object';
+  if ('score' in value) return 'score_not_allowed';
+  if (!SUMMARY_RECOMMENDATIONS.includes(value.recommendation)) return 'invalid_recommendation';
+  if (!Array.isArray(value.why) || value.why.length === 0 || !value.why.every(isNonEmptyString)) {
+    return 'invalid_why';
+  }
+  if (!isNonEmptyString(value.uncertainty)) return 'invalid_uncertainty';
+  if (!isNonEmptyString(value.suggestedTopic)) return 'invalid_suggested_topic';
+  if (!Array.isArray(value.evidenceRefs) || !value.evidenceRefs.every(r => typeof r === 'string')) {
+    return 'invalid_evidence_refs';
+  }
+  return null;
+}
+
 function typedError(code, message) {
   return { ok: false, error: { code, message } };
 }
@@ -89,9 +132,13 @@ function validateCardDraft(value) {
 
 module.exports = {
   validateOwnerAgentResult,
+  validateVisitorAgentResult,
+  validateConnectionSummary,
   validateCardDraft,
   typedError,
   ok,
   MEMORY_KINDS,
   MEMORY_VISIBILITIES,
+  VISITOR_NEXT_ACTIONS,
+  SUMMARY_RECOMMENDATIONS,
 };

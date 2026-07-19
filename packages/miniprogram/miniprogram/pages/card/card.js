@@ -388,9 +388,13 @@ Page({
     nav.switchTab('/pages/card/card');
   },
 
-  // 访客视图入口：先和主人的 AI 分身聊聊（任务 0.4 mock 故事）
+  // 访客视图入口：先和主人的 AI 分身聊聊（任务 0.4 mock + 任务 2.5 云链路）
+  // 分享资料里带 ownerId/openid 时透传给分身页，走真实云对话；否则回退 fixture 演示
   goVisitorChat() {
-    nav.navigateTo('/pages/visitor-chat/visitor-chat');
+    const p = this.data.profile || {};
+    const ownerId = p.ownerId || p.openid || '';
+    const query = ownerId ? '?ownerId=' + encodeURIComponent(ownerId) : '';
+    nav.navigateTo('/pages/visitor-chat/visitor-chat' + query);
   },
 
   onShareAppMessage() {
