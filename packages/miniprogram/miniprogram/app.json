@@ -1,6 +1,8 @@
 {
   "pages": [
     "pages/card/card",
+    "pages/requests/requests",
+    "pages/vibe/vibe",
     "pages/threads/threads",
     "pages/more/more",
     "pages/discover/discover",
@@ -30,14 +32,14 @@
         "selectedIconPath": "images/tab_home_active.png"
       },
       {
-        "pagePath": "pages/threads/threads",
-        "text": "动态",
+        "pagePath": "pages/requests/requests",
+        "text": "请求",
         "iconPath": "images/tab_threads.png",
         "selectedIconPath": "images/tab_threads_active.png"
       },
       {
-        "pagePath": "pages/more/more",
-        "text": "更多",
+        "pagePath": "pages/vibe/vibe",
+        "text": "Vibe",
         "iconPath": "images/tab_settings.png",
         "selectedIconPath": "images/tab_settings_active.png"
       }

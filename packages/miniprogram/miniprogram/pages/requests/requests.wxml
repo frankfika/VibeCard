@@ -1,0 +1,9 @@
+<view class="page">
+  <navbar title="联系请求" />
+
+  <view class="empty">
+    <view class="empty-icon">📥</view>
+    <view class="empty-title">还没有人想认识你</view>
+    <view class="empty-desc">分享你的 Card，真正理解你的人会带着具体的理由来找你。是否认识，永远由你决定。</view>
+  </view>
+</view>

@@ -110,7 +110,13 @@ Dependencies: 0.1
 
 ## 0.3 Focus Mini Program Navigation
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress (2026-07-19, on `main`):
+
+- Implemented: `app.json` tabBar → 名片 / 请求 / Vibe; custom-tab-bar list updated; new placeholder pages `pages/requests` + `pages/vibe` with empty states and correct tab selection; legacy pages (threads / more / discover / games / thread-publish) remain registered but unreachable from main navigation; only `more.js` (now unrouted) links to discover/games, so no legacy entry remains in the main journey
+- Verified here: JS syntax (`node --check`) and JSON validity of all touched files
+- Remaining: WeChat DevTools compile + tab switching check must be run by the owner (DevTools cannot run in this environment). Intentional deviation: 0.4 proceeds while this verification is pending, since 0.3 code is complete.
 
 Owner: Lane A
 

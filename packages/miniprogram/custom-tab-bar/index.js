@@ -3,8 +3,8 @@ Component({
     selected: 0,
     list: [
       { pagePath: '/pages/card/card', text: '名片', icon: '🪪' },
-      { pagePath: '/pages/threads/threads', text: '动态', icon: '✨' },
-      { pagePath: '/pages/more/more', text: '更多', icon: '⚙️' },
+      { pagePath: '/pages/requests/requests', text: '请求', icon: '📥' },
+      { pagePath: '/pages/vibe/vibe', text: 'Vibe', icon: '✨' },
     ]
   },
   methods: {
