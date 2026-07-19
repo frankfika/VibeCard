@@ -1,17 +1,23 @@
 /**
- * 我的 Vibe（任务 0.4 mock）
+ * 我的 Vibe（任务 0.4 mock + 任务 1.3 真实链路）
  *
- * 主人与私有 Vibe 的对话页。当前完全使用本地 fixture 数据，
- * 不调用任何真实模型或云函数。演示路径：
- *   聊天 -> Vibe 提议记忆 -> 记住 / 改一下 / 别记这个 -> 已记住列表更新。
+ * 主人与私有 Vibe 的对话页。优先走真实云链路：
+ *   发送 -> agent.ownerMessage（结构化校验后的回复+最多一条记忆提议）
+ *   -> memory.appendMessage 持久化 -> 提议卡片（记住/改一下/别记这个）
+ *   -> memory.confirmMemory / deleteMemory -> 「已记住」列表来自 listMemories。
+ *
+ * 云环境未部署或调用失败时自动回退到本地 fixture 演示模式，保证比赛演示
+ * 不中断；聊天主流程在记忆提取失败时依然可用（AI_BEHAVIOR.md 失败行为）。
  *
  * 产品规则：Vibe 可以提议记忆，但只有主人确认后才会真正记住。
  */
 const fixtures = require('../../data/vibe-fixtures.js');
+const cloud = require('../../utils/cloud.js');
 
 const VISIBILITY_LABELS = {
   public: '已公开',
   agent_only: '仅分身可见',
+  connected: '认识后可见',
   private: '仅自己可见',
 };
 
@@ -25,37 +31,16 @@ Page({
   data: {
     memories: [],      // 顶部「已记住」列表（仅含主人确认过的记忆）
     messages: [],      // 对话消息 { id, role: 'owner' | 'vibe', text }
-    proposal: null,    // 记忆提议卡片 { id, text, state, editText }
+    proposal: null,    // 记忆提议卡片 { id, memoryId, text, state, editText }
     inputValue: '',
     scrollIntoId: '',
   },
 
   onLoad() {
-    const memories = fixtures.fixtureOwnerMemories
-      .filter((m) => m.status === 'confirmed')
-      .map((m) => ({
-        id: m.id,
-        content: m.content,
-        visibilityLabel: VISIBILITY_LABELS[m.visibility] || m.visibility,
-      }));
-
-    this.setData({
-      memories,
-      messages: [
-        { id: 'fixture-msg-owner-1', role: 'owner', text: '我最近想认识真正做过 AI 社交产品的人。' },
-        {
-          id: 'fixture-msg-vibe-1',
-          role: 'vibe',
-          text: '我听到了。比起「认识更多人」，你更在意对方是不是真的做过，并且和你一样在意边界。',
-        },
-      ],
-      proposal: {
-        id: 'fixture-proposal-1',
-        text: '你最近更想认识真正做过 AI 社交产品的人。',
-        state: 'pending', // pending | editing | confirmed
-        editText: '',
-      },
-    });
+    this.demoMode = false;
+    this.conversationId = '';
+    this.sending = false;
+    this.loadMemories();
   },
 
   onShow() {
@@ -64,13 +49,59 @@ Page({
     }
   },
 
+  // ---------- 记忆列表（listMemories，仅已确认） ----------
+
+  async loadMemories() {
+    try {
+      const res = await cloud.callFunction('memory', {
+        action: 'listMemories',
+        status: 'confirmed',
+      });
+      const memories = (res.memories || []).map((m) => ({
+        id: m._id,
+        content: m.content,
+        visibilityLabel: VISIBILITY_LABELS[m.visibility] || m.visibility,
+      }));
+      this.setData({ memories });
+    } catch (err) {
+      // 云未部署/未登录：回退到 fixture 演示模式（任务 0.4 的演示路径保持可用）
+      console.warn('[vibe] cloud unavailable, fallback to fixture demo:', err && err.message);
+      this.demoMode = true;
+      const memories = fixtures.fixtureOwnerMemories
+        .filter((m) => m.status === 'confirmed')
+        .map((m) => ({
+          id: m.id,
+          content: m.content,
+          visibilityLabel: VISIBILITY_LABELS[m.visibility] || m.visibility,
+        }));
+      this.setData({
+        memories,
+        messages: [
+          { id: 'fixture-msg-owner-1', role: 'owner', text: '我最近想认识真正做过 AI 社交产品的人。' },
+          {
+            id: 'fixture-msg-vibe-1',
+            role: 'vibe',
+            text: '我听到了。比起「认识更多人」，你更在意对方是不是真的做过，并且和你一样在意边界。',
+          },
+        ],
+        proposal: {
+          id: 'fixture-proposal-1',
+          memoryId: '',
+          text: '你最近更想认识真正做过 AI 社交产品的人。',
+          state: 'pending',
+          editText: '',
+        },
+      });
+    }
+  },
+
   // ---------- 记忆提议 ----------
 
-  onRememberProposal() {
+  async onRememberProposal() {
     const p = this.data.proposal;
     if (!p || p.state !== 'pending') return;
-    this.confirmMemory(p.text);
-    this.setData({ 'proposal.state': 'confirmed' });
+    const ok = await this.confirmMemoryOnServer(p.memoryId, { content: p.text });
+    if (ok) this.setData({ 'proposal.state': 'confirmed' });
   },
 
   onEditProposal() {
@@ -83,22 +114,31 @@ Page({
     this.setData({ 'proposal.editText': e.detail.value });
   },
 
-  onSaveEditedProposal() {
+  async onSaveEditedProposal() {
     const text = (this.data.proposal.editText || '').trim();
     if (!text) {
       wx.showToast({ title: '内容不能为空', icon: 'none' });
       return;
     }
-    this.confirmMemory(text);
-    this.setData({ 'proposal.state': 'confirmed', 'proposal.text': text });
+    const ok = await this.confirmMemoryOnServer(this.data.proposal.memoryId, { content: text });
+    if (ok) this.setData({ 'proposal.state': 'confirmed', 'proposal.text': text });
   },
 
   onCancelEditProposal() {
     this.setData({ 'proposal.state': 'pending', 'proposal.editText': '' });
   },
 
-  onDismissProposal() {
-    if (!this.data.proposal) return;
+  async onDismissProposal() {
+    const p = this.data.proposal;
+    if (!p) return;
+    // 被拒绝的提议软删除，之后不会进入任何检索（listMemories 只取 confirmed）
+    if (!this.demoMode && p.memoryId) {
+      try {
+        await cloud.callFunction('memory', { action: 'deleteMemory', memoryId: p.memoryId });
+      } catch (err) {
+        console.warn('[vibe] deleteMemory failed:', err && err.message);
+      }
+    }
     const reply = {
       id: nextMessageId('vibe'),
       role: 'vibe',
@@ -111,16 +151,29 @@ Page({
     });
   },
 
-  // 提议被确认后进入「已记住」列表；新确认的记忆默认仅自己可见，
-  // 是否发布到公开 Card 是之后独立的一步。
-  confirmMemory(text) {
-    const memory = {
-      id: 'fixture-memory-confirmed-' + Date.now(),
-      content: text,
-      visibilityLabel: VISIBILITY_LABELS.private,
-    };
-    this.setData({ memories: this.data.memories.concat(memory) });
-    wx.showToast({ title: '已记住', icon: 'none' });
+  // 确认记忆：confirmMemory（可带修改后的内容），成功后刷新「已记住」列表。
+  // 失败时提示并可重试，提议卡片保持 pending。
+  async confirmMemoryOnServer(memoryId, { content }) {
+    if (this.demoMode || !memoryId) {
+      const memory = {
+        id: 'fixture-memory-confirmed-' + Date.now(),
+        content,
+        visibilityLabel: VISIBILITY_LABELS.private,
+      };
+      this.setData({ memories: this.data.memories.concat(memory) });
+      wx.showToast({ title: '已记住', icon: 'none' });
+      return true;
+    }
+    try {
+      await cloud.callFunction('memory', { action: 'confirmMemory', memoryId, content });
+      await this.loadMemories();
+      wx.showToast({ title: '已记住', icon: 'none' });
+      return true;
+    } catch (err) {
+      console.warn('[vibe] confirmMemory failed:', err && err.message);
+      wx.showToast({ title: '没存上，再试一次', icon: 'none' });
+      return false;
+    }
   },
 
   // ---------- 对话输入 ----------
@@ -129,26 +182,107 @@ Page({
     this.setData({ inputValue: e.detail.value });
   },
 
-  onSend() {
+  async onSend() {
     const text = (this.data.inputValue || '').trim();
-    if (!text) return;
-    const ownerMsg = { id: nextMessageId('owner'), role: 'owner', text: text };
+    if (!text || this.sending) return;
+
+    const ownerMsg = { id: nextMessageId('owner'), role: 'owner', text };
     this.setData({
       messages: this.data.messages.concat(ownerMsg),
       inputValue: '',
       scrollIntoId: ownerMsg.id,
     });
-    // mock 回复：固定的温暖回复，不调用真实模型
-    setTimeout(() => {
-      const reply = {
-        id: nextMessageId('vibe'),
-        role: 'vibe',
-        text: '谢谢你告诉我这些。你说过的我都先放在心里，但只有你确认过的，我才会真正记住。',
-      };
-      this.setData({
-        messages: this.data.messages.concat(reply),
-        scrollIntoId: reply.id,
+
+    if (this.demoMode) {
+      // fixture 演示回复
+      setTimeout(() => {
+        const reply = {
+          id: nextMessageId('vibe'),
+          role: 'vibe',
+          text: '谢谢你告诉我这些。你说过的我都先放在心里，但只有你确认过的，我才会真正记住。',
+        };
+        this.setData({
+          messages: this.data.messages.concat(reply),
+          scrollIntoId: reply.id,
+        });
+      }, 400);
+      return;
+    }
+
+    this.sending = true;
+    try {
+      await this.persistMessage('owner', text);
+
+      // agent.ownerMessage：结构化校验后的回复 + 最多一条记忆提议
+      const history = this.data.messages.slice(-12).map((m) => ({
+        role: m.role === 'owner' ? 'user' : 'assistant',
+        content: m.text,
+      }));
+      const res = await cloud.callFunction('agent', { action: 'ownerMessage', messages: history });
+
+      if (!res || res.ok !== true) {
+        // 模型不可用：聊天不中断，消息不丢（AI_BEHAVIOR.md 失败文案）
+        this.appendVibeMessage('我现在有点连不上，刚才的话不会丢。可以稍后再试。');
+        return;
+      }
+
+      const result = res.result;
+      this.appendVibeMessage(result.reply);
+      await this.persistMessage('vibe', result.reply);
+
+      // 记忆提议：先存 proposed（不可检索），主人确认后才生效
+      if (result.memoryProposal && !this.data.proposal) {
+        try {
+          const created = await cloud.callFunction('memory', {
+            action: 'createMemoryProposal',
+            kind: result.memoryProposal.kind,
+            content: result.memoryProposal.content,
+            visibility: result.memoryProposal.suggestedVisibility || 'private',
+            sourceConversationId: this.conversationId || '',
+            sourceMessageIds: result.memoryProposal.sourceMessageIds || [],
+          });
+          const proposal = {
+            id: nextMessageId('proposal'),
+            memoryId: created.memory && created.memory._id,
+            text: result.memoryProposal.content,
+            state: 'pending',
+            editText: '',
+          };
+          this.setData({ proposal, scrollIntoId: 'proposal-card' });
+        } catch (err) {
+          // 提取失败不影响聊天主流程
+          console.warn('[vibe] createMemoryProposal failed:', err && err.message);
+        }
+      }
+    } catch (err) {
+      console.warn('[vibe] ownerMessage failed:', err && err.message);
+      this.appendVibeMessage('我现在有点连不上，刚才的话不会丢。可以稍后再试。');
+    } finally {
+      this.sending = false;
+    }
+  },
+
+  appendVibeMessage(text) {
+    const reply = { id: nextMessageId('vibe'), role: 'vibe', text };
+    this.setData({
+      messages: this.data.messages.concat(reply),
+      scrollIntoId: reply.id,
+    });
+  },
+
+  async persistMessage(role, text) {
+    try {
+      const res = await cloud.callFunction('memory', {
+        action: 'appendMessage',
+        conversationId: this.conversationId || undefined,
+        mode: 'owner',
+        role,
+        content: text,
       });
-    }, 400);
+      if (res && res.conversationId) this.conversationId = res.conversationId;
+    } catch (err) {
+      // 持久化失败不阻塞聊天
+      console.warn('[vibe] appendMessage failed:', err && err.message);
+    }
   },
 });

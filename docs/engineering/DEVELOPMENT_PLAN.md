@@ -271,7 +271,17 @@ Dependencies: 1.1
 
 ## 1.3 Implement Owner Conversation
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-19, on `main`. Mini Program `pages/vibe` now wires the real chain: send → `agent.ownerMessage` (schema-validated reply + at most one proposal) → `memory.appendMessage` persistence → proposal card → `memory.createMemoryProposal` / `confirmMemory` / `deleteMemory`; 「已记住」list comes from `listMemories` (confirmed only)
+- Failure behavior per AI_BEHAVIOR.md: agent/provider failure → "我现在有点连不上，刚才的话不会丢。可以稍后再试。" and the chat stays usable; persistence failures never block the chat; confirm failure keeps the proposal pending with a retry toast
+- Rejected proposals are soft-deleted and are never retrievable (retrieval = confirmed only, enforced in 1.1)
+- Cloud unavailable (undeployed env / logged out) → automatic fallback to the 0.4 fixture demo path, so the competition demo never breaks
+- Validation: `node --check` ✅; node stub smoke tests covering demo fallback, full real path (send → proposal → confirm → list refresh), and agent-failure path — all pass
+- Intentional deviation: Web `MyVibePage` stays on fixtures — the first backend is WeChat Cloud Development and the web has no cloud session; a shared HTTP API is needed before web can use the real chain (noted for post-MVP / platform adapter work)
+- Not verifiable here: deployment + invocation inside WeChat DevTools (owner's cloud env)
 
 Owners: Lane A and Lane D
 
