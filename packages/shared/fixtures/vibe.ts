@@ -171,6 +171,63 @@ export const fixtureConnectionRequest: ConnectionRequest = {
 };
 
 /**
+ * Task 5.2 Core fixtures: confirmed memories behind stricter visibilities.
+ * Kept as a SEPARATE export from `fixtureOwnerMemories` so existing demo
+ * surfaces (which render that list) are unchanged; Core permission tests
+ * combine both lists to prove visitor contexts can never include these.
+ */
+export const fixtureOwnerSensitiveMemories: Memory[] = [
+  {
+    id: 'fixture-memory-connected-collaboration',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    kind: 'fact',
+    content: '正在和一位已连接的朋友合写一篇关于个人数据主权的文章，尚未公开。',
+    visibility: 'connected',
+    status: 'confirmed',
+    sourceConversationId: 'fixture-conversation-owner-4',
+    sourceMessageIds: ['fixture-message-5'],
+    createdAt: T0 - 20 * hour,
+    updatedAt: T0 - 20 * hour,
+  },
+  {
+    id: 'fixture-memory-private-health-note',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    kind: 'preference',
+    content: '晚上十点以后不回复任何工作消息，要留出陪家人的时间。',
+    visibility: 'private',
+    status: 'confirmed',
+    sourceConversationId: 'fixture-conversation-owner-5',
+    sourceMessageIds: ['fixture-message-6'],
+    createdAt: T0 - 10 * hour,
+    updatedAt: T0 - 10 * hour,
+  },
+];
+
+/**
+ * A v1 users document for 林舟, as stored by the legacy product (ARCHITECTURE
+ * §9). Deliberately carries contact-bearing namecard keys so migration tests
+ * can prove they never reach a public Card draft. All values are fictional.
+ */
+export const fixtureV1UserProfile = {
+  nickname: fixtureOwner.name,
+  avatar: fixtureOwner.avatarUrl,
+  bio: '在做一张会越来越懂你的 AI 名片',
+  namecard: {
+    motto: '先理解，再认识。',
+    intro: '独立开发者，做微信生态里的个人 AI 产品。',
+    theme: 'dawn',
+    coverImage: 'https://cdn.example.com/fixture-cover.png',
+    interests: ['个人 AI 分身', '隐私边界', '微信生态', '独立开发'],
+    // Contact data that must NEVER be projected into a public Card:
+    wechat: 'fixture-wechat-linzhou',
+    socialLinks: ['https://example.com/fixture-profile'],
+    contacts: { email: 'linzhou@mail.example.com' },
+  },
+};
+
+/**
  * Task 4.3 demo data: a second visitor whose request is deliberately weak
  * (the exact "想认识一下" anti-pattern from AI_BEHAVIOR.md §7). The owner
  * inbox shows it next to 苏晴's strong request so the demo can contrast the

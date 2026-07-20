@@ -821,7 +821,17 @@ Dependencies: Milestone 4
 
 ## 5.2 Extract A Platform-Independent Core
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-21, on branch `feature/task-5.2-platform-core`. Stayed in `packages/shared` (no new `packages/core`): the package was already pure TS with zero platform imports, so a new package would have duplicated contracts without removing real coupling.
+- New Core modules (pure, platform-free): `memory.ts` (confirmation & lifecycle: propose/confirm/edit/pause/resume/delete with coded `MemoryTransitionError`), `visibility.ts` (ARCHITECTURE §7 role filtering: `memoriesForOwner`, `memoriesForVisitorQuote` public-only, `memoriesForVisitorBoundary` agent_only-never-quotable, defensive `forbiddenForVisitor` second net), `public-card.ts` (`buildPublicCard`: Card + ≤3 newest published non-expired Now items, public-safe fields only), `connection.ts` (pending/later → connect/later/decline transitions; `sharedContactMethodIds` only on connect; rate-limit/block gates), `agent-schema.ts` (hand-rolled validators for `OwnerAgentResult`/`VisitorAgentResult`/`ConnectionSummary`, incl. draft-only `nowProposal`; score-shaped output rejected), `migration.ts` (pure v1 profile → Card draft, strips contact/social keys, preserves owner-written text).
+- Clients: web `MyVibePage` now consumes `memoriesForOwner` from the Core (last local permission filter removed). Mini Program cloud functions are per-directory CJS and cannot require a TS package at deploy time, so JS mirrors remain but `packages/shared/test/parity.test.ts` runs Core TS and every JS mirror over identical fixture inputs asserting identical outputs (incl. error codes and full `buildPublicCard` deep-equality) — drift fails loudly.
+- Browser-compatibility proof: static platform-free test greps all Core sources for `window`/`document`/`localStorage`/`wx.`/`process.`/`require(`/model SDKs, plus a coverage test forcing new Core files to enroll.
+- Validation: Core tests **61/61** (`npm test --workspace=packages/shared`: memory 9, visibility 6, public-card 7, connection 8, agent-schema 7, migration 6, parity 13, platform-free 3); `npm run lint` ✅, `npm run build` ✅; miniprogram page tests 50/50; cloud functions memory 17/17, agent 57/57, card 13/13, now 16/16, requests 24/24, content-check 7/7; web e2e **70/70**.
+- Deviation recorded: Now lifecycle transitions (publish/archive/hide/delete) remain in parity-tested mirrors rather than Core TS — only Now projection was required here; a candidate follow-up for 5.3.
+- Environment note: e2e initially failed because a stray `dailyflow` vite server kept grabbing port 3000; validated on a freed port. Pre-existing flake, unrelated to this task.
 
 Owner: Core
 
