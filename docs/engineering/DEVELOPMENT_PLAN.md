@@ -915,7 +915,14 @@ Dependencies: 5.2
 
 ## 5.4 Add Model Provider Adapters
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.4-model-adapters` (off `main` @ fcce3cd)
+- Owner: AI lane (`packages/shared/` + `packages/miniprogram/cloudfunctions/agent/`); one implementation sub-agent; coordinating agent integrates
+- Current phase: provider-neutral interface, deterministic mock, OpenAI-compatible HTTP provider, BYOK config, capability declarations, typed errors
+- Remaining: adapter documentation, behavior tests with both providers, validation, completion entry
 
 Owner: AI
 
