@@ -485,18 +485,13 @@ Page({
         canvas.width = width;
         canvas.height = height;
 
-        // 深色极光底；人是唯一主角，不放任何品牌和广告
-        ctx.fillStyle = '#0b0b0e';
+        // 与 App 内名片一致的浅灰底 + 极淡 indigo 光晕；人是唯一主角，无品牌广告
+        ctx.fillStyle = '#f7f7f8';
         ctx.fillRect(0, 0, width, height);
 
-        let glow = ctx.createRadialGradient(width - 80, 60, 0, width - 80, 60, 420);
-        glow.addColorStop(0, 'rgba(99,102,241,0.40)');
+        let glow = ctx.createRadialGradient(width - 60, 40, 0, width - 60, 40, 420);
+        glow.addColorStop(0, 'rgba(99,102,241,0.12)');
         glow.addColorStop(1, 'rgba(99,102,241,0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(0, 0, width, height);
-        glow = ctx.createRadialGradient(60, height - 40, 0, 60, height - 40, 380);
-        glow.addColorStop(0, 'rgba(168,130,255,0.26)');
-        glow.addColorStop(1, 'rgba(168,130,255,0)');
         ctx.fillStyle = glow;
         ctx.fillRect(0, 0, width, height);
 
@@ -505,7 +500,7 @@ Page({
           const avatarCx = 140;
           const avatarCy = 150;
           const avatarR = 64;
-          ctx.fillStyle = 'rgba(129,140,248,0.35)';
+          ctx.fillStyle = '#e6e6fb';
           ctx.beginPath(); ctx.arc(avatarCx, avatarCy, avatarR + 10, 0, Math.PI * 2); ctx.fill();
           if (img) {
             ctx.save();
@@ -533,11 +528,11 @@ Page({
           // 名字 + handle
           const textX = 248;
           const textMax = width - textX - 64;
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = '#16161a';
           ctx.font = 'bold 60px -apple-system, SF Pro Display, PingFang SC, sans-serif';
           ctx.fillText(fitCanvasText(ctx, profile.name, textMax), textX, 158);
           if (profile.handle) {
-            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.fillStyle = '#8e8e93';
             ctx.font = '27px -apple-system, SF Pro Display, PingFang SC, sans-serif';
             ctx.fillText(fitCanvasText(ctx, profile.handle, textMax), textX, 202);
           }
@@ -553,20 +548,17 @@ Page({
           for (const label of allTags.slice(0, 4)) {
             const chipWidth = ctx.measureText(label).width + 32;
             if (tagX + chipWidth > tagMaxRight) break;
-            ctx.fillStyle = 'rgba(255,255,255,0.10)';
+            ctx.fillStyle = '#eceefe';
             ctx.beginPath();
             drawRoundRectPath(ctx, tagX, tagY, chipWidth, 40, 20);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#4f46e5';
             ctx.fillText(label, tagX + 16, tagY + 28);
             tagX += chipWidth + 12;
           }
 
           // 分隔线
-          ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+          ctx.strokeStyle = 'rgba(17,17,19,0.08)';
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(64, 320);
@@ -576,7 +568,7 @@ Page({
           // 关于我：简介 > 最新动态（最多两行）
           const about = profile.bio || profile.latestMoment || '';
           if (about) {
-            ctx.fillStyle = 'rgba(255,255,255,0.88)';
+            ctx.fillStyle = '#3f3f46';
             ctx.font = '28px -apple-system, SF Pro Display, PingFang SC, sans-serif';
             const words = String(about).split('');
             const lines = [];
@@ -603,10 +595,10 @@ Page({
 
           // 想认识什么样的人（名片的灵魂）
           if (profile.lookingFor) {
-            ctx.fillStyle = '#818cf8';
+            ctx.fillStyle = '#6366f1';
             ctx.font = 'bold 22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
             ctx.fillText('LOOKING FOR', 64, 490);
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#16161a';
             ctx.font = 'bold 31px -apple-system, SF Pro Display, PingFang SC, sans-serif';
             ctx.fillText(fitCanvasText(ctx, profile.lookingFor, width - 128), 64, 534);
           }
@@ -625,7 +617,8 @@ Page({
           });
         };
 
-        const avatarUrl = profile.avatar && !profile.avatar.includes('dicebear.com')
+        // dicebear 生成头像同样真实绘制：/svg -> /png；仅无头像时用首字母兜底
+        const avatarUrl = profile.avatar
           ? profile.avatar.replace('/svg?', '/png?')
           : null;
 
