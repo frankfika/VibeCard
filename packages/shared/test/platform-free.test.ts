@@ -27,6 +27,7 @@ const CORE_FILES = [
   'connection.ts',
   'agent-schema.ts',
   'migration.ts',
+  'archive.ts',
   'index.ts',
   join('fixtures', 'vibe.ts'),
   join('fixtures', 'now.ts'),
