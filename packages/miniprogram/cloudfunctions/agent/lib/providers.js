@@ -53,7 +53,13 @@ function mockVisitorReply(system, text) {
     };
   }
   if (GROUNDED_PATTERN.test(text)) {
-    const refs = [...system.matchAll(/\[(mem:[^\]]+|card:[^\]]+)\]/g)].map(m => m[1]).slice(0, 2);
+    let refs = [...system.matchAll(/\[(now:[^\]]+|mem:[^\]]+|card:[^\]]+)\]/g)].map(m => m[1]).slice(0, 2);
+    // Recent-context questions (task 4.5): prefer Now items, then public
+    // current-focus memory; if neither exists, admit uncertainty below
+    // instead of citing unrelated evidence.
+    if (/最近/.test(text)) {
+      refs = [...system.matchAll(/\[(now:[^\]]+|card:currentFocus)\]/g)].map(m => m[1]).slice(0, 2);
+    }
     if (refs.length > 0) {
       return {
         reply: '这个我知道一些，都写在他的公开名片上。你可以顺着证据里的方向问得更具体一点，或者告诉我你为什么想认识他。',
@@ -142,6 +148,15 @@ function createMockProvider() {
             }
           : null,
         cardUpdateSuggested: false,
+        // Now proposal (task 4.5): a concrete recent update is proposed as a
+        // draft only — never published by the agent.
+        nowProposal: /最近在|刚完成|完成了/.test(text)
+          ? {
+              text: text.length > 60 ? `${text.slice(0, 60)}…` : text,
+              topic: /刚完成|完成了/.test(text) ? 'completed_work' : 'current_work',
+              expiresAt: null,
+            }
+          : null,
         ...(recall && memoryIds.length > 0 ? { referencedMemoryIds: memoryIds.slice(0, 1) } : {}),
       };
       return JSON.stringify(result);
