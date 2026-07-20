@@ -112,8 +112,8 @@
 .avatar { width: 180rpx; height: 180rpx; border-radius: 50%; background: #eceefe; position: relative; z-index: 1; box-shadow: 0 12rpx 40rpx rgba(99, 102, 241, 0.16); }
 .avatar-placeholder { background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 80rpx; font-weight: bold; }
 
-.profile-name { font-size: 48rpx; font-weight: 800; margin-bottom: 8rpx; color: #16161a; letter-spacing: -1rpx; }
-.profile-handle { font-size: 28rpx; color: #8e8e93; font-weight: 500; }
+.profile-name { font-size: 48rpx; font-weight: 800; margin-bottom: 8rpx; color: #16161a; letter-spacing: -1rpx; max-width: 620rpx; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-handle { font-size: 28rpx; color: #8e8e93; font-weight: 500; max-width: 620rpx; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .tags-wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 16rpx; margin-bottom: 48rpx; }
 .profile-tag {
