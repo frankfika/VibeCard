@@ -443,10 +443,8 @@ Page({
       // never travel inside the share link, only through owner-approved exchange.
       const publicProfile = { ...profile, verified: undefined };
       const data = encodeURIComponent(JSON.stringify(publicProfile));
-      const handleStr = profile.handle ? ` @${profile.handle}` : '';
-      const lookingStr = profile.lookingFor ? ` · ${profile.lookingFor}` : '';
-      const tagStr = profile.tags && profile.tags.length > 0 ? ` · ${profile.tags.map(t => t.label).join(' ')}` : '';
-      const title = `${profile.name}${handleStr}${lookingStr}${tagStr}`;
+      // 标题即名片的自我表达：这是「我的 AI 名片」，并告诉对方能做什么
+      const title = `${profile.name}的 AI 名片 · 先和我的 Vibe 聊聊`;
 
       const promise = new Promise(resolve => {
         this.drawShareCanvas(profile).then(tempFilePath => {
@@ -487,94 +485,97 @@ Page({
         canvas.width = width;
         canvas.height = height;
 
-        // 大胆 indigo 渐变底 + 白字，年轻有趣、居中排版
-        const bg = ctx.createLinearGradient(0, 0, width, height);
-        bg.addColorStop(0, '#6366f1');
-        bg.addColorStop(0.55, '#818cf8');
-        bg.addColorStop(1, '#a5b4fc');
-        ctx.fillStyle = bg;
+        // 浅色底 + 白色实体名片：一眼认出「这是一张名片」
+        ctx.fillStyle = '#eceef6';
         ctx.fillRect(0, 0, width, height);
 
-        // 装饰气泡（半透明白圆，制造趣味层次）
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.beginPath(); ctx.arc(width - 60, 60, 140, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(80, height - 60, 180, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath(); ctx.arc(width - 180, height - 100, 46, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(150, 110, 30, 0, Math.PI * 2); ctx.fill();
+        const cardX = 54, cardY = 44, cardW = width - 108, cardH = 452;
+        // 卡片投影（柔和）
+        ctx.fillStyle = 'rgba(99,102,241,0.10)';
+        ctx.beginPath();
+        drawRoundRectPath(ctx, cardX, cardY + 10, cardW, cardH, 40);
+        ctx.fill();
+        // 卡片本体
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        drawRoundRectPath(ctx, cardX, cardY, cardW, cardH, 40);
+        ctx.fill();
 
         const renderContent = (img) => {
-          const cx = width / 2;
-
-          // 头像：白色圆环 + indigo 实心兜底
-          const avatarCy = 158;
-          const avatarR = 76;
-          ctx.fillStyle = 'rgba(255,255,255,0.35)';
-          ctx.beginPath(); ctx.arc(cx, avatarCy, avatarR + 10, 0, Math.PI * 2); ctx.fill();
+          // 头像：浅 indigo 圆环 + indigo 渐变兜底
+          const avatarCx = cardX + 96;
+          const avatarCy = cardY + 108;
+          const avatarR = 60;
+          ctx.fillStyle = '#eceefe';
+          ctx.beginPath(); ctx.arc(avatarCx, avatarCy, avatarR + 8, 0, Math.PI * 2); ctx.fill();
           if (img) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(cx, avatarCy, avatarR, 0, Math.PI * 2);
+            ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2);
             ctx.clip();
-            ctx.drawImage(img, cx - avatarR, avatarCy - avatarR, avatarR * 2, avatarR * 2);
+            ctx.drawImage(img, avatarCx - avatarR, avatarCy - avatarR, avatarR * 2, avatarR * 2);
             ctx.restore();
           } else {
-            ctx.fillStyle = '#4f46e5';
-            ctx.beginPath(); ctx.arc(cx, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
+            const grd = ctx.createLinearGradient(avatarCx - avatarR, avatarCy - avatarR, avatarCx + avatarR, avatarCy + avatarR);
+            grd.addColorStop(0, '#818cf8');
+            grd.addColorStop(1, '#6366f1');
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
             const initial = profile.name ? profile.name.charAt(0).toUpperCase() : '?';
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 68px sans-serif';
+            ctx.font = 'bold 56px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(initial, cx, avatarCy + 4);
+            ctx.fillText(initial, avatarCx, avatarCy + 4);
           }
-          ctx.textAlign = 'center';
+          ctx.textAlign = 'left';
           ctx.textBaseline = 'alphabetic';
 
-          // 名字（超大粗体白字，过长截断）
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 58px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText(fitCanvasText(ctx, profile.name, 620), cx, 316);
-
-          // Handle
+          // 名字 + handle（卡片右上区域）
+          const textX = cardX + 190;
+          const textMax = cardX + cardW - textX - 40;
+          ctx.fillStyle = '#16161a';
+          ctx.font = 'bold 48px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+          ctx.fillText(fitCanvasText(ctx, profile.name, textMax), textX, cardY + 96);
           if (profile.handle) {
-            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            ctx.fillStyle = '#8e8e93';
             ctx.font = '26px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            ctx.fillText(fitCanvasText(ctx, profile.handle, 500), cx, 356);
+            ctx.fillText(fitCanvasText(ctx, profile.handle, textMax), textX, cardY + 140);
           }
 
-          // 标签：半透明白 chips，整体居中
+          // 标签 chips（indigo 软底）
           ctx.font = '24px -apple-system, SF Pro Display, PingFang SC, sans-serif';
           const tags = profile.tags || [];
           const allTags = (profile.event ? [{ label: profile.event }, ...tags] : tags)
             .map(t => String(t.label || '')).filter(Boolean);
-          const chipGap = 14;
-          const chipHeight = 42;
-          const chips = [];
-          let totalWidth = 0;
+          let tagX = textX;
+          const tagY = cardY + 166;
+          const tagMaxRight = cardX + cardW - 36;
           for (const label of allTags.slice(0, 4)) {
-            const w = ctx.measureText(label).width + 32;
-            if (totalWidth + w + (chips.length ? chipGap : 0) > 600) break;
-            totalWidth += w + (chips.length ? chipGap : 0);
-            chips.push({ label, w });
-          }
-          let tagX = cx - totalWidth / 2;
-          const tagY = 384;
-          for (const chip of chips) {
-            ctx.fillStyle = 'rgba(255,255,255,0.22)';
+            const chipWidth = ctx.measureText(label).width + 32;
+            if (tagX + chipWidth > tagMaxRight) break;
+            ctx.fillStyle = '#eceefe';
             ctx.beginPath();
-            drawRoundRectPath(ctx, tagX, tagY, chip.w, chipHeight, chipHeight / 2);
+            drawRoundRectPath(ctx, tagX, tagY, chipWidth, 42, 21);
             ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(chip.label, tagX + chip.w / 2, tagY + 30);
-            tagX += chip.w + chipGap;
+            ctx.fillStyle = '#4f46e5';
+            ctx.fillText(label, tagX + 16, tagY + 29);
+            tagX += chipWidth + 14;
           }
 
-          // 一句话钩子：简介 > 最新动态 > lookingFor（居中，最多两行）
+          // 分隔线
+          ctx.strokeStyle = 'rgba(17,17,19,0.07)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(cardX + 48, cardY + 250);
+          ctx.lineTo(cardX + cardW - 48, cardY + 250);
+          ctx.stroke();
+
+          // 一句话表达：简介 > 最新动态 > lookingFor（最多两行）
           const hook = profile.bio || profile.latestMoment
             || (profile.lookingFor ? '想认识：' + profile.lookingFor : '');
           if (hook) {
-            ctx.fillStyle = 'rgba(255,255,255,0.92)';
+            ctx.fillStyle = '#3f3f46';
             ctx.font = '27px -apple-system, SF Pro Display, PingFang SC, sans-serif';
             const words = String(hook).split('');
             const lines = [];
@@ -582,7 +583,7 @@ Page({
             let truncated = false;
             for (let n = 0; n < words.length; n++) {
               const testLine = line + words[n];
-              if (ctx.measureText(testLine).width > 560 && line) {
+              if (ctx.measureText(testLine).width > cardW - 96 && line) {
                 lines.push(line);
                 line = words[n];
                 if (lines.length === 2) { truncated = true; break; }
@@ -591,18 +592,38 @@ Page({
               }
             }
             if (!truncated && line && lines.length < 2) lines.push(line);
-            let y = 486;
+            let y = cardY + 306;
             lines.slice(0, 2).forEach((l, i) => {
               const isLast = truncated && i === 1;
-              ctx.fillText(isLast ? fitCanvasText(ctx, l, 530) : l, cx, y);
+              ctx.fillText(isLast ? fitCanvasText(ctx, l, cardW - 130) : l, cardX + 48, y);
               y += 42;
             });
           }
 
-          // 底部品牌
-          ctx.fillStyle = 'rgba(255,255,255,0.6)';
-          ctx.font = 'bold 22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText('VibeCard · 会越来越懂你的 AI 名片', cx, height - 34);
+          // CTA：indigo 主按钮，告诉对方下一步做什么
+          const ctaText = '先和我的 Vibe 聊聊';
+          ctx.font = 'bold 26px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+          const ctaW = ctx.measureText(ctaText).width + 96;
+          const ctaH = 58;
+          const ctaX = cardX + (cardW - ctaW) / 2;
+          const ctaY = cardY + cardH - ctaH - 32;
+          const ctaGrd = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
+          ctaGrd.addColorStop(0, '#818cf8');
+          ctaGrd.addColorStop(1, '#6366f1');
+          ctx.fillStyle = ctaGrd;
+          ctx.beginPath();
+          drawRoundRectPath(ctx, ctaX, ctaY, ctaW, ctaH, ctaH / 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.fillText(ctaText + '  →', cardX + cardW / 2, ctaY + 39);
+          ctx.textAlign = 'left';
+
+          // 底部品牌（远离下边缘，避免聊天气泡裁切）
+          ctx.fillStyle = '#a8a8b0';
+          ctx.font = '22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('VibeCard · 会越来越懂你的 AI 名片', width / 2, height - 52);
           ctx.textAlign = 'left';
 
           // Export
