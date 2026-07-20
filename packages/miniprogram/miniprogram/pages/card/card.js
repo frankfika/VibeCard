@@ -485,92 +485,61 @@ Page({
         canvas.width = width;
         canvas.height = height;
 
-        // 硅谷 OG 卡：深底 + 极光渐变 + 超大字，一眼认出「这是一张 AI 名片」
+        // 深色极光底；人是唯一主角，不放任何品牌和广告
         ctx.fillStyle = '#0b0b0e';
         ctx.fillRect(0, 0, width, height);
 
-        // 极光光晕
         let glow = ctx.createRadialGradient(width - 80, 60, 0, width - 80, 60, 420);
-        glow.addColorStop(0, 'rgba(99,102,241,0.45)');
+        glow.addColorStop(0, 'rgba(99,102,241,0.40)');
         glow.addColorStop(1, 'rgba(99,102,241,0)');
         ctx.fillStyle = glow;
         ctx.fillRect(0, 0, width, height);
         glow = ctx.createRadialGradient(60, height - 40, 0, 60, height - 40, 380);
-        glow.addColorStop(0, 'rgba(168,130,255,0.30)');
+        glow.addColorStop(0, 'rgba(168,130,255,0.26)');
         glow.addColorStop(1, 'rgba(168,130,255,0)');
         ctx.fillStyle = glow;
         ctx.fillRect(0, 0, width, height);
 
         const renderContent = (img) => {
-          // 顶部：品牌标识 + 「AI 名片」定位 chip
-          ctx.fillStyle = '#6366f1';
-          ctx.beginPath();
-          drawRoundRectPath(ctx, 64, 52, 40, 40, 12);
-          ctx.fill();
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 24px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('V', 84, 74);
+          // 大头像 + 光晕圆环
+          const avatarCx = 140;
+          const avatarCy = 150;
+          const avatarR = 64;
+          ctx.fillStyle = 'rgba(129,140,248,0.35)';
+          ctx.beginPath(); ctx.arc(avatarCx, avatarCy, avatarR + 10, 0, Math.PI * 2); ctx.fill();
+          if (img) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(img, avatarCx - avatarR, avatarCy - avatarR, avatarR * 2, avatarR * 2);
+            ctx.restore();
+          } else {
+            const grd = ctx.createLinearGradient(avatarCx - avatarR, avatarCy - avatarR, avatarCx + avatarR, avatarCy + avatarR);
+            grd.addColorStop(0, '#818cf8');
+            grd.addColorStop(1, '#6366f1');
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
+            const initial = profile.name ? profile.name.charAt(0).toUpperCase() : '?';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 58px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(initial, avatarCx, avatarCy + 4);
+          }
           ctx.textAlign = 'left';
           ctx.textBaseline = 'alphabetic';
-          ctx.font = 'bold 26px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText('VibeCard', 120, 84);
 
-          const posText = 'AI 名片';
-          ctx.font = '22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          const posW = ctx.measureText(posText).width + 36;
-          ctx.fillStyle = 'rgba(255,255,255,0.08)';
-          ctx.beginPath();
-          drawRoundRectPath(ctx, width - 64 - posW, 52, posW, 40, 20);
-          ctx.fill();
-          ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(255,255,255,0.85)';
-          ctx.textAlign = 'center';
-          ctx.fillText(posText, width - 64 - posW / 2, 80);
-          ctx.textAlign = 'left';
-
-          // 超大名字（hero 排版）
+          // 名字 + handle
+          const textX = 248;
+          const textMax = width - textX - 64;
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 84px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText(fitCanvasText(ctx, profile.name, width - 128), 64, 250);
-
-          // Handle
+          ctx.font = 'bold 60px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+          ctx.fillText(fitCanvasText(ctx, profile.name, textMax), textX, 158);
           if (profile.handle) {
             ctx.fillStyle = 'rgba(255,255,255,0.55)';
-            ctx.font = '28px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            ctx.fillText(fitCanvasText(ctx, profile.handle, width - 128), 64, 300);
-          }
-
-          // 一句话表达：简介 > 最新动态 > lookingFor（最多两行）
-          const hook = profile.bio || profile.latestMoment
-            || (profile.lookingFor ? '想认识：' + profile.lookingFor : '');
-          if (hook) {
-            ctx.fillStyle = 'rgba(255,255,255,0.85)';
             ctx.font = '27px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            const words = String(hook).split('');
-            const lines = [];
-            let line = '';
-            let truncated = false;
-            for (let n = 0; n < words.length; n++) {
-              const testLine = line + words[n];
-              if (ctx.measureText(testLine).width > width - 128 && line) {
-                lines.push(line);
-                line = words[n];
-                if (lines.length === 2) { truncated = true; break; }
-              } else {
-                line = testLine;
-              }
-            }
-            if (!truncated && line && lines.length < 2) lines.push(line);
-            let y = 352;
-            lines.slice(0, 2).forEach((l, i) => {
-              const isLast = truncated && i === 1;
-              ctx.fillText(isLast ? fitCanvasText(ctx, l, width - 170) : l, 64, y);
-              y += 42;
-            });
+            ctx.fillText(fitCanvasText(ctx, profile.handle, textMax), textX, 202);
           }
 
           // 标签：玻璃 chips
@@ -578,8 +547,8 @@ Page({
           const tags = profile.tags || [];
           const allTags = (profile.event ? [{ label: profile.event }, ...tags] : tags)
             .map(t => String(t.label || '')).filter(Boolean);
-          let tagX = 64;
-          const tagY = 424;
+          let tagX = textX;
+          const tagY = 226;
           const tagMaxRight = width - 64;
           for (const label of allTags.slice(0, 4)) {
             const chipWidth = ctx.measureText(label).width + 32;
@@ -596,47 +565,51 @@ Page({
             tagX += chipWidth + 12;
           }
 
-          // 底部分隔线
-          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          // 分隔线
+          ctx.strokeStyle = 'rgba(255,255,255,0.10)';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(64, 500);
-          ctx.lineTo(width - 64, 500);
+          ctx.moveTo(64, 320);
+          ctx.lineTo(width - 64, 320);
           ctx.stroke();
 
-          // 底部：头像 + CTA
-          const avatarCx = 100;
-          const avatarCy = 550;
-          const avatarR = 32;
-          if (img) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2);
-            ctx.clip();
-            ctx.drawImage(img, avatarCx - avatarR, avatarCy - avatarR, avatarR * 2, avatarR * 2);
-            ctx.restore();
-          } else {
-            const grd = ctx.createLinearGradient(avatarCx - avatarR, avatarCy - avatarR, avatarCx + avatarR, avatarCy + avatarR);
-            grd.addColorStop(0, '#818cf8');
-            grd.addColorStop(1, '#6366f1');
-            ctx.fillStyle = grd;
-            ctx.beginPath(); ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
-            const initial = profile.name ? profile.name.charAt(0).toUpperCase() : '?';
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 30px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(initial, avatarCx, avatarCy + 2);
+          // 关于我：简介 > 最新动态（最多两行）
+          const about = profile.bio || profile.latestMoment || '';
+          if (about) {
+            ctx.fillStyle = 'rgba(255,255,255,0.88)';
+            ctx.font = '28px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+            const words = String(about).split('');
+            const lines = [];
+            let line = '';
+            let truncated = false;
+            for (let n = 0; n < words.length; n++) {
+              const testLine = line + words[n];
+              if (ctx.measureText(testLine).width > width - 128 && line) {
+                lines.push(line);
+                line = words[n];
+                if (lines.length === 2) { truncated = true; break; }
+              } else {
+                line = testLine;
+              }
+            }
+            if (!truncated && line && lines.length < 2) lines.push(line);
+            let y = 380;
+            lines.slice(0, 2).forEach((l, i) => {
+              const isLast = truncated && i === 1;
+              ctx.fillText(isLast ? fitCanvasText(ctx, l, width - 170) : l, 64, y);
+              y += 44;
+            });
           }
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'alphabetic';
 
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 27px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText('先和我的 Vibe 聊聊', 152, 542);
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          ctx.font = '22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText('它会告诉你我为什么值得认识 →', 152, 574);
+          // 想认识什么样的人（名片的灵魂）
+          if (profile.lookingFor) {
+            ctx.fillStyle = '#818cf8';
+            ctx.font = 'bold 22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+            ctx.fillText('LOOKING FOR', 64, 490);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 31px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+            ctx.fillText(fitCanvasText(ctx, profile.lookingFor, width - 128), 64, 534);
+          }
 
           // Export
           wx.canvasToTempFilePath({
