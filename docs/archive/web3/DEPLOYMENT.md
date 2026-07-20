@@ -1,6 +1,6 @@
-# VibeCard 部署指南
+# VibeCard Web3 v1 部署指南（历史能力）
 
-> 本指南覆盖从合约部署到前端上线的完整流程。执行前请确认所有 [上线前检查清单](../TEST_REPORT.md) 中的项目。
+> 本指南覆盖旧 Web3 版本从合约部署到前端上线的完整流程。对应检查清单见 [`../TEST_REPORT_WEB3_V1.md`](../TEST_REPORT_WEB3_V1.md)。
 
 ---
 

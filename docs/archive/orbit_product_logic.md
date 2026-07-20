@@ -1,4 +1,4 @@
-# Orbit (formerly Bonjour) Web3 Product Logic
+# Orbit (formerly Bonjour) Web3 Product Logic (Archived)
 
 ## 1. Document Purpose
 This document defines the product logic, viral growth mechanics, identity system, and MVP for **Orbit** (the upgraded Web3 identity and connection protocol). 
