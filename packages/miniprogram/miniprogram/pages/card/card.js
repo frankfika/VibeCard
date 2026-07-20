@@ -36,8 +36,8 @@ const TAG_OPTIONS = [
   '🎤 Speaker', '☕ Coffee Chat'
 ];
 const LOOKING_FOR_OPTIONS = [
-  '🚀 找合伙人', '💼 寻找机会', '🤝 寻求投资',
-  '☕️ 随便聊聊', '💡 交流想法', '👥 招募队友'
+  '找合伙人', '寻找机会', '寻求投资',
+  '随便聊聊', '交流想法', '招募队友'
 ];
 const EVENT_OPTIONS = ['ETHGlobal', 'Devcon', 'Token2049', 'Hackathon', 'Remote', 'Local'];
 
