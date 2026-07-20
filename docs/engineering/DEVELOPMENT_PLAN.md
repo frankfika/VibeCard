@@ -704,19 +704,17 @@ Owner: Lane D
 
 ## 4.5 Add Personal Now Updates
 
-Status: `[~]`
+Status: `[x]`
 
-Progress:
+Completion:
 
-- Started 2026-07-21 on coordination branch `feature/task-4.5-personal-now`
-- Parallel sub-agents with strict directory ownership:
-  - Agent A (Core): `packages/shared/` — versioned `NowItem` contract, fixtures, pure helpers, branch `feat/task-4.5-now-shared`
-  - Agent B (Web): `packages/web/` — owner Now management, Vibe Now proposal with owner confirmation, Card/Public Card display (max 3), visitor grounding, Playwright E2E, branch `feat/task-4.5-now-web`
-  - Agent C (Mini Program): `packages/miniprogram/` — cloud storage + owner permissions, Now actions, Card display, Vibe draft proposal, visitor chat grounding, page/cloud-function tests, branch `feat/task-4.5-now-miniprogram`
-- Canonical `NowItem` field definition is fixed by the coordinating agent; sub-agents must not invent divergent models
-- Current phase: parallel implementation
-- Remaining: sub-agent integration review, unified `NowItem` verification, full lint/build/e2e, miniprogram tests, completion entry
-- 4.2 stays untouched pending WeChat physical-device verification; 5.1 must not start
+- 2026-07-21, on coordination branch `feature/task-4.5-personal-now`, built by three parallel sub-agents with strict directory ownership and integrated by the coordinating agent.
+- Canonical contract (coordinator-fixed, consumed identically by all three lanes): `packages/shared/now.ts` — versioned `NowItem` (`schemaVersion: 1`) with statuses `draft | published | archived | hidden | deleted`, topics, `sourceMemoryId`, `publishedAt`, `expiresAt`, `createdAt`/`updatedAt`; pure platform-free helpers `isNowItemActive` / `filterActiveNow` / `latestActiveNow` (public projection = newest 3 published, non-expired) and `canProjectMemoryToNow` enforcing that publishing never mutates source Memory visibility; deterministic `nowFixtures` (published current, expiring, expired, draft, archived, hidden, deleted, one with `sourceMemoryId`). Commit `0ba9c1f` (+ seed `1b0c921`).
+- Web (`bd76d13`): owner Now management on My Card (write/edit/publish/archive/hide/delete, status badges, empty/error/retry states); My Vibe proposes ONE Now draft with explicit owner confirmation (发布/改一下/先不了), never auto-publishes, never copies raw chat; Card + Public Card show ≤3 newest active items, empty state invents nothing; Visitor Vibe answers recent-context questions only from active Now items → public current-focus → explicit 「他最近还没有公开动态，我不想替他猜。」; share payload carries the same public snapshot; new `e2e/now-updates.spec.ts` (8 tests × 2 projects). Web projection helpers re-export the shared ones (`ff55dae`) — no divergent model.
+- Mini Program (`a84bcf7`): new `now` cloud function (owner-only openid-scoped draft/publish/edit/archive/hide/delete; public `getActiveNowItems` returns ≤3 active items, safe fields only; index requirements documented in its README); `card.getPublicCard` projects `card.now` from published-only query; `agent.visitorMessage` grounds from published non-expired Now first, `nowProposal` draft-only schema for owner chat; vibe page owner panel + Vibe proposal card, card page 「最近动态」 section in both fixture-demo and cloud modes; fixtures mirror the shared ones. app.json untouched; all 4.2 changes preserved (purely additive diffs).
+- Validation: `npm run lint` ✅, `npm run build` ✅, Playwright **70/70** pass (54 baseline + 16 new, chromium + mobile-chrome); Mini Program page tests **50/50**; cloud-function tests now 16/16, agent 57/57, card 13/13, memory 17/17, requests 24/24, content-check 7/7; `git diff --check` clean.
+- Data boundaries verified by tests: private conversation never published without owner confirmation; archived/hidden/deleted/expired items never shown publicly or used as visitor grounding; owner and visitor surfaces render the same published snapshot; source Memory visibility unchanged on publish.
+- Notes for next tasks: the `now` cloud function must be deployed in WeChat DevTools and the two `now_items` indexes created before cloud mode works (fixture demo works offline); physical-device verification still pending (together with 4.2). Note: `packages/web/server.js` in the main checkout carries an unrelated uncommitted user fix (tmp-rename race); e2e was validated with it present in the working tree — it was NOT committed, per task rules.
 
 Goal:
 
