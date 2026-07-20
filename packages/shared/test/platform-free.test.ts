@@ -30,6 +30,8 @@ const CORE_FILES = [
   'mock-provider.ts',
   'migration.ts',
   'archive.ts',
+  'repositories.ts',
+  'in-memory-store.ts',
   'index.ts',
   join('fixtures', 'vibe.ts'),
   join('fixtures', 'now.ts'),
