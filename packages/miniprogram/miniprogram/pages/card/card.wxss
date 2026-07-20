@@ -312,3 +312,33 @@
 .highlight-edit-title { flex: 1; height: 88rpx; background: #ffffff; border-radius: 20rpx; padding: 0 32rpx; border: 2rpx solid rgba(17, 17, 19, 0.08); font-size: 28rpx; color: #16161a; }
 .highlight-edit-delete { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; color: #a8a8b0; font-size: 32rpx; border-radius: 50%; transition: all 0.2s ease; }
 .highlight-edit-delete:active { background: #f5f5f5; color: #ef4444; }
+
+/* ---------- 最近动态（任务 4.5） ---------- */
+
+.now-section {
+  margin-top: 24rpx;
+}
+
+.now-item {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 12rpx;
+  box-shadow: 0 4rpx 20rpx rgba(17, 17, 19, 0.06);
+}
+
+.now-item-topic {
+  display: inline-block;
+  font-size: 20rpx;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 100rpx;
+  padding: 4rpx 16rpx;
+  margin-bottom: 8rpx;
+}
+
+.now-item-text {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #16161a;
+}

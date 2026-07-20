@@ -1,5 +1,22 @@
 const store = require('../../utils/store.js');
 const nav = require('../../utils/nav.js');
+const cloud = require('../../utils/cloud.js');
+const nowHelper = require('../../utils/now.js');
+
+// 最近动态（任务 4.5）：云端/分享负载里来的都是已投影的公开字段
+// { id, text, topic, publishedAt }，这里只补展示标签，绝不补充内容
+function toNowDisplayRows(items, limit) {
+  return (items || [])
+    .filter((item) => item && typeof item.text === 'string' && item.text.trim())
+    .slice(0, limit || nowHelper.PUBLIC_NOW_LIMIT)
+    .map((item) => ({
+      id: item._id || item.id,
+      text: item.text,
+      topic: item.topic,
+      topicLabel: nowHelper.NOW_TOPIC_LABELS[item.topic] || '',
+      publishedAt: item.publishedAt || null,
+    }));
+}
 
 function drawRoundRectPath(ctx, x, y, w, h, r) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -106,13 +123,21 @@ Page({
     editWechat: '',
     cardVisible: false,
     onboardingSteps: ONBOARDING_STEPS,
+    nowItems: [], // 最近动态（任务 4.5）：≤3 条已发布未过期；空则不渲染
   },
 
   onLoad(options) {
     if (options.shared) {
       try {
         const sharedProfile = cleanProfileDisplay(JSON.parse(decodeURIComponent(options.shared)));
-        this.setData({ profile: sharedProfile, isSetup: true, isSharedView: true, cardVisible: true });
+        this.setData({
+          profile: sharedProfile,
+          isSetup: true,
+          isSharedView: true,
+          cardVisible: true,
+          // 分享负载里带着发布时的公开快照；访客与主人看到同一份
+          nowItems: toNowDisplayRows(sharedProfile.nowItems),
+        });
         this.hideSharedTabBar();
         return;
       } catch (e) {}
@@ -167,6 +192,21 @@ Page({
       // Trigger enter animation
       this.setData({ cardVisible: false });
       setTimeout(() => this.setData({ cardVisible: true }), 100);
+      this.loadNowItems();
+    }
+  },
+
+  // 最近动态（任务 4.5）：主人视图尽力从云端拉取已发布未过期的动态；
+  // 云不可用/未登录时保持空列表——空状态不渲染版块，也不编造内容
+  async loadNowItems() {
+    try {
+      const profile = this.data.profile || {};
+      const payload = { action: 'getActiveNowItems' };
+      if (profile.ownerId || profile.openid) payload.ownerId = profile.ownerId || profile.openid;
+      const res = await cloud.callFunction('now', payload);
+      this.setData({ nowItems: toNowDisplayRows(res.nowItems || []) });
+    } catch (err) {
+      console.warn('[card] getActiveNowItems failed:', err && err.message);
     }
   },
 
@@ -461,6 +501,15 @@ Page({
       // never travel inside the share link, only through owner-approved exchange.
       const publicProfile = { ...profile, verified: undefined };
       if (publicProfile.avatar) publicProfile.avatar = publicProfile.avatar.replace('/svg?', '/png?');
+      // 最近动态是公开数据，随分享负载一起走，访客看到同一份发布快照
+      if (this.data.nowItems && this.data.nowItems.length > 0) {
+        publicProfile.nowItems = this.data.nowItems.map((item) => ({
+          id: item.id,
+          text: item.text,
+          topic: item.topic,
+          publishedAt: item.publishedAt,
+        }));
+      }
       const data = encodeURIComponent(JSON.stringify(publicProfile));
       // 标题即名片的自我表达：这是「我的 AI 名片」，并告诉对方能做什么
       const title = `${profile.name}的 AI 名片 · 先和我的 Vibe 聊聊`;

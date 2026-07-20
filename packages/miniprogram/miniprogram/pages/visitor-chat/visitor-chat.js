@@ -17,14 +17,26 @@
  */
 const fixtures = require('../../data/vibe-fixtures.js');
 const cloud = require('../../utils/cloud.js');
+const nowHelper = require('../../utils/now.js');
 
 const fixtureCard = fixtures.fixtureOwnerCard;
 
 // ---------- fixture 演示内容（云不可用时使用） ----------
 
+// 「他最近在忙什么？」的回答规则与云端一致（AI_BEHAVIOR §13）：
+// 优先引用已发布且未过期的最近动态，其次公开的当下重心记忆；
+// 两者都没有就明确说没有最近公开动态，绝不编造。
+// fixture 世界以 FIXTURE_NOW 为时间锚点，保证演示确定性。
+function fixtureRecentAnswer() {
+  const active = nowHelper.activeNowItems(fixtures.fixtureNowItems, fixtures.FIXTURE_NOW, 1);
+  if (active.length > 0) return active[0].text;
+  if (fixtureCard.currentFocus) return fixtureCard.currentFocus;
+  return '他最近还没有公开的动态，我不想替他编。你可以换个问题，或者直接告诉我你为什么想认识他。';
+}
+
 // 预设问题与回答：只引用 fixture 中的公开信息
 const FIXTURE_PRESET_QUESTIONS = [
-  { id: 'q-focus', text: '他最近在忙什么？', answer: fixtureCard.currentFocus },
+  { id: 'q-focus', text: '他最近在忙什么？', answer: fixtureRecentAnswer() },
   {
     id: 'q-meet',
     text: '他想认识什么样的人？',

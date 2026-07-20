@@ -118,6 +118,15 @@
           <view wx:if="{{profile.verified.wechat}}" class="verified-chip">WeChat</view>
         </view>
 
+        <!-- 最近动态（任务 4.5）：最多 3 条主人发布且未过期的动态；没有就不渲染，绝不编造 -->
+        <view wx:if="{{nowItems && nowItems.length > 0}}" class="now-section">
+          <view class="section-label">最近动态</view>
+          <view wx:for="{{nowItems}}" wx:key="id" class="now-item">
+            <view class="now-item-topic">{{item.topicLabel}}</view>
+            <view class="now-item-text">{{item.text}}</view>
+          </view>
+        </view>
+
         <!-- Highlights -->
         <view wx:if="{{profile.highlights && profile.highlights.length > 0}}" class="highlights-wrap">
           <view class="section-label">HIGHLIGHTS</view>

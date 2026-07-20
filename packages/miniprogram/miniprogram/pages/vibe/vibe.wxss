@@ -319,3 +319,147 @@
   color: #3d2f1d;
   font-weight: 600;
 }
+
+/* ---------- 最近动态（任务 4.5） ---------- */
+
+.now-bar {
+  flex-shrink: 0;
+  padding: 8rpx 32rpx 8rpx;
+}
+
+.now-list {
+  max-height: 300rpx;
+}
+
+.now-item {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 12rpx;
+  box-shadow: 0 4rpx 20rpx rgba(17, 17, 19, 0.06);
+}
+
+.now-item-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+
+.now-topic {
+  font-size: 20rpx;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 100rpx;
+  padding: 4rpx 16rpx;
+}
+
+.now-status {
+  font-size: 20rpx;
+  color: #8e8e93;
+  background: #f2f2f4;
+  border-radius: 100rpx;
+  padding: 4rpx 16rpx;
+}
+
+.now-status-published {
+  color: #15803d;
+  background: rgba(21, 128, 61, 0.1);
+}
+
+.now-status-draft {
+  color: #b45309;
+  background: rgba(180, 83, 9, 0.1);
+}
+
+.now-text {
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #16161a;
+}
+
+.now-edit {
+  margin-top: 4rpx;
+}
+
+.now-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.now-action {
+  font-size: 22rpx;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 100rpx;
+  padding: 8rpx 24rpx;
+}
+
+.now-action:active {
+  opacity: 0.7;
+}
+
+.now-action-primary {
+  color: #ffffff;
+  background: #6366f1;
+}
+
+.now-action-quiet {
+  color: #b6b6bd;
+  background: #f2f2f4;
+}
+
+.now-composer {
+  margin-top: 4rpx;
+}
+
+.now-topic-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.now-topic-chip {
+  font-size: 22rpx;
+  color: #8e8e93;
+  background: #f2f2f4;
+  border-radius: 100rpx;
+  padding: 8rpx 24rpx;
+}
+
+.now-topic-chip-active {
+  color: #ffffff;
+  background: #6366f1;
+}
+
+.now-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.now-composer-input {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 100rpx;
+  padding: 16rpx 28rpx;
+  font-size: 26rpx;
+  color: #16161a;
+  box-shadow: 0 4rpx 20rpx rgba(17, 17, 19, 0.06);
+}
+
+.now-composer-btn {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #b6b6bd;
+  background: #f2f2f4;
+  border-radius: 100rpx;
+  padding: 16rpx 28rpx;
+}
+
+.now-composer-btn-active {
+  color: #ffffff;
+  background: #6366f1;
+}

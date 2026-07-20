@@ -177,6 +177,111 @@ var fixtureWeakConnectionRequest = {
   updatedAt: T0 - 3 * hour,
 };
 
+/**
+ * 任务 4.5：最近动态（Now）fixture，镜像 packages/shared/now.ts 契约。
+ *
+ * fixture 世界的时间锚点是 FIXTURE_NOW（= T0）：演示模式判断「是否过期」
+ * 一律以它为准，保证任何时刻打开演示都得到同样的结果。
+ *
+ * 覆盖全部状态：有效发布、即将过期、已过期、草稿、已归档、已隐藏、已删除，
+ * 以及一条带 sourceMemoryId 的动态（发布不改变来源记忆可见性）。
+ */
+var FIXTURE_NOW = T0;
+
+var fixtureNowItems = [
+  {
+    id: 'fixture-now-current',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '最近在验证 AI 分身如何在保护私人记忆的同时，帮助两个人建立联系。',
+    topic: 'current_work',
+    sourceMemoryId: 'fixture-memory-public-focus',
+    status: 'published',
+    publishedAt: T0 - 2 * hour,
+    expiresAt: null,
+    createdAt: T0 - 3 * hour,
+    updatedAt: T0 - 2 * hour,
+  },
+  {
+    id: 'fixture-now-expiring',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '这周在模速空间办公，做 AI 社交产品的朋友可以来喝杯咖啡。',
+    topic: 'offer_help',
+    sourceMemoryId: null,
+    status: 'published',
+    publishedAt: T0 - 26 * hour,
+    expiresAt: T0 + 2 * hour, // 即将过期，但此刻仍有效
+    createdAt: T0 - 26 * hour,
+    updatedAt: T0 - 26 * hour,
+  },
+  {
+    id: 'fixture-now-expired',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '上周的黑客松评审已经结束了。',
+    topic: 'completed_work',
+    sourceMemoryId: null,
+    status: 'published',
+    publishedAt: T0 - 96 * hour,
+    expiresAt: T0 - 24 * hour, // 已过期：绝不能被当成当前事实
+    createdAt: T0 - 96 * hour,
+    updatedAt: T0 - 96 * hour,
+  },
+  {
+    id: 'fixture-now-draft',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '想把「先理解，再认识」写成一篇长文。',
+    topic: 'exploring',
+    sourceMemoryId: null,
+    status: 'draft',
+    publishedAt: null,
+    expiresAt: null,
+    createdAt: T0 - 5 * hour,
+    updatedAt: T0 - 5 * hour,
+  },
+  {
+    id: 'fixture-now-archived',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '之前在找一位做过微信生态增长的产品合伙人。',
+    topic: 'looking_for',
+    sourceMemoryId: null,
+    status: 'archived',
+    publishedAt: T0 - 200 * hour,
+    expiresAt: null,
+    createdAt: T0 - 200 * hour,
+    updatedAt: T0 - 100 * hour,
+  },
+  {
+    id: 'fixture-now-hidden',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '一条主人选择暂时藏起来的动态。',
+    topic: 'current_work',
+    sourceMemoryId: null,
+    status: 'hidden',
+    publishedAt: T0 - 150 * hour,
+    expiresAt: null,
+    createdAt: T0 - 150 * hour,
+    updatedAt: T0 - 120 * hour,
+  },
+  {
+    id: 'fixture-now-deleted',
+    schemaVersion: 1,
+    ownerId: fixtureOwner.id,
+    text: '一条已被主人删除的动态，任何界面都不该再出现。',
+    topic: 'current_work',
+    sourceMemoryId: null,
+    status: 'deleted',
+    publishedAt: T0 - 300 * hour,
+    expiresAt: null,
+    createdAt: T0 - 300 * hour,
+    updatedAt: T0 - 250 * hour,
+  },
+];
+
 module.exports = {
   fixtureOwner: fixtureOwner,
   fixtureVisitor: fixtureVisitor,
@@ -186,4 +291,6 @@ module.exports = {
   fixtureOwnerContactMethods: fixtureOwnerContactMethods,
   fixtureConnectionRequest: fixtureConnectionRequest,
   fixtureWeakConnectionRequest: fixtureWeakConnectionRequest,
+  FIXTURE_NOW: FIXTURE_NOW,
+  fixtureNowItems: fixtureNowItems,
 };

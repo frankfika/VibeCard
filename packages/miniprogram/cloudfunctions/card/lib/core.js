@@ -84,6 +84,38 @@ function contentsOf(memories, kind) {
     .slice(0, 5);
 }
 
+/** Max Now items on the public Card (AI_BEHAVIOR §13). */
+const PUBLIC_NOW_LIMIT = 3;
+
+/** Active = published and not expired. Only active items are ever public. */
+function isActiveNowItem(item, now) {
+  return (
+    !!item &&
+    item.status === 'published' &&
+    (item.expiresAt === null || item.expiresAt === undefined || item.expiresAt > now)
+  );
+}
+
+/**
+ * Second-net Now filter + projection (task 4.5): the db query already reads
+ * only status='published'; expiry is applied here and the projection keeps at
+ * most 3 newest active items with public-safe fields only (no ownerId,
+ * sourceMemoryId, or lifecycle internals). Empty input projects to [] — the
+ * empty state invents nothing.
+ */
+function projectActiveNowItems(nowItems, now, limit = PUBLIC_NOW_LIMIT) {
+  return (nowItems || [])
+    .filter(item => isActiveNowItem(item, now) && isNonEmptyString(item.text))
+    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+    .slice(0, limit)
+    .map(item => ({
+      id: item._id || item.id,
+      text: item.text,
+      topic: item.topic,
+      publishedAt: item.publishedAt || null,
+    }));
+}
+
 /**
  * Build the public VibeCard projection.
  *
@@ -92,9 +124,11 @@ function contentsOf(memories, kind) {
  * @param {object} input.user v1 users document (may carry private fields —
  *   they are never read into the projection)
  * @param {Array} input.memories owner memories (defensively re-filtered)
+ * @param {Array} [input.nowItems] owner now_items (defensively re-filtered
+ *   to active-only and projected; task 4.5)
  * @param {number} now timestamp for updatedAt
  */
-function buildPublicCard({ ownerId, user, memories }, now) {
+function buildPublicCard({ ownerId, user, memories, nowItems }, now) {
   const namecard = sanitizeNamecard(user && user.namecard);
   const projectable = filterProjectableMemories(memories);
 
@@ -112,6 +146,7 @@ function buildPublicCard({ ownerId, user, memories }, now) {
       ? namecard.interests.filter(isNonEmptyString).slice(0, 8)
       : [],
     highlights: [],
+    now: projectActiveNowItems(nowItems, now),
     agentEnabled: true,
     updatedAt: now,
   };
@@ -122,5 +157,7 @@ module.exports = {
   sanitizeNamecard,
   isCardDeleted,
   filterProjectableMemories,
+  isActiveNowItem,
+  projectActiveNowItems,
   buildPublicCard,
 };

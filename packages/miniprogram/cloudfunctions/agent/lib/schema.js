@@ -7,6 +7,7 @@
 
 const MEMORY_KINDS = ['fact', 'current', 'preference', 'boundary'];
 const MEMORY_VISIBILITIES = ['public', 'agent_only', 'connected', 'private'];
+const NOW_ITEM_TOPICS = ['current_work', 'completed_work', 'exploring', 'looking_for', 'offer_help'];
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -25,6 +26,17 @@ function validateOwnerAgentResult(value) {
     if (p.sourceMessageIds !== undefined && !Array.isArray(p.sourceMessageIds)) return 'invalid_proposal_sources';
   }
   if (typeof value.cardUpdateSuggested !== 'boolean') return 'invalid_card_update_flag';
+  // nowProposal (task 4.5, AI_BEHAVIOR §13): optional Now draft proposal.
+  // The agent may only ever propose a draft — publishing is an owner action.
+  if (value.nowProposal !== undefined && value.nowProposal !== null) {
+    const p = value.nowProposal;
+    if (typeof p !== 'object') return 'invalid_now_proposal';
+    if (!isNonEmptyString(p.text) || p.text.length > 200) return 'invalid_now_proposal_text';
+    if (!NOW_ITEM_TOPICS.includes(p.topic)) return 'invalid_now_proposal_topic';
+    if (p.expiresAt !== undefined && p.expiresAt !== null && typeof p.expiresAt !== 'number') {
+      return 'invalid_now_proposal_expires_at';
+    }
+  }
   // referencedMemoryIds (task 3.3): optional; shape-only check here. The
   // caller filters the ids down to memories that actually exist.
   if (value.referencedMemoryIds !== undefined && value.referencedMemoryIds !== null) {
@@ -162,6 +174,7 @@ module.exports = {
   ok,
   MEMORY_KINDS,
   MEMORY_VISIBILITIES,
+  NOW_ITEM_TOPICS,
   VISITOR_NEXT_ACTIONS,
   SUMMARY_RECOMMENDATIONS,
 };
