@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { NowItem, NowItemStatus, NowItemTopic } from '@shared';
 import { vibeFixtures } from '@shared';
+// Selection/ordering of public Now items must come from the shared helpers so
+// owner and visitor surfaces show the same published snapshot (task 4.5).
+import { isNowItemActive, latestActiveNow } from '@shared';
+
+// Back-compat aliases for existing web call sites; semantics live in @shared/now.
+export { isNowItemActive, latestActiveNow };
+export const isNowActive = isNowItemActive;
 
 /**
  * Task 4.5 — Personal Now updates (web side).
@@ -36,18 +43,6 @@ export const NOW_STATUS_LABELS: Record<NowItemStatus, string> = {
   hidden: '已隐藏',
   deleted: '已删除',
 };
-
-export function isNowActive(item: NowItem, now: number): boolean {
-  return item.status === 'published' && (item.expiresAt === null || item.expiresAt > now);
-}
-
-/** The public projection: newest `limit` active items by publishedAt. */
-export function latestActiveNow(items: NowItem[], now: number, limit = 3): NowItem[] {
-  return items
-    .filter(item => isNowActive(item, now))
-    .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
-    .slice(0, limit);
-}
 
 // --- Deterministic demo seeds (fictional, like vibeFixtures) ---------------
 
