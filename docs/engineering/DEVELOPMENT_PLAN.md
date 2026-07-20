@@ -958,7 +958,14 @@ Dependencies: 5.2
 
 ## 5.5 Add Storage Adapters And A Local Reference Store
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.5-storage-adapters` (off `main` @ 4851851)
+- Owner: Data lane — Core repository interfaces in `packages/shared/`, local reference store + conformance suite in `packages/platforms/`; one implementation sub-agent; coordinating agent integrates
+- Current phase: repository interfaces (memories, cards+Now, conversations, connection requests, knowledge metadata), local reference store, adapter conformance tests
+- Remaining: WeChat adapter mapping review, migration durability tests, validation, completion entry
 
 Owner: Data
 
