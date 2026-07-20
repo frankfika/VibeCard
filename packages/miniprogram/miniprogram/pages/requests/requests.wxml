@@ -13,7 +13,7 @@
     </view>
 
     <view wx:for="{{requestsList}}" wx:key="id" class="request-card" bindtap="openDetail" data-id="{{item.id}}">
-      <image wx:if="{{item.visitorAvatarUrl}}" class="request-avatar" src="{{item.visitorAvatarUrl}}" mode="aspectFill" />
+      <image wx:if="{{item.visitorAvatarUrl && !avatarErr[item.id]}}" class="request-avatar" src="{{item.visitorAvatarUrl}}" mode="aspectFill" binderror="onAvatarError" data-id="{{item.id}}" />
       <view wx:else class="request-avatar request-avatar-placeholder">{{item.visitorName[0]}}</view>
       <view class="request-main">
         <view class="request-top">
@@ -36,7 +36,7 @@
       <view class="detail-section">
         <view class="detail-label">对方是谁</view>
         <view class="detail-visitor">
-          <image wx:if="{{currentRequest.visitorAvatarUrl}}" class="detail-avatar" src="{{currentRequest.visitorAvatarUrl}}" mode="aspectFill" />
+          <image wx:if="{{currentRequest.visitorAvatarUrl && !avatarErr[currentRequest.id]}}" class="detail-avatar" src="{{currentRequest.visitorAvatarUrl}}" mode="aspectFill" binderror="onAvatarError" data-id="{{currentRequest.id}}" />
           <view wx:else class="detail-avatar detail-avatar-placeholder">{{currentRequest.visitorName[0]}}</view>
           <view class="detail-summary">{{currentRequest.visitorSummary}}</view>
         </view>

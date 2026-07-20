@@ -79,7 +79,7 @@
         <!-- Profile Header -->
         <view class="profile-header">
           <view class="avatar-wrap">
-            <image wx:if="{{profile.avatar}}" class="avatar" src="{{profile.avatar}}" mode="aspectFill" />
+            <image wx:if="{{profile.avatar && !avatarFailed}}" class="avatar" src="{{profile.avatar}}" mode="aspectFill" binderror="onAvatarError" />
             <view wx:else class="avatar avatar-placeholder">{{profile.name ? profile.name[0] : '?'}}</view>
           </view>
           <view class="profile-name">{{profile.name}}</view>

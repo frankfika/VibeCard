@@ -12,20 +12,20 @@
 var fixtureOwner = {
   id: 'fixture-owner-linzhou',
   name: '林舟',
-  avatarUrl: 'https://api.dicebear.com/9.x/thumbs/svg?seed=fixture-owner-linzhou',
+  avatarUrl: '',
 };
 
 var fixtureVisitor = {
   id: 'fixture-visitor-suqing',
   name: '苏晴',
-  avatarUrl: 'https://api.dicebear.com/9.x/thumbs/svg?seed=fixture-visitor-suqing',
+  avatarUrl: '',
 };
 
 // 任务 4.3：第二位访客，刻意弱理由，用来演示「边界」而非「门槛」
 var fixtureWeakVisitor = {
   id: 'fixture-visitor-wangtuo',
   name: '王拓',
-  avatarUrl: 'https://api.dicebear.com/9.x/thumbs/svg?seed=fixture-visitor-wangtuo',
+  avatarUrl: '',
 };
 
 var T0 = 1752000000000; // 固定时间戳，保证 fixture 确定性

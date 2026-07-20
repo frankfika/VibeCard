@@ -186,7 +186,7 @@
 }
 
 .detail-spacer {
-  height: 48rpx;
+  height: 220rpx;
 }
 
 .detail-back {

@@ -78,6 +78,7 @@ Page({
     sharedContacts: [],
     decidedAction: '', // 仅 demo 模式：'' | 'connected' | 'later' | 'declined'
     acting: false,
+    avatarErr: {}, // 头像加载失败的请求 id -> true，失败后回退为首字头像
   },
 
   onLoad() {
@@ -221,6 +222,12 @@ Page({
   // 从联系方式选择返回详情（不重新加载 summary）
   backToDetail() {
     this.setData({ view: 'detail' });
+  },
+
+  // 头像加载失败（如外链图床不在白名单）时回退为首字头像
+  onAvatarError(e) {
+    const { id } = e.currentTarget.dataset;
+    if (id) this.setData({ [`avatarErr.${id}`]: true });
   },
 
   // ---------- 决策：认识一下 ----------

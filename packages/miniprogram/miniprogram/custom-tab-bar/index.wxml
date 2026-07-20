@@ -1,4 +1,4 @@
-<cover-view class="tab-bar-wrapper">
+<cover-view wx:if="{{!hidden}}" class="tab-bar-wrapper">
   <!-- Gradient fade above tab bar -->
   <cover-view class="tab-bar-fade" />
 

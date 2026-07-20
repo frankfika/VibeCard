@@ -79,7 +79,7 @@ Page({
       try {
         const sharedProfile = JSON.parse(decodeURIComponent(options.shared));
         this.setData({ profile: sharedProfile, isSetup: true, isSharedView: true, cardVisible: true });
-        nav.hideTabBar();
+        this.hideSharedTabBar();
         return;
       } catch (e) {}
     }
@@ -87,12 +87,29 @@ Page({
   },
 
   onShow() {
+    if (this.data.isSharedView) {
+      // hideTabBar 可能早于 tabBar 挂载而生效失败，在多个生命周期幂等补刀
+      this.hideSharedTabBar();
+      return;
+    }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 });
+      this.getTabBar().setData({ selected: 0, hidden: false });
     }
-    if (!this.data.isSharedView) {
-      this.loadProfile();
+    this.loadProfile();
+  },
+
+  onReady() {
+    if (this.data.isSharedView) {
+      this.hideSharedTabBar();
+      setTimeout(() => { if (this.data.isSharedView) this.hideSharedTabBar(); }, 500);
     }
+  },
+
+  // 访客分享视图需要彻底隐藏 tabBar：wx API 与自定义组件双保险
+  hideSharedTabBar() {
+    nav.hideTabBar();
+    const tabBar = typeof this.getTabBar === 'function' && this.getTabBar();
+    if (tabBar) tabBar.setData({ hidden: true });
   },
 
   loadProfile() {
@@ -109,7 +126,7 @@ Page({
         profile = { ...profile, latestMoment: threads[0].content };
       }
     }
-    this.setData({ profile, isSetup });
+    this.setData({ profile, isSetup, avatarFailed: false });
     if (!isSetup) {
       this.setData({ showOnboarding: true, onboardingStep: 0, cardVisible: false });
     } else {
@@ -117,6 +134,11 @@ Page({
       this.setData({ cardVisible: false });
       setTimeout(() => this.setData({ cardVisible: true }), 100);
     }
+  },
+
+  // 头像加载失败（外链图床不在白名单）时回退为首字头像
+  onAvatarError() {
+    this.setData({ avatarFailed: true });
   },
 
   // Onboarding
