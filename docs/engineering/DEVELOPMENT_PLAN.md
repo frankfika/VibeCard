@@ -771,7 +771,14 @@ The target is:
 
 ## 5.1 Establish The Open Source Contract
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.1-open-source-contract` (stacked on `feature/task-4.5-personal-now`)
+- Coordinating agent owns; one implementation sub-agent (root + docs only)
+- Current phase: license decision, governance docs, secret/personal-data audit, README modes section
+- Remaining: audit verification, lint/build, completion entry
 
 Owner: coordinating agent
 
