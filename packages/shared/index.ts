@@ -200,5 +200,28 @@ export type {
   VibeArchive,
 } from './archive';
 
+// Storage repository interfaces (task 5.5, ARCHITECTURE §17): contracts only;
+// engine adapters live under packages/platforms/.
+export type {
+  MemoryQuery,
+  MemoryRepository,
+  CardRepository,
+  NowQuery,
+  NowRepository,
+  ConversationQuery,
+  ConversationRepository,
+  ConnectionQuery,
+  ConnectionRepository,
+  KnowledgeSourceQuery,
+  KnowledgeSourceRepository,
+  ContactMethodRepository,
+  VibeRepositories,
+} from './repositories';
+
+// In-memory reference adapter (task 5.5): zero-setup repository set for
+// tests/demos; also the second engine pinned by the conformance suite.
+export { createInMemoryRepositories, createFixtureRepositories } from './in-memory-store';
+export type { InMemorySeed } from './in-memory-store';
+
 export * as vibeFixtures from './fixtures/vibe';
 export * as nowFixtures from './fixtures/now';

@@ -958,14 +958,17 @@ Dependencies: 5.2
 
 ## 5.5 Add Storage Adapters And A Local Reference Store
 
-Status: `[~]`
+Status: `[x]`
 
-Progress:
+Completion:
 
-- Started 2026-07-21 on branch `feature/task-5.5-storage-adapters` (off `main` @ 4851851)
-- Owner: Data lane — Core repository interfaces in `packages/shared/`, local reference store + conformance suite in `packages/platforms/`; one implementation sub-agent; coordinating agent integrates
-- Current phase: repository interfaces (memories, cards+Now, conversations, connection requests, knowledge metadata), local reference store, adapter conformance tests
-- Remaining: WeChat adapter mapping review, migration durability tests, validation, completion entry
+- 2026-07-21, on branch `feature/task-5.5-storage-adapters`.
+- Core repository interfaces (`packages/shared/repositories.ts`, pure TS, Core records only): `MemoryRepository`, `CardRepository`, `NowRepository` (separate from cards — ARCHITECTURE §4 keeps separate collections/indexes and Now has its own lifecycle), `ConversationRepository`, `ConnectionRepository`, `KnowledgeSourceRepository`, plus `ContactMethodRepository` (added beyond the §17 sketch — required for archive round-trip and deletion-plan execution; recorded as an intentional deviation). `VibeRepositories` aggregate; one deterministic ordering; vendor metadata (SQLite rowids, cloud `_id`) never enters contracts.
+- Local reference store (`packages/platforms/local-store/`, `node:sqlite` on Node 24): one table per collection with Core record as JSON + extracted index columns; versioned up-only migrations in single transactions (failed-migration rollback and crash-mid-migration leave data intact — tested); WAL + busy_timeout; interleaved two-connection writes converge; zero network.
+- WeChat adapter preserved untouched: documented collection→repository mapping in `docs/engineering/STORAGE_ADAPTERS.md` plus a real second engine — fixture-backed in-memory adapter (`packages/shared/in-memory-store.ts`) — since wrapping live cloud functions would edit deployed paths for no gain.
+- Reusable adapter conformance suite (`conformance.ts`): 20 tests per adapter (CRUD, filters, ordering, owner isolation, hard deletes, stable ids, archive export→import→re-export byte-identity), executed against BOTH the SQLite store and the in-memory adapter — future databases reuse the same factory.
+- Local mode proof (`test/local-mode.test.ts`): create Card → propose/confirm memory via Core lifecycle → publish/update Now (source memory visibility unchanged) → export private archive → execute deletion plan (store verified empty) → import into fresh store → same fixture identity recovered, re-export byte-identical. No network.
+- Validation: Core tests **106/106** (+4); local-store **48/48** (conformance 20×2, migrations 5, concurrency 2, local-mode 1); miniprogram page tests 50/50; cloud functions memory 17/17, agent 71/71, card 13/13, now 16/16, requests 24/24, content-check 7/7; `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅.
 
 Owner: Data
 

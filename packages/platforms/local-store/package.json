@@ -1,0 +1,11 @@
+{
+  "name": "@vibecard/platform-local-store",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "description": "Local reference repository adapter for the VibeCard Core, backed by node:sqlite.",
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts"
+  }
+}
