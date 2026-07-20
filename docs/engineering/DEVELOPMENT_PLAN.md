@@ -1041,7 +1041,14 @@ Dependencies: 5.4 and 5.5
 
 ## 5.7 Ship A One-Command Self-Hosted Stack
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.7-self-hosted-stack` (off `main` @ dc7b8e0)
+- Owner: Infrastructure — new `packages/server/` (open server + H5 HTTP API) composing Core, local-store, and model adapters; one implementation sub-agent; coordinating agent integrates
+- Current phase: server + API, Docker Compose, env template, migrations, health/backup/restore, rate limiting, moderation hooks, smoke test
+- Remaining: clean-machine verification, validation, completion entry
 
 Owner: Infrastructure
 
