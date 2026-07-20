@@ -704,7 +704,19 @@ Owner: Lane D
 
 ## 4.5 Add Personal Now Updates
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on coordination branch `feature/task-4.5-personal-now`
+- Parallel sub-agents with strict directory ownership:
+  - Agent A (Core): `packages/shared/` — versioned `NowItem` contract, fixtures, pure helpers, branch `feat/task-4.5-now-shared`
+  - Agent B (Web): `packages/web/` — owner Now management, Vibe Now proposal with owner confirmation, Card/Public Card display (max 3), visitor grounding, Playwright E2E, branch `feat/task-4.5-now-web`
+  - Agent C (Mini Program): `packages/miniprogram/` — cloud storage + owner permissions, Now actions, Card display, Vibe draft proposal, visitor chat grounding, page/cloud-function tests, branch `feat/task-4.5-now-miniprogram`
+- Canonical `NowItem` field definition is fixed by the coordinating agent; sub-agents must not invent divergent models
+- Current phase: parallel implementation
+- Remaining: sub-agent integration review, unified `NowItem` verification, full lint/build/e2e, miniprogram tests, completion entry
+- 4.2 stays untouched pending WeChat physical-device verification; 5.1 must not start
 
 Goal:
 
