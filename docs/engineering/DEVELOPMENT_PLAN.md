@@ -869,7 +869,14 @@ Dependencies: 5.1
 
 ## 5.3 Define The Portable Vibe Archive
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.3-vibe-archive` (off `main` @ 895f3d3)
+- Owner: Core lane (`packages/shared/`); one implementation sub-agent; coordinating agent integrates
+- Current phase: versioned `.vibe` archive format (public vs private export), validation, migrations, round-trip tests
+- Remaining: delete-after-export support, encryption documentation, validation, completion entry
 
 Owner: Core
 
