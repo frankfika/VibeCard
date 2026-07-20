@@ -110,13 +110,18 @@ Dependencies: 0.1
 
 ## 0.3 Focus Mini Program Navigation
 
-Status: `[~]`
+Status: `[x]`
 
 Progress (2026-07-19, on `main`):
 
 - Implemented: `app.json` tabBar → 名片 / 请求 / Vibe; custom-tab-bar list updated; new placeholder pages `pages/requests` + `pages/vibe` with empty states and correct tab selection; legacy pages (threads / more / discover / games / thread-publish) remain registered but unreachable from main navigation; only `more.js` (now unrouted) links to discover/games, so no legacy entry remains in the main journey
 - Verified here: JS syntax (`node --check`) and JSON validity of all touched files
 - Remaining: WeChat DevTools compile + tab switching check must be run by the owner (DevTools cannot run in this environment). Intentional deviation: 0.4 proceeds while this verification is pending, since 0.3 code is complete.
+
+Completion (2026-07-20, on `main`):
+
+- DevTools verification (run under task 4.2): cold compile passes; all three tabs render and switch in the simulator (`switchTab` navigation plus screenshots showing the rendered tab bar with the correct active highlight on each tab); stored v1 profile still renders on Card.
+- Real bug found and fixed: `custom-tab-bar/` lived at the project root instead of `miniprogram/` (the `miniprogramRoot`) since its introduction in `22440db`, so the framework never loaded it — no tab bar ever rendered, and cold compiles crashed inside DevTools' `_getPackageFiles`. Moved to `miniprogram/custom-tab-bar/`; compile and tab bar rendering both confirmed after the move.
 
 Owner: Lane A
 
@@ -608,7 +613,15 @@ Dependencies: Milestone 3
 
 ## 4.2 WeChat DevTools And Device Verification
 
-Status: `[!]`
+Status: `[~]`
+
+Progress (2026-07-20, on `main`):
+
+- Owner logged into DevTools; automated simulator verification ran via `miniprogram-automator` against the real IDE (AppID `wxa79d41c8255ff90d`, base library 3.13.1): **18 behavior checks pass** — cold compile, v1 profile migration, three tabs render+switch, share payload privacy, deep link to the correct owner, shared-card visibility, visitor role isolation, visitor chat (AI identity + grounded answers), requests list/detail, block entry, owner-controlled contact unlock, vibe memories.
+- Bugs found by the verification and fixed in this task: (1) share URL embedded the full profile including `verified.wechat` — payload now strips `verified`; (2) shared Card rendered invisible (`cardVisible` never set in the shared branch) — fixed, visitor view confirmed by screenshot; (3) `custom-tab-bar/` misplaced at project root since `22440db` — moved to `miniprogram/custom-tab-bar/`, which also fixed a DevTools cold-compile crash (`_getPackageFiles` path.join undefined) and made the tab bar render for the first time (screenshot-verified); (4) four visitor/owner-facing Web3 legacy strings replaced with current product copy.
+- Note: the IDE's automation server degrades after the first connect/disconnect cycle per launch — each verification script must run as the first session on a freshly launched IDE.
+- Remaining: physical-device pass. Preview QR generated (`cli preview`, package ~251.5 KB); waiting for the owner to scan and walk the checklist below. On device the pages fall back to fixture demo mode until cloud functions are deployed to the owner's env.
+- AI message retry: covered by cloudfunction unit tests and page smoke tests; no live AI call exists in demo mode to exercise it in the simulator.
 
 Blocked (recorded 2026-07-19, on `main`):
 

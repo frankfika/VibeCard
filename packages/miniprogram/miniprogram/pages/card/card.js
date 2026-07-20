@@ -30,7 +30,7 @@ const LOOKING_FOR_OPTIONS = [
 const EVENT_OPTIONS = ['ETHGlobal', 'Devcon', 'Token2049', 'Hackathon', 'Remote', 'Local'];
 
 const ONBOARDING_STEPS = [
-  { title: '欢迎使用 vibecard', subtitle: '创建你的 Web3 社交名片', hint: '让我们从基本信息开始' },
+  { title: '欢迎使用 vibecard', subtitle: '创建你的 AI 名片', hint: '让我们从基本信息开始' },
   { title: '选择标签', subtitle: '最多选 5 个，也可以自定义', hint: '标签帮助他人快速了解你' },
   { title: '完善资料', subtitle: '补充简介和意向', hint: '这些信息会展示在你的名片上' },
 ];
@@ -78,7 +78,7 @@ Page({
     if (options.shared) {
       try {
         const sharedProfile = JSON.parse(decodeURIComponent(options.shared));
-        this.setData({ profile: sharedProfile, isSetup: true, isSharedView: true });
+        this.setData({ profile: sharedProfile, isSetup: true, isSharedView: true, cardVisible: true });
         nav.hideTabBar();
         return;
       } catch (e) {}
@@ -400,10 +400,13 @@ Page({
   onShareAppMessage() {
     const profile = this.data.profile;
     if (!profile || !profile.name) {
-      return { title: 'vibecard - Web3 社交名片', path: '/pages/card/card' };
+      return { title: 'VibeCard · 一张会越来越懂你的 AI 名片', path: '/pages/card/card' };
     }
     try {
-      const data = encodeURIComponent(JSON.stringify(profile));
+      // Contact details (verified.wechat etc.) are private by default: they must
+      // never travel inside the share link, only through owner-approved exchange.
+      const publicProfile = { ...profile, verified: undefined };
+      const data = encodeURIComponent(JSON.stringify(publicProfile));
       const handleStr = profile.handle ? ` @${profile.handle}` : '';
       const lookingStr = profile.lookingFor ? ` · ${profile.lookingFor}` : '';
       const tagStr = profile.tags && profile.tags.length > 0 ? ` · ${profile.tags.map(t => t.label).join(' ')}` : '';
@@ -431,7 +434,7 @@ Page({
         promise
       };
     } catch (e) {
-      return { title: 'vibecard - Web3 社交名片', path: '/pages/card/card' };
+      return { title: 'VibeCard · 一张会越来越懂你的 AI 名片', path: '/pages/card/card' };
     }
   },
 
@@ -580,7 +583,7 @@ Page({
           ctx.fillStyle = 'rgba(255,255,255,0.3)';
           ctx.font = '24px -apple-system, SF Pro Display, PingFang SC, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('vibecard · Web3 社交名片', width / 2, height - 40);
+          ctx.fillText('VibeCard · 会越来越懂你的 AI 名片', width / 2, height - 40);
           ctx.textAlign = 'left';
 
           // Export
