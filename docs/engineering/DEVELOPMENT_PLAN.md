@@ -1002,14 +1002,16 @@ Dependencies: 5.2 and 5.3
 
 ## 5.6 Add Optional Retrieval And Knowledge Adapters
 
-Status: `[~]`
+Status: `[x]`
 
-Progress:
+Completion:
 
-- Started 2026-07-21 on branch `feature/task-5.6-retrieval-adapters` (off `main` @ 78354d6)
-- Owner: AI + Data lanes (`packages/shared/` Core interfaces + reference implementations); one implementation sub-agent; coordinating agent integrates
-- Current phase: structured retrieval (filters/recency/kind/keyword), RetrievalProvider + embedding/vector-store interfaces, provenance, knowledge-source adapters
-- Remaining: injection/isolation tests, removability proof, validation, completion entry
+- 2026-07-21, on branch `feature/task-5.6-retrieval-adapters`.
+- Stage-1 structured retrieval (`packages/shared/retrieval.ts`, the default — zero embeddings required): `retrieveMemories` pipeline = owner filter → confirmed/active → **visibility for audience before anything else** (audiences `owner | visitor_quote | visitor_boundary` map 1:1 onto `visibility.ts`) → kind filter → deterministic scoring (`recency = 1/(1+ageDays/30)` + bounded keyword match, explicit `now`, no randomness). Every `RetrievedMemory` carries `memoryId`, score, matched reasons, source ids, and the full visibility decision.
+- Stages 2–3 behind interfaces only (`retrieval-provider.ts`): `RetrievalProvider`, `EmbeddingProvider` (aligned with the 5.4 `ModelProvider.embed` capability; missing → typed `unsupported_capability`), owner-scoped `VectorStore` (entries reference memoryIds only — vendor data never touches Core records), `Reranker` seam with pass-through + deterministic kind-boost references. Semantic ranking applies the identical permission filter before returning. Reference implementations: FNV-1a hash embedding (token + char-bigram for unsegmented Chinese) and in-memory cosine vector store. **No vector database built**; external stores documented as optional adapters in `docs/engineering/RETRIEVAL_ADAPTERS.md`.
+- Knowledge adapters (`knowledge.ts`): file/note/link/external ingest content-as-input (no fs/network in Core) into `ArchiveKnowledgeSource` + deterministic 500-char chunks with full provenance (sourceId, chunkIndex, adapter, kind, title, locator, ingestedAt); chunk visibility defaults owner-private; `retrieveKnowledgeChunks` enforces the same visibility-before-retrieval rule. External sources map to archive kind `note` to keep the 5.3 contract stable (chunk provenance preserves `external`) — recorded deviation.
+- Acceptance tests: zero-embedding personal retrieval; semantic on/off leaves Core records byte-identical; outputs contain source IDs + visibility decisions; `dropNamespace` removability proof; prompt-injection text inside a private memory/chunk is still never returned for visitor roles; cross-owner isolation on all paths incl. vector namespaces.
+- Validation: Core tests **132/132** (+26: retrieval 10, retrieval-provider 9, knowledge 7); miniprogram page tests 50/50; cloud functions memory 17/17, agent 71/71, card 13/13, now 16/16, requests 24/24, content-check 7/7; `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅.
 
 Owner: AI and Data
 
