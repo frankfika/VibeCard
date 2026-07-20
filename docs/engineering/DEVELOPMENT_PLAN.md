@@ -869,14 +869,17 @@ Dependencies: 5.1
 
 ## 5.3 Define The Portable Vibe Archive
 
-Status: `[~]`
+Status: `[x]`
 
-Progress:
+Completion:
 
-- Started 2026-07-21 on branch `feature/task-5.3-vibe-archive` (off `main` @ 895f3d3)
-- Owner: Core lane (`packages/shared/`); one implementation sub-agent; coordinating agent integrates
-- Current phase: versioned `.vibe` archive format (public vs private export), validation, migrations, round-trip tests
-- Remaining: delete-after-export support, encryption documentation, validation, completion entry
+- 2026-07-21, on branch `feature/task-5.3-vibe-archive`.
+- Format v1 (`packages/shared/archive.ts`, spec in `docs/engineering/VIBE_ARCHIVE.md`): single versioned JSON document (`format: "vibecard-vibe-archive"`, `schemaVersion: 1`, `kind: public | private`, app/export metadata, `sectionVersions` for 9 independently versioned sections, optional dependency-free fnv1a-32 integrity checksum, `encryption` marker field). Sections: profile (private only), card, nowItems (private = full NowItem history; public = active projection only), memories (confirmed AND proposed, private only), conversations (explicit opt-in), knowledgeSources metadata, connectionRequests incl. decisions, contactMethods (private only), attachments manifest (metadata only — never file bytes).
+- Public/private boundary is structural: separate `exportPublicArchive` / `exportPrivateArchive` functions; private sections are empty by construction in public exports, and a public archive carrying private sections fails validation with `public_boundary_violation`. Tests prove absence via recursive key/value scan.
+- `importArchive` = migrate → validate → normalize (pure, no storage). Typed error codes: `invalid_shape`, `unsupported_version`, `future_version`, `section_version_mismatch`, `checksum_mismatch`, `encrypted_archive`, `public_boundary_violation`, `wrong_kind`. Migration dispatch table with a real, tested v0→v1 path (ids unchanged).
+- Stable identifiers round-trip unchanged; no id needs re-keying (documented §8). `buildDeletionPlan` returns exactly which records a client must delete after a verified private export; the Core plans, the client executes; public archives cannot authorize deletion.
+- The format structurally has no fields for model keys, access tokens, or server secrets; client-side encryption sits outside the Core (client encrypts the serialized envelope; Core rejects non-null `encryption` with `encrypted_archive`).
+- Validation: Core tests **79/79** (61 baseline + 18 deterministic archive tests: round-trip recover-same-identity, public-export scan, typed failures, migration, id stability); `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅.
 
 Owner: Core
 

@@ -132,5 +132,42 @@ export {
 } from './migration';
 export type { V1UserProfile, V1PresentationalNamecard, V1CardBase } from './migration';
 
+// Portable Vibe Archive (task 5.3): versioned `.vibe` export/import format.
+export {
+  ARCHIVE_FORMAT,
+  ARCHIVE_SCHEMA_VERSION,
+  ARCHIVE_SUPPORTED_VERSIONS,
+  ARCHIVE_SECTION_VERSIONS,
+  canonicalJson,
+  fnv1a32,
+  exportPrivateArchive,
+  exportPublicArchive,
+  validateArchive,
+  migrateArchive,
+  importArchive,
+  buildDeletionPlan,
+} from './archive';
+export type {
+  ArchiveAppInfo,
+  ArchiveAttachment,
+  ArchiveConversation,
+  ArchiveConversationSection,
+  ArchiveDeletionPlan,
+  ArchiveError,
+  ArchiveErrorCode,
+  ArchiveKind,
+  ArchiveKnowledgeSource,
+  ArchiveMessage,
+  ArchiveProfile,
+  ArchiveResult,
+  ArchiveSection,
+  ExportPrivateArchiveInput,
+  ExportPublicArchiveInput,
+  ImportedArchiveState,
+  PrivateVibeArchive,
+  PublicVibeArchive,
+  VibeArchive,
+} from './archive';
+
 export * as vibeFixtures from './fixtures/vibe';
 export * as nowFixtures from './fixtures/now';
