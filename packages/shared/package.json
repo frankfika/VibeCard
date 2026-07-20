@@ -1,6 +1,7 @@
 {
   "name": "@vibecard/shared",
   "version": "1.0.0",
+  "license": "MIT",
   "type": "module",
   "main": "index.ts",
   "types": "index.ts"

@@ -147,6 +147,31 @@ Local and self-hosted use must not require an official VibeCard account.
 VibeCard Cloud sells managed availability, sync, AI usage, retrieval, backups,
 and support rather than a closed mandatory backend.
 
+## Runtime Modes And Licensing
+
+VibeCard is designed around three runtime modes:
+
+- **Local**: conversation and memory stay on your device, with a local or
+  bring-your-own model; the Card can be exported as a static snapshot.
+- **Self-Hosted**: you deploy the open server and H5 client on your own
+  infrastructure, choosing the database, retrieval, model, and domain.
+- **VibeCard Cloud**: the official managed deployment of the same open
+  contracts, charging only for infrastructure and service — hosting, sync,
+  backups, managed AI usage, and support.
+
+Honest status: the competition MVP in this repository today runs on WeChat
+Cloud Development (Mini Program + cloud functions + React web). The Local and
+Self-Hosted modes are the post-competition design direction; the
+platform-independent Core, provider adapters, and one-command self-host server
+are being extracted in Milestone 5. Nothing described as open source will ever
+require a proprietary server or a paid license.
+
+The code is open under a two-tier license: the runnable product (Mini
+Program, web app, cloud functions) is **AGPL-3.0-only**, and the integration
+surfaces (`packages/shared` domain contracts, `packages/contracts`) are
+**MIT**. The "VibeCard" name and logo may not brand a derived hosted service
+without permission. Full policy: [`docs/engineering/OPEN_SOURCE.md`](./docs/engineering/OPEN_SOURCE.md).
+
 ## Product Promise
 
 ```text
