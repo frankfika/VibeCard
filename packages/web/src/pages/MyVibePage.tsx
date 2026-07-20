@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Send, Check, Pencil, X } from 'lucide-react';
 import { vibeFixtures } from '@shared';
 import type { Memory } from '@shared';
+// Owner memory selection comes from the Core so web never re-implements
+// retrieval or permission rules (task 5.2).
+import { memoriesForOwner } from '@shared';
 import { useNowItems } from '../lib/now';
 
 /**
@@ -64,8 +67,8 @@ const initialMessages: ChatMessage[] = [
     role: 'vibe',
     text: '这句话值得被记住。也和你上次说的那件正在打磨的事是同一件——先理解，再认识。',
     // Real fixture state: the reply above genuinely calls back to this memory.
-    memoryRefs: vibeFixtures.fixtureOwnerMemories
-      .filter(m => m.id === 'fixture-memory-public-focus' && m.status === 'confirmed')
+    memoryRefs: memoriesForOwner(vibeFixtures.fixtureOwnerMemories)
+      .filter(m => m.id === 'fixture-memory-public-focus')
       .map(m => ({ id: m.id, content: m.content })),
   },
 ];
@@ -80,7 +83,7 @@ export default function MyVibePage() {
     draft: '你最近更想认识真正做过 AI 社交产品的人。',
   });
   const [remembered, setRemembered] = useState<Memory[]>(() =>
-    vibeFixtures.fixtureOwnerMemories.filter(m => m.status === 'confirmed'),
+    memoriesForOwner(vibeFixtures.fixtureOwnerMemories),
   );
   const { addNow } = useNowItems();
   const [nowProposal, setNowProposal] = useState<NowProposal>({
