@@ -14,6 +14,12 @@
 const fixtures = require('../../data/vibe-fixtures.js');
 const cloud = require('../../utils/cloud.js');
 const store = require('../../utils/store.js');
+const nowHelper = require('../../utils/now.js');
+
+const NOW_TOPICS = nowHelper.NOW_ITEM_TOPICS.map((topic) => ({
+  value: topic,
+  label: nowHelper.NOW_TOPIC_LABELS[topic],
+}));
 
 const VISIBILITY_LABELS = {
   public: '已公开',
@@ -37,6 +43,13 @@ Page({
     scrollIntoId: '',
     cardDraft: null,   // Card 草稿预览 { rows: [{ key, label, oldText, newText }], raw }
     cardDraftLoading: false,
+    nowItems: [],        // 「最近动态」主人列表（不含已删除；含状态标签）
+    nowTopics: NOW_TOPICS,
+    nowComposer: '',     // 主人手写新动态的输入
+    nowComposerTopic: 'current_work',
+    nowEditingId: '',    // 正在编辑的动态 id
+    nowEditText: '',
+    nowProposal: null,   // Vibe 提议的 Now 草稿 { id, nowId, text, topic, state, editText }
   },
 
   onLoad() {
@@ -44,6 +57,7 @@ Page({
     this.conversationId = '';
     this.sending = false;
     this.loadMemories();
+    this.loadNowItems();
   },
 
   onShow() {
@@ -105,7 +119,236 @@ Page({
           editText: '',
         },
       });
+      this.loadFixtureNowItems();
     }
+  },
+
+  // ---------- 最近动态（任务 4.5） ----------
+  //
+  // Now 是主人确认发布的一小段最近公开动态，不是 Feed。Vibe 只能提议草稿，
+  // 发布永远是主人的显式操作；归档/隐藏/删除的内容不会出现在名片上。
+
+  // demo 模式的 Now 数据：以 fixture 时间锚点判断有效性，保证确定性
+  loadFixtureNowItems() {
+    this.demoNowItems = fixtures.fixtureNowItems.map((item) => ({ ...item }));
+    this.setData({ nowItems: nowHelper.ownerNowList(this.demoNowItems) });
+  },
+
+  async loadNowItems() {
+    if (this.demoMode) {
+      this.loadFixtureNowItems();
+      return;
+    }
+    try {
+      const res = await cloud.callFunction('now', { action: 'listNowItems' });
+      this.setData({ nowItems: nowHelper.ownerNowList(res.nowItems || []) });
+    } catch (err) {
+      // 云未部署：Now 面板回退到 fixture 演示（demo 标志由 loadMemories 设置；
+      // 若它还没跑完，这里静默失败，不阻塞页面）
+      console.warn('[vibe] listNowItems failed:', err && err.message);
+      if (this.demoMode) this.loadFixtureNowItems();
+    }
+  },
+
+  syncDemoNowList() {
+    this.setData({ nowItems: nowHelper.ownerNowList(this.demoNowItems || []) });
+  },
+
+  onNowComposerInput(e) {
+    this.setData({ nowComposer: e.detail.value });
+  },
+
+  onNowComposerTopic(e) {
+    this.setData({ nowComposerTopic: e.currentTarget.dataset.topic });
+  },
+
+  // 主人手写一条动态：同样先存为草稿，再显式发布
+  async onCreateNowDraft() {
+    const text = (this.data.nowComposer || '').trim();
+    if (!text) {
+      wx.showToast({ title: '先写一句最近动态', icon: 'none' });
+      return;
+    }
+    if (text.length > 200) {
+      wx.showToast({ title: '最多 200 字', icon: 'none' });
+      return;
+    }
+    const topic = this.data.nowComposerTopic;
+    if (this.demoMode) {
+      const now = fixtures.FIXTURE_NOW;
+      this.demoNowItems = (this.demoNowItems || []).concat({
+        id: 'fixture-now-new-' + Date.now(),
+        schemaVersion: 1,
+        ownerId: fixtures.fixtureOwner.id,
+        text,
+        topic,
+        sourceMemoryId: null,
+        status: 'draft',
+        publishedAt: null,
+        expiresAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      this.syncDemoNowList();
+      this.setData({ nowComposer: '' });
+      wx.showToast({ title: '已存为草稿', icon: 'none' });
+      return;
+    }
+    try {
+      await cloud.callFunction('now', { action: 'createNowDraft', text, topic });
+      this.setData({ nowComposer: '' });
+      await this.loadNowItems();
+      wx.showToast({ title: '已存为草稿', icon: 'none' });
+    } catch (err) {
+      console.warn('[vibe] createNowDraft failed:', err && err.message);
+      wx.showToast({ title: '没存上，再试一次', icon: 'none' });
+    }
+  },
+
+  // 列表行的就地编辑
+  onNowEditStart(e) {
+    const id = e.currentTarget.dataset.id;
+    const item = this.data.nowItems.find((n) => n.id === id);
+    if (!item) return;
+    this.setData({ nowEditingId: id, nowEditText: item.text });
+  },
+
+  onNowEditInput(e) {
+    this.setData({ nowEditText: e.detail.value });
+  },
+
+  onNowEditCancel() {
+    this.setData({ nowEditingId: '', nowEditText: '' });
+  },
+
+  async onNowEditSave() {
+    const id = this.data.nowEditingId;
+    const text = (this.data.nowEditText || '').trim();
+    if (!id) return;
+    if (!text) {
+      wx.showToast({ title: '内容不能为空', icon: 'none' });
+      return;
+    }
+    const ok = await this.applyNowAction('editNowItem', { nowId: id, text }, (item) => {
+      item.text = text;
+      item.updatedAt = (this.demoMode ? fixtures.FIXTURE_NOW : Date.now());
+    });
+    if (ok) this.setData({ nowEditingId: '', nowEditText: '' });
+  },
+
+  onPublishNow(e) {
+    const id = e.currentTarget.dataset.id;
+    this.applyNowAction('publishNowItem', { nowId: id }, (item) => {
+      item.status = 'published';
+      item.publishedAt = item.publishedAt || (this.demoMode ? fixtures.FIXTURE_NOW : Date.now());
+      item.updatedAt = item.publishedAt;
+    });
+  },
+
+  onArchiveNow(e) {
+    const id = e.currentTarget.dataset.id;
+    this.applyNowAction('archiveNowItem', { nowId: id }, (item) => {
+      item.status = 'archived';
+      item.updatedAt = this.demoMode ? fixtures.FIXTURE_NOW : Date.now();
+    });
+  },
+
+  onHideNow(e) {
+    const id = e.currentTarget.dataset.id;
+    this.applyNowAction('hideNowItem', { nowId: id }, (item) => {
+      item.status = 'hidden';
+      item.updatedAt = this.demoMode ? fixtures.FIXTURE_NOW : Date.now();
+    });
+  },
+
+  onDeleteNow(e) {
+    const id = e.currentTarget.dataset.id;
+    this.applyNowAction('deleteNowItem', { nowId: id }, (item) => {
+      item.status = 'deleted';
+      item.updatedAt = this.demoMode ? fixtures.FIXTURE_NOW : Date.now();
+    });
+  },
+
+  // 统一的 Now 变更入口：云模式走 now 云函数（服务端按 openid 强制主人权限），
+  // demo 模式只改本地 fixture 世界。返回是否成功。
+  async applyNowAction(action, payload, demoMutate) {
+    if (this.demoMode) {
+      const item = (this.demoNowItems || []).find((n) => n.id === payload.nowId);
+      if (!item) return false;
+      demoMutate(item);
+      this.syncDemoNowList();
+      return true;
+    }
+    try {
+      await cloud.callFunction('now', Object.assign({ action }, payload));
+      await this.loadNowItems();
+      return true;
+    } catch (err) {
+      console.warn('[vibe] ' + action + ' failed:', err && err.message);
+      wx.showToast({ title: '操作失败，再试一次', icon: 'none' });
+      return false;
+    }
+  },
+
+  // ---------- Vibe 提议的 Now 草稿 ----------
+
+  async onPublishNowProposal() {
+    const p = this.data.nowProposal;
+    if (!p || p.state !== 'pending' || !p.nowId) return;
+    const ok = await this.applyNowAction('publishNowItem', { nowId: p.nowId }, (item) => {
+      item.status = 'published';
+      item.publishedAt = item.publishedAt || fixtures.FIXTURE_NOW;
+      item.updatedAt = item.publishedAt;
+    });
+    if (ok) {
+      this.setData({ 'nowProposal.state': 'published' });
+      this.appendVibeMessage('已发布到你的最近动态：' + p.text);
+    }
+  },
+
+  onEditNowProposal() {
+    const p = this.data.nowProposal;
+    if (!p || p.state !== 'pending') return;
+    this.setData({ 'nowProposal.state': 'editing', 'nowProposal.editText': p.text });
+  },
+
+  onNowProposalEditInput(e) {
+    this.setData({ 'nowProposal.editText': e.detail.value });
+  },
+
+  onCancelEditNowProposal() {
+    this.setData({ 'nowProposal.state': 'pending', 'nowProposal.editText': '' });
+  },
+
+  // 改一下再发布：先保存修改，再显式发布（AI_BEHAVIOR §13：edit and publish）
+  async onSaveEditedNowProposal() {
+    const p = this.data.nowProposal;
+    const text = (this.data.nowProposal.editText || '').trim();
+    if (!p || !p.nowId) return;
+    if (!text) {
+      wx.showToast({ title: '内容不能为空', icon: 'none' });
+      return;
+    }
+    const edited = await this.applyNowAction('editNowItem', { nowId: p.nowId, text }, (item) => {
+      item.text = text;
+      item.updatedAt = fixtures.FIXTURE_NOW;
+    });
+    if (!edited) return;
+    const published = await this.applyNowAction('publishNowItem', { nowId: p.nowId }, (item) => {
+      item.status = 'published';
+      item.publishedAt = item.publishedAt || fixtures.FIXTURE_NOW;
+      item.updatedAt = item.publishedAt;
+    });
+    if (published) {
+      this.setData({ 'nowProposal.state': 'published', 'nowProposal.text': text });
+      this.appendVibeMessage('已发布到你的最近动态：' + text);
+    }
+  },
+
+  // 先不发：草稿保留在「最近动态」列表里，主人以后随时可以发布
+  onDismissNowProposal() {
+    this.setData({ nowProposal: null });
+    wx.showToast({ title: '已存为草稿，想发的时候再发', icon: 'none' });
   },
 
   // ---------- 记忆提议 ----------
@@ -219,6 +462,36 @@ Page({
           messages: this.data.messages.concat(reply),
           scrollIntoId: reply.id,
         });
+        // demo 的 Now 提议时刻：主人说了一个具体的最近动态，Vibe 提议草稿，
+        // 同样只有主人确认后才会发布（AI_BEHAVIOR §13）
+        if (/最近在|刚完成|完成了/.test(text) && !this.data.nowProposal) {
+          const draft = {
+            id: 'fixture-now-proposed-' + Date.now(),
+            schemaVersion: 1,
+            ownerId: fixtures.fixtureOwner.id,
+            text: text.length > 60 ? text.slice(0, 60) + '…' : text,
+            topic: /刚完成|完成了/.test(text) ? 'completed_work' : 'current_work',
+            sourceMemoryId: null,
+            status: 'draft',
+            publishedAt: null,
+            expiresAt: null,
+            createdAt: fixtures.FIXTURE_NOW,
+            updatedAt: fixtures.FIXTURE_NOW,
+          };
+          this.demoNowItems = (this.demoNowItems || []).concat(draft);
+          this.syncDemoNowList();
+          this.setData({
+            nowProposal: {
+              id: nextMessageId('now-proposal'),
+              nowId: draft.id,
+              text: draft.text,
+              topic: draft.topic,
+              state: 'pending',
+              editText: '',
+            },
+            scrollIntoId: 'now-proposal-card',
+          });
+        }
       }, 400);
       return;
     }
@@ -271,6 +544,31 @@ Page({
         } catch (err) {
           // 提取失败不影响聊天主流程
           console.warn('[vibe] createMemoryProposal failed:', err && err.message);
+        }
+      }
+
+      // Now 提议（任务 4.5）：Vibe 只能创建草稿，发布永远是主人的显式操作
+      if (result.nowProposal && !this.data.nowProposal) {
+        try {
+          const created = await cloud.callFunction('now', {
+            action: 'createNowDraft',
+            text: result.nowProposal.text,
+            topic: result.nowProposal.topic,
+            expiresAt: result.nowProposal.expiresAt !== undefined ? result.nowProposal.expiresAt : null,
+          });
+          const nowProposal = {
+            id: nextMessageId('now-proposal'),
+            nowId: created.nowItem && created.nowItem._id,
+            text: result.nowProposal.text,
+            topic: result.nowProposal.topic,
+            state: 'pending',
+            editText: '',
+          };
+          this.setData({ nowProposal, scrollIntoId: 'now-proposal-card' });
+          await this.loadNowItems();
+        } catch (err) {
+          // 草稿创建失败不影响聊天主流程
+          console.warn('[vibe] createNowDraft (proposal) failed:', err && err.message);
         }
       }
     } catch (err) {

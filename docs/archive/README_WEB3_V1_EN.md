@@ -1,6 +1,6 @@
 <div align="center">
 
-# vibecard
+# vibecard (Archived Web3 v1 README)
 > Your Social Identity Card + Companion Discovery Platform · 你的社交身份名片 + 搭子发现平台
 
 ![Profile Card](./docs/assets/card-profile.png)

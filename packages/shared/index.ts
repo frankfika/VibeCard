@@ -18,4 +18,12 @@ export type {
   ConnectionRequest,
   ConnectionAction,
 } from './vibe';
+export type { NowItem, NowItemStatus, NowItemTopic } from './now';
+export {
+  isNowItemActive,
+  filterActiveNow,
+  latestActiveNow,
+  canProjectMemoryToNow,
+} from './now';
 export * as vibeFixtures from './fixtures/vibe';
+export * as nowFixtures from './fixtures/now';

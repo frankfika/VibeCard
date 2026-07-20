@@ -71,16 +71,22 @@ exports.main = async (event) => {
         }
         // Permission filtering at query stage: only public + agent_only,
         // confirmed memories are ever read for a visitor conversation.
-        const [publicMemories, agentMemories] = await Promise.all([
+        // now_items: only status='published' is read; expired items are
+        // dropped before grounding (task 4.5) and drafts/archived/hidden/
+        // deleted items are never read at all.
+        const [publicMemories, agentMemories, publishedNowItems] = await Promise.all([
           listMemoriesWithVisibility(ownerId, 'public'),
           listMemoriesWithVisibility(ownerId, 'agent_only'),
+          listPublishedNowItems(ownerId),
         ]);
+        const nowItems = filterActiveNowItems(publishedNowItems, Date.now());
         const card = buildVisitorCardContext(owner, publicMemories);
         return await runVisitorAgent({
           provider,
           card,
           publicMemories,
           agentMemories,
+          nowItems,
           messages,
           roundCount: typeof roundCount === 'number' ? roundCount : 0,
         });
@@ -116,6 +122,31 @@ async function listMemoriesWithVisibility(ownerId, visibility) {
     .where({ ownerId, status: 'confirmed', visibility })
     .get();
   return result.data;
+}
+
+/**
+ * Read published Now items for visitor grounding (task 4.5). If the
+ * collection does not exist yet (fresh environments), grounding simply has
+ * no Now evidence — the agent falls back to public current-focus memory.
+ */
+async function listPublishedNowItems(ownerId) {
+  try {
+    const result = await db.collection('now_items')
+      .where({ ownerId, status: 'published' })
+      .get();
+    return result.data;
+  } catch (error) {
+    console.warn('now_items read failed, grounding without now items:', error && error.message);
+    return [];
+  }
+}
+
+/** Active = published and not expired. Expired items are never grounding. */
+function filterActiveNowItems(items, now) {
+  return (items || []).filter(
+    item => item && item.status === 'published'
+      && (item.expiresAt === null || item.expiresAt === undefined || item.expiresAt > now),
+  );
 }
 
 async function getUserByOpenid(openid) {

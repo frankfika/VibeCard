@@ -19,6 +19,46 @@
     </view>
   </view>
 
+  <!-- 最近动态（任务 4.5）：主人确认发布的一小段公开动态，不是 Feed -->
+  <view class="now-bar">
+    <view class="memory-bar-header">
+      <view class="memory-bar-title">最近动态</view>
+      <view class="memory-bar-count">{{nowItems.length}} 条</view>
+    </view>
+    <scroll-view scroll-y class="now-list">
+      <view wx:for="{{nowItems}}" wx:key="id" class="now-item">
+        <view class="now-item-head">
+          <view class="now-topic">{{item.topicLabel}}</view>
+          <view class="now-status now-status-{{item.status}}">{{item.statusLabel}}</view>
+        </view>
+        <view wx:if="{{nowEditingId !== item.id}}" class="now-text" bindtap="onNowEditStart" data-id="{{item.id}}">{{item.text}}</view>
+        <view wx:if="{{nowEditingId === item.id}}" class="now-edit">
+          <textarea class="proposal-edit-input" value="{{nowEditText}}" bindinput="onNowEditInput" auto-height maxlength="200" />
+          <view class="proposal-actions">
+            <view class="proposal-btn proposal-btn-primary" bindtap="onNowEditSave">保存</view>
+            <view class="proposal-btn proposal-btn-quiet" bindtap="onNowEditCancel">取消</view>
+          </view>
+        </view>
+        <view class="now-actions">
+          <view wx:if="{{item.status === 'draft' || item.status === 'archived' || item.status === 'hidden'}}" class="now-action now-action-primary" bindtap="onPublishNow" data-id="{{item.id}}">发布</view>
+          <view wx:if="{{item.status !== 'archived'}}" class="now-action" bindtap="onArchiveNow" data-id="{{item.id}}">归档</view>
+          <view wx:if="{{item.status !== 'hidden'}}" class="now-action" bindtap="onHideNow" data-id="{{item.id}}">隐藏</view>
+          <view class="now-action now-action-quiet" bindtap="onDeleteNow" data-id="{{item.id}}">删除</view>
+        </view>
+      </view>
+      <view wx:if="{{nowItems.length === 0}}" class="memory-empty">还没有最近动态。写一句，或者聊出什么值得放的，Vibe 会提议。</view>
+    </scroll-view>
+    <view class="now-composer">
+      <view class="now-topic-row">
+        <view wx:for="{{nowTopics}}" wx:key="value" class="now-topic-chip {{nowComposerTopic === item.value ? 'now-topic-chip-active' : ''}}" bindtap="onNowComposerTopic" data-topic="{{item.value}}">{{item.label}}</view>
+      </view>
+      <view class="now-composer-row">
+        <input class="now-composer-input" placeholder="写一句最近动态…" placeholder-style="color: #a8a8b0;" value="{{nowComposer}}" bindinput="onNowComposerInput" maxlength="200" />
+        <view class="now-composer-btn {{nowComposer ? 'now-composer-btn-active' : ''}}" bindtap="onCreateNowDraft">存草稿</view>
+      </view>
+    </view>
+  </view>
+
   <!-- 对话区 -->
   <scroll-view scroll-y class="chat" scroll-into-view="{{scrollIntoId}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
     <view class="chat-inner">
@@ -52,6 +92,28 @@
         </view>
 
         <view wx:if="{{proposal.state === 'confirmed'}}" class="proposal-done">✓ 已记住，可以在上面「已记住」里看到</view>
+      </view>
+
+      <!-- Now 提议卡片（任务 4.5）：Vibe 只能提议草稿，发布由主人决定 -->
+      <view wx:if="{{nowProposal}}" id="now-proposal-card" class="proposal {{nowProposal.state === 'published' ? 'proposal-confirmed' : ''}}">
+        <view class="proposal-label">要不要放到你的最近动态？</view>
+        <view wx:if="{{nowProposal.state !== 'editing'}}" class="proposal-text">{{nowProposal.text}}</view>
+
+        <view wx:if="{{nowProposal.state === 'pending'}}" class="proposal-actions">
+          <view class="proposal-btn proposal-btn-primary" bindtap="onPublishNowProposal">发布</view>
+          <view class="proposal-btn" bindtap="onEditNowProposal">改一下</view>
+          <view class="proposal-btn proposal-btn-quiet" bindtap="onDismissNowProposal">先不发</view>
+        </view>
+
+        <view wx:if="{{nowProposal.state === 'editing'}}" class="proposal-edit">
+          <textarea class="proposal-edit-input" value="{{nowProposal.editText}}" bindinput="onNowProposalEditInput" auto-height maxlength="200" />
+          <view class="proposal-actions">
+            <view class="proposal-btn proposal-btn-primary" bindtap="onSaveEditedNowProposal">确认发布</view>
+            <view class="proposal-btn proposal-btn-quiet" bindtap="onCancelEditNowProposal">取消</view>
+          </view>
+        </view>
+
+        <view wx:if="{{nowProposal.state === 'published'}}" class="proposal-done">✓ 已发布，会显示在你的名片「最近动态」里</view>
       </view>
 
       <!-- Card 草稿预览：Vibe 只建议，主人决定是否采用 -->

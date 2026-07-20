@@ -45,12 +45,21 @@ exports.main = async (event) => {
     if (core.isCardDeleted(user)) return typedError('card_deleted', 'this card is no longer available');
 
     // Permission filtering happens here, before retrieval — not after generation.
-    const memoryResult = await db.collection('memories')
-      .where({ ownerId, status: 'confirmed', visibility: 'public' })
-      .get();
+    // now_items: only status='published' is ever read; expiry + the 3-item cap
+    // are applied in the projection (task 4.5).
+    const [memoryResult, nowResult] = await Promise.all([
+      db.collection('memories')
+        .where({ ownerId, status: 'confirmed', visibility: 'public' })
+        .get(),
+      db.collection('now_items')
+        .where({ ownerId, status: 'published' })
+        .orderBy('publishedAt', 'desc')
+        .get()
+        .catch(() => ({ data: [] })),
+    ]);
 
     const card = core.buildPublicCard(
-      { ownerId, user, memories: memoryResult.data },
+      { ownerId, user, memories: memoryResult.data, nowItems: nowResult.data },
       Date.now(),
     );
     return ok({ card });

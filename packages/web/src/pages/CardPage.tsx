@@ -10,6 +10,7 @@ import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
 import QRCode from 'qrcode';
 import { getSocialIcon, getSocialLabel } from '../lib/social';
 import OnboardingFlow from '../components/card/OnboardingFlow';
+import NowSection from '../components/card/NowSection';
 import { useNamecardUrl } from '../hooks/useNamecardUrl';
 import { buildSiweMessage, makeNonce } from '../lib/siwe';
 import { useToast } from '../components/ui/ToastProvider';
@@ -152,6 +153,8 @@ export default function CardPage() {
               <p className="text-[16px] leading-relaxed font-medium text-foreground/80 text-center">{profile.bio}</p>
             </motion.div>
           )}
+
+          <NowSection />
 
           {(profile.mbti || profile.zodiac || profile.age || profile.location) && (
             <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.35 }} className="flex flex-wrap justify-center gap-2 mb-6">

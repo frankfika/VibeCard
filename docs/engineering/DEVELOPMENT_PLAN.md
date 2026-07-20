@@ -702,9 +702,618 @@ Owner: Lane D
 
 ---
 
-# Post-Competition: Desktop Vibe Pet
+## 4.5 Add Personal Now Updates
 
-Do not start this section until Milestone 4 is complete.
+Status: `[x]`
+
+Completion:
+
+- 2026-07-21, on coordination branch `feature/task-4.5-personal-now`, built by three parallel sub-agents with strict directory ownership and integrated by the coordinating agent.
+- Canonical contract (coordinator-fixed, consumed identically by all three lanes): `packages/shared/now.ts` — versioned `NowItem` (`schemaVersion: 1`) with statuses `draft | published | archived | hidden | deleted`, topics, `sourceMemoryId`, `publishedAt`, `expiresAt`, `createdAt`/`updatedAt`; pure platform-free helpers `isNowItemActive` / `filterActiveNow` / `latestActiveNow` (public projection = newest 3 published, non-expired) and `canProjectMemoryToNow` enforcing that publishing never mutates source Memory visibility; deterministic `nowFixtures` (published current, expiring, expired, draft, archived, hidden, deleted, one with `sourceMemoryId`). Commit `0ba9c1f` (+ seed `1b0c921`).
+- Web (`bd76d13`): owner Now management on My Card (write/edit/publish/archive/hide/delete, status badges, empty/error/retry states); My Vibe proposes ONE Now draft with explicit owner confirmation (发布/改一下/先不了), never auto-publishes, never copies raw chat; Card + Public Card show ≤3 newest active items, empty state invents nothing; Visitor Vibe answers recent-context questions only from active Now items → public current-focus → explicit 「他最近还没有公开动态，我不想替他猜。」; share payload carries the same public snapshot; new `e2e/now-updates.spec.ts` (8 tests × 2 projects). Web projection helpers re-export the shared ones (`ff55dae`) — no divergent model.
+- Mini Program (`a84bcf7`): new `now` cloud function (owner-only openid-scoped draft/publish/edit/archive/hide/delete; public `getActiveNowItems` returns ≤3 active items, safe fields only; index requirements documented in its README); `card.getPublicCard` projects `card.now` from published-only query; `agent.visitorMessage` grounds from published non-expired Now first, `nowProposal` draft-only schema for owner chat; vibe page owner panel + Vibe proposal card, card page 「最近动态」 section in both fixture-demo and cloud modes; fixtures mirror the shared ones. app.json untouched; all 4.2 changes preserved (purely additive diffs).
+- Validation: `npm run lint` ✅, `npm run build` ✅, Playwright **70/70** pass (54 baseline + 16 new, chromium + mobile-chrome); Mini Program page tests **50/50**; cloud-function tests now 16/16, agent 57/57, card 13/13, memory 17/17, requests 24/24, content-check 7/7; `git diff --check` clean.
+- Data boundaries verified by tests: private conversation never published without owner confirmation; archived/hidden/deleted/expired items never shown publicly or used as visitor grounding; owner and visitor surfaces render the same published snapshot; source Memory visibility unchanged on publish.
+- Notes for next tasks: the `now` cloud function must be deployed in WeChat DevTools and the two `now_items` indexes created before cloud mode works (fixture demo works offline); physical-device verification still pending (together with 4.2). Note: `packages/web/server.js` in the main checkout carries an unrelated uncommitted user fix (tmp-rename race); e2e was validated with it present in the working tree — it was NOT committed, per task rules.
+
+Goal:
+
+> The Card shows what the owner is doing now without becoming a social feed.
+
+Owners: Lanes A, B, C, and D
+
+Implement:
+
+- Add a versioned `NowItem` contract with draft, published, archived, and deleted states
+- Let the owner write, edit, publish, archive, and delete an update
+- Let My Vibe propose one Now item from a meaningful owner conversation
+- Require explicit owner confirmation before publishing
+- Show at most the three newest published items on Card and Public Card
+- Let the visitor agent answer recent-context questions from published Now items
+- Keep source memory visibility unchanged when an item is published
+
+Do not add:
+
+- A global feed
+- Following or followers
+- Likes, comments, repost counts, or ranking
+- Algorithmic recommendations
+- Automatic publishing
+
+Acceptance:
+
+- Private conversation text never appears publicly without owner confirmation
+- Archived, deleted, and expired items are not described as current
+- Owner and visitor surfaces show the same published snapshot
+- Empty state does not invent recent activity
+- Web tests cover publish, archive, public display, and visitor grounding
+- Mini Program tests cover owner confirmation and public Card display
+- `npm run lint` and `npm run build` pass
+
+Dependencies: 1.4 and 2.1
+
+---
+
+# Post-Competition Roadmap
+
+Do not start post-competition work until the competition branch is stable.
+Execute one numbered task at a time. A later client may start only after the
+portable Core and export format it depends on are verified.
+
+The target is:
+
+> A fully open-source personal AI identity and memory system that works without
+> an official VibeCard account, while VibeCard Cloud sells managed operation.
+
+---
+
+# Milestone 5: Open Source Foundation
+
+## 5.1 Establish The Open Source Contract
+
+Status: `[ ]`
+
+Owner: coordinating agent
+
+Decide and document:
+
+- OSI-approved licenses for the runnable product, Core, clients, SDKs, and examples
+- Recommended policy: copyleft for the hosted Core and permissive licensing for integration SDKs
+- Trademark and naming rules that do not restrict code freedom
+- Contribution process, code of conduct, security reporting, and release process
+- What deployment configuration and secrets can never be committed
+
+Create:
+
+```text
+LICENSE
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+docs/engineering/OPEN_SOURCE.md
+```
+
+Requirements:
+
+- Mini Program, H5, Core, agent service, memory engine, and self-host server are open source
+- Local and self-hosted use does not require a paid license or official account
+- Official cloud may charge for infrastructure and service
+- No feature is described as open source when a proprietary server is mandatory
+- Run a secret and personal-data audit before making the repository public
+
+Acceptance:
+
+- A new contributor can identify the license of every first-party package
+- Repository contains no real credentials, private contacts, or production data
+- Contribution and security-reporting paths are documented
+- README explains local, self-hosted, and managed modes without misleading users
+
+Dependencies: Milestone 4
+
+## 5.2 Extract A Platform-Independent Core
+
+Status: `[ ]`
+
+Owner: Core
+
+Evolve `packages/shared` into the portable Core. Create a new `packages/core`
+only if a migration removes real platform coupling; do not duplicate contracts.
+
+Core owns:
+
+- Versioned `VibeCard`, `NowItem`, `Memory`, and `ConnectionRequest` contracts
+- Memory confirmation and lifecycle rules
+- Visibility and role filtering
+- Public Card projection
+- Connection-request state transitions
+- Structured agent input and output schemas
+- Pure migrations and deterministic fixtures
+
+Core must not import:
+
+- WeChat APIs
+- Browser globals
+- Node-only filesystem APIs
+- A model-provider SDK
+- A database client
+- Billing or official-cloud code
+
+Acceptance:
+
+- Core tests run in Node and a browser-compatible test environment
+- WeChat and Web consume the same contracts
+- Permission tests prove visitor context cannot include private memory
+- Existing v1 data migration still passes
+- No second memory or permission implementation exists in a client
+
+Dependencies: 5.1
+
+## 5.3 Define The Portable Vibe Archive
+
+Status: `[ ]`
+
+Owner: Core
+
+Define a versioned `.vibe` archive or equivalent documented JSON package for:
+
+- Profile and Card
+- Now history
+- Confirmed and proposed memories
+- Conversation export when explicitly selected
+- Knowledge-source metadata
+- Connection requests and decisions
+- Attachment manifest without silently uploading local files
+- Export metadata and schema versions
+
+Requirements:
+
+- Separate public-only export from complete private export
+- Support validation before import
+- Support migrations between schema versions
+- Preserve stable identifiers where safe
+- Allow full deletion after successful export
+- Do not include model keys, access tokens, or server secrets
+- Document optional client-side encryption for private archives
+
+Acceptance:
+
+- Export, delete local state, import, and recover the same fixture identity
+- Public export contains no private memory or contact method
+- Invalid and future-unsupported archives fail with typed errors
+- Round-trip tests are deterministic
+
+Dependencies: 5.2
+
+## 5.4 Add Model Provider Adapters
+
+Status: `[ ]`
+
+Owner: AI
+
+Keep the current agent behavior behind a provider-neutral interface.
+
+Provide:
+
+- Deterministic mock provider
+- OpenAI-compatible HTTP provider
+- Bring-your-own-key configuration
+- Adapter documentation for local and private model services
+- Capability declaration for text, embeddings, structured output, vision, and audio
+
+Requirements:
+
+- Provider responses are converted into Core schemas
+- Keys stay in the selected trusted runtime
+- Self-hosted users are not required to call VibeCard Cloud
+- Provider errors map to stable typed errors
+- Logging never includes keys or unredacted private prompts
+
+Acceptance:
+
+- The same behavior tests pass with mock and OpenAI-compatible providers
+- Switching provider requires configuration, not business-logic changes
+- A provider can be added without editing client pages
+- Unsupported capabilities fail clearly
+
+Dependencies: 5.2
+
+## 5.5 Add Storage Adapters And A Local Reference Store
+
+Status: `[ ]`
+
+Owner: Data
+
+Define repositories for:
+
+- Memories
+- Cards and Now items
+- Conversations
+- Connection requests
+- Knowledge-source metadata
+
+Provide one local reference implementation using SQLite, IndexedDB, or another
+appropriate open local store. Preserve the existing WeChat Cloud adapter.
+
+Requirements:
+
+- Repository interfaces use Core records
+- Storage-vendor metadata stays outside public contracts
+- Migrations are explicit and tested
+- Local-only owner use works without a network connection
+- Concurrent writes and interrupted migrations do not corrupt data
+
+Acceptance:
+
+- The Core fixture suite passes against the local and WeChat adapters
+- Local mode can create, remember, update Now, export, and import
+- Deletion removes records from later retrieval
+- Adapter conformance tests are reusable by future databases
+
+Dependencies: 5.2 and 5.3
+
+## 5.6 Add Optional Retrieval And Knowledge Adapters
+
+Status: `[ ]`
+
+Owner: AI and Data
+
+Start with structured filters, recency, memory kind, and keyword matching. Add
+semantic retrieval only behind `RetrievalProvider`.
+
+Support:
+
+- Embedding provider interface
+- Optional vector-store interface
+- Chunk and source provenance
+- Visibility filtering before retrieval
+- Optional reranking
+- File, note, link, and external knowledge-source adapters
+
+Do not build a new vector database.
+
+Acceptance:
+
+- Personal memory works without embeddings or a vector database
+- Enabling semantic retrieval does not change Core records
+- Retrieved output contains source IDs and visibility decisions
+- A vector adapter can be removed without losing canonical memory data
+- Prompt-injection and cross-owner isolation tests pass
+
+Dependencies: 5.4 and 5.5
+
+## 5.7 Ship A One-Command Self-Hosted Stack
+
+Status: `[ ]`
+
+Owner: Infrastructure
+
+Provide:
+
+- Open server for owner, public Card, visitor agent, and requests
+- H5-ready HTTP API
+- Docker Compose reference deployment
+- Environment template
+- Database migrations
+- Health checks, backups, restore, and upgrade documentation
+- Rate limiting, moderation hooks, and secure defaults
+
+Acceptance:
+
+- A clean machine can start the stack from documented commands
+- Setup does not require a VibeCard Cloud key
+- Owner can import a `.vibe` archive and publish a Card
+- A visitor can open the Card, talk to the public agent, and submit a request
+- Backup and restore preserve Core fixture state
+- Deployment passes an automated smoke test
+
+Dependencies: 5.3, 5.4, 5.5, and 5.6
+
+Milestone 5 is complete when a technical user can run the complete core product
+without the official service and move data in and out without vendor lock-in.
+
+---
+
+# Milestone 6: H5 / PWA Open Client
+
+## 6.1 Build Local-First Owner Onboarding
+
+Status: `[ ]`
+
+Owner: Web
+
+Implement:
+
+- Create or import a Vibe
+- Choose local, self-hosted, or managed connection
+- Configure a model only when the selected mode requires it
+- Talk to My Vibe and confirm memory
+- Edit Card and publish Now
+- Export and delete data
+
+Acceptance:
+
+- Local mode works without account creation
+- Self-hosted endpoint can be changed without rebuilding the client
+- No credential is written into a public Card or browser log
+- Mobile and desktop browser layouts pass
+
+Dependencies: Milestone 5
+
+## 6.2 Build Public Sharing And Visitor Flow
+
+Status: `[ ]`
+
+Owner: Web
+
+Implement:
+
+- Public Card URL
+- QR sharing
+- Static public snapshot mode
+- Optional online visitor agent
+- Connection request submission
+- Owner-selected contact unlock
+- Embeddable Card
+
+Acceptance:
+
+- Static Card remains readable when the owner agent is offline
+- Agent-disabled state is clear and still allows an approved contact path
+- Private memory and contacts never appear in page source or public API
+- Self-hosted and managed URLs follow the same public contract
+
+Dependencies: 6.1 and 5.7
+
+## 6.3 Make H5 Installable And Resilient
+
+Status: `[ ]`
+
+Owner: Web
+
+Add:
+
+- PWA installation
+- Offline owner shell and queued local changes
+- Sync-conflict handling
+- Accessible keyboard and screen-reader paths
+- Reduced-motion behavior
+- Upgrade-safe local migrations
+
+Acceptance:
+
+- Owner can read and edit local state offline
+- Reconnect does not duplicate memory or Now items
+- Accessibility checks and responsive E2E tests pass
+- A failed migration leaves a recoverable export
+
+Dependencies: 6.1 and 6.2
+
+---
+
+# Milestone 7: Open Managed Cloud Service
+
+The managed service operates the open system. It must not become a mandatory
+closed dependency.
+
+## 7.1 Add Account, Sync, And Public-Agent Hosting
+
+Status: `[ ]`
+
+Owner: Cloud
+
+Provide:
+
+- Optional account and device sync
+- Stable Card URLs
+- Always-on visitor agents
+- Request notifications
+- Backups and restore
+- Region and retention controls
+
+Acceptance:
+
+- Local users can opt in without recreating identity
+- Users can export and leave the service
+- Sync respects memory visibility and deletion
+- Public uptime does not require uploading unselected raw data
+
+Dependencies: Milestone 6
+
+## 7.2 Add Managed AI And Knowledge Plans
+
+Status: `[ ]`
+
+Owner: Cloud and AI
+
+Sell managed service for:
+
+- Model routing and usage credits
+- Embeddings and retrieval
+- Managed knowledge storage
+- Parsing and source synchronization
+- Larger memory and file limits
+- Operational monitoring and support
+
+Requirements:
+
+- Usage and cost are visible
+- Users may continue using their own model and store
+- Canonical data remains exportable
+- Billing state never changes permission behavior
+
+Acceptance:
+
+- Quotas are enforced server-side
+- A user can switch from managed AI to BYOK
+- Failed payment does not silently delete or expose data
+- Data export works without an active paid plan
+
+Dependencies: 7.1
+
+## 7.3 Publish Cloud Deployment And Portability Guarantees
+
+Status: `[ ]`
+
+Owner: coordinating agent
+
+Document:
+
+- Which open-source release the cloud runs
+- Data locations and retention
+- Export and deletion guarantees
+- Self-host migration procedure
+- Incident and security disclosure process
+- Service-level options
+
+Acceptance:
+
+- A managed fixture account can migrate to self-hosted and remain functional
+- Public Card links have a documented redirect/export strategy
+- Cloud-specific metadata does not contaminate the portable archive
+
+Dependencies: 7.1 and 7.2
+
+---
+
+# Milestone 8: Desktop Vibe Pet
+
+## 8.1 Build The Lightweight Desktop Shell
+
+Status: `[ ]`
+
+Owner: Desktop
+
+Implement:
+
+- Menu-bar or lightweight desktop companion
+- One-click text capture
+- My Vibe conversation
+- Memory confirmation
+- Card and Now update proposals
+- Connection-request inbox
+
+Acceptance:
+
+- Desktop uses the same Core and selected repository
+- It does not create a second memory system
+- Private local mode works without cloud login
+- Background behavior and notifications are user-controlled
+
+Dependencies: Milestone 5
+
+## 8.2 Add Local Knowledge And Model Options
+
+Status: `[ ]`
+
+Owner: Desktop and AI
+
+Add:
+
+- File, folder, note, link, and clipboard ingestion
+- Local model adapter
+- Private OpenAI-compatible endpoint
+- Source management and deletion
+- Optional encrypted sync
+
+Acceptance:
+
+- Removing a source removes it from future retrieval
+- Local files are not uploaded without explicit configuration
+- Answers show internal source provenance to the owner
+- Desktop can export a portable archive
+
+Dependencies: 8.1 and 5.6
+
+---
+
+# Milestone 9: Mobile And Adapter Ecosystem
+
+## 9.1 Define The Client SDK
+
+Status: `[ ]`
+
+Owner: Core
+
+Provide documented SDKs for:
+
+- Card rendering
+- Owner and visitor sessions
+- Memory proposal confirmation
+- Now publishing
+- Connection requests
+- Authentication adapter integration
+
+Acceptance:
+
+- SDK examples work against self-hosted and managed servers
+- SDK license permits third-party integrations
+- SDK never exposes provider-specific or database-specific records
+
+Dependencies: Milestones 5 and 6
+
+## 9.2 Add Native Mobile Clients Only For Native Value
+
+Status: `[ ]`
+
+Owner: Mobile
+
+Build iOS and Android when the product needs:
+
+- Push notifications
+- Voice capture
+- Offline local models
+- Share-sheet integration
+- Camera, NFC, or contact-card capabilities
+
+Acceptance:
+
+- Native clients reuse Core contracts and conformance tests
+- Platform permission prompts are contextual
+- The complete owner data remains exportable
+- H5 remains a supported first-class client
+
+Dependencies: 9.1
+
+## 9.3 Add Third-Party Adapters Without Becoming A Community
+
+Status: `[ ]`
+
+Owner: Ecosystem
+
+Support third-party:
+
+- Model providers
+- Storage and vector stores
+- Knowledge sources
+- Themes and Card templates
+- Platform share targets
+- Importers and exporters
+
+Do not add a central social feed as the adapter marketplace.
+
+Acceptance:
+
+- An adapter declares capabilities and permissions
+- Adapter failures cannot bypass Core privacy rules
+- A user can disable and remove an adapter with its credentials
+- Reference adapters and contribution tests are documented
+
+Dependencies: 9.1
+
+---
+
+# Long-Term Definition Of Done
+
+VibeCard is fully open and portable when:
+
+- The complete personal AI loop runs locally or self-hosted
+- No official account, model, database, or vector service is mandatory
+- WeChat, H5, desktop, and later mobile clients share one Core
+- Owner-confirmed memory and public projection remain separate
+- A user can export, import, migrate, and delete all canonical data
+- Public Card and Now work without a global community feed
+- Official cloud earns revenue from managed operation, not artificial lock-in
+- A third party can build a compatible client or adapter from public contracts
 
 Future work:
 
