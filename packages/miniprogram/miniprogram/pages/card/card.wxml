@@ -87,10 +87,10 @@
         </view>
 
         <!-- Tags & Event -->
-        <view wx:if="{{profile.event || (profile.tags && profile.tags.length > 0)}}" class="tags-wrap" bindtap="openEdit">
+        <view wx:if="{{profile.event || (profile.tags && profile.tags.length > 0)}}" class="tags-wrap" bindtap="{{isSharedView ? 'noop' : 'openEdit'}}">
           <view wx:if="{{profile.event}}" class="profile-tag profile-tag-event">📍 {{profile.event}}</view>
           <view wx:for="{{profile.tags}}" wx:key="label" class="profile-tag">{{item.label}}</view>
-          <view class="profile-tag profile-tag-add">+ 编辑</view>
+          <view wx:if="{{!isSharedView}}" class="profile-tag profile-tag-add">+ 编辑</view>
         </view>
 
         <!-- Bio -->
@@ -184,11 +184,11 @@
               <view class="avatar-mode-pill {{avatarMode === 'custom' ? 'avatar-mode-active' : ''}}" bindtap="setAvatarMode" data-mode="custom">本地上传</view>
             </view>
           </view>
-          <scroll-view wx:if="{{avatarMode === 'generated'}}" scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
-            <view class="h-scroll-inner">
-              <view wx:for="{{avatarSeeds}}" wx:key="*this" class="avatar-seed {{editAvatarSeed === item ? 'avatar-seed-active' : ''}}" bindtap="selectAvatarSeed" data-seed="{{item}}">{{item}}</view>
+          <view wx:if="{{avatarMode === 'generated'}}" class="avatar-grid">
+            <view wx:for="{{avatarOptions}}" wx:key="key" class="avatar-option {{editAvatar === item.url ? 'avatar-option-active' : ''}}" bindtap="selectAvatarSeed" data-url="{{item.url}}" data-seed="{{item.key}}">
+              <image class="avatar-option-img" src="{{item.url}}" mode="aspectFit" lazy-load />
             </view>
-          </scroll-view>
+          </view>
           <view wx:if="{{avatarMode === 'custom'}}" class="field-tip">点击头像从相册或相机选择</view>
         </view>
 
@@ -215,11 +215,9 @@
             <text class="section-title-new">我的标签</text>
             <text class="section-subtitle-new">{{editTags.length}}/5</text>
           </view>
-          <scroll-view scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
-            <view class="h-scroll-inner">
-              <view wx:for="{{tagOptions}}" wx:key="*this" class="pill {{utils.includes(editTags, item) ? 'pill-active' : ''}}" bindtap="onEditTagSelect" data-tag="{{item}}">{{item}}</view>
-            </view>
-          </scroll-view>
+          <view class="pill-grid">
+            <view wx:for="{{tagOptions}}" wx:key="*this" class="pill {{utils.includes(editTags, item) ? 'pill-active' : ''}}" bindtap="onEditTagSelect" data-tag="{{item}}">{{item}}</view>
+          </view>
           <view class="custom-tag-row">
             <input class="custom-tag-input" placeholder="输入自定义标签..." placeholder-style="color: #a3a3a3;" value="{{editCustomTag}}" bindinput="onEditCustomTagInput" />
             <view class="custom-tag-btn {{editCustomTag ? 'custom-tag-btn-active' : ''}}" bindtap="addEditCustomTag">添加</view>
@@ -229,21 +227,17 @@
         <!-- Looking For -->
         <view class="edit-section">
           <view class="section-title-new">寻找什么</view>
-          <scroll-view scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
-            <view class="h-scroll-inner">
-              <view wx:for="{{lookingForOptions}}" wx:key="*this" class="pill-card {{editLookingFor === item ? 'pill-card-active' : ''}}" bindtap="onEditLookingSelect" data-item="{{item}}">{{item}}</view>
-            </view>
-          </scroll-view>
+          <view class="pill-grid">
+            <view wx:for="{{lookingForOptions}}" wx:key="*this" class="pill-card {{editLookingFor === item ? 'pill-card-active' : ''}}" bindtap="onEditLookingSelect" data-item="{{item}}">{{item}}</view>
+          </view>
         </view>
 
         <!-- Event -->
         <view class="edit-section">
           <view class="section-title-new">当前活动</view>
-          <scroll-view scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
-            <view class="h-scroll-inner">
-              <view wx:for="{{eventOptions}}" wx:key="*this" class="pill-card {{editEvent === item ? 'pill-card-active' : ''}}" bindtap="onEditEventSelect" data-item="{{item}}">{{item}}</view>
-            </view>
-          </scroll-view>
+          <view class="pill-grid">
+            <view wx:for="{{eventOptions}}" wx:key="*this" class="pill-card {{editEvent === item ? 'pill-card-active' : ''}}" bindtap="onEditEventSelect" data-item="{{item}}">{{item}}</view>
+          </view>
         </view>
 
         <!-- Verified Accounts -->

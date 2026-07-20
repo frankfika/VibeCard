@@ -27,13 +27,35 @@ function fitCanvasText(ctx, text, maxWidth) {
   return out + '…';
 }
 
-const AVATAR_SEEDS = ['Alex', 'Luna', 'Max', 'Zoe', 'Kai', 'Nova', 'Aria', 'Leo', 'Mia', 'Finn', 'Sage', 'River'];
+const AVATAR_STYLES = ['notionists', 'adventurer'];
+const AVATAR_SEEDS = ['Alex', 'Luna', 'Max', 'Zoe', 'Kai', 'Nova'];
+// 历史数据里标签和 lookingFor 带 emoji 前缀，展示时统一清掉
+function stripEmojiPrefix(text) {
+  return String(text || '').replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '');
+}
+function cleanProfileDisplay(profile) {
+  if (!profile) return profile;
+  const cleaned = { ...profile };
+  if (Array.isArray(cleaned.tags)) {
+    cleaned.tags = cleaned.tags.map(t => ({ ...t, label: stripEmojiPrefix(t.label) }));
+  }
+  if (cleaned.lookingFor) cleaned.lookingFor = stripEmojiPrefix(cleaned.lookingFor);
+  return cleaned;
+}
+
+function avatarUrlFor(style, seed) {
+  return `https://api.dicebear.com/7.x/${style}/png?seed=${seed}&backgroundColor=transparent`;
+}
+const AVATAR_OPTIONS = [];
+AVATAR_STYLES.forEach(style => AVATAR_SEEDS.forEach(seed => {
+  AVATAR_OPTIONS.push({ key: `${style}-${seed}`, url: avatarUrlFor(style, seed) });
+}));
 const TAG_OPTIONS = [
   'Builder', 'Designer', 'Founder', 'Developer', 'Researcher',
   'Community', 'Product', 'AI', 'Web3', 'Creator',
-  'Investor', 'Indie Hacker', '🎨 Design', '🚀 Shipping',
-  '🧠 Strategy', '💻 Full Stack', '📱 Mobile', '🌍 Remote',
-  '🎤 Speaker', '☕ Coffee Chat'
+  'Investor', 'Indie Hacker', 'Design', 'Shipping',
+  'Strategy', 'Full Stack', 'Mobile', 'Remote',
+  'Speaker', 'Coffee Chat'
 ];
 const LOOKING_FOR_OPTIONS = [
   '找合伙人', '寻找机会', '寻求投资',
@@ -74,7 +96,7 @@ Page({
     tagOptions: TAG_OPTIONS,
     lookingForOptions: LOOKING_FOR_OPTIONS,
     eventOptions: EVENT_OPTIONS,
-    avatarSeeds: AVATAR_SEEDS,
+    avatarOptions: AVATAR_OPTIONS,
     editAvatar: '',
     editAvatarSeed: '',
     avatarMode: 'generated',
@@ -89,7 +111,7 @@ Page({
   onLoad(options) {
     if (options.shared) {
       try {
-        const sharedProfile = JSON.parse(decodeURIComponent(options.shared));
+        const sharedProfile = cleanProfileDisplay(JSON.parse(decodeURIComponent(options.shared)));
         this.setData({ profile: sharedProfile, isSetup: true, isSharedView: true, cardVisible: true });
         this.hideSharedTabBar();
         return;
@@ -125,11 +147,11 @@ Page({
   },
 
   loadProfile() {
-    let profile = store.getProfile() || {};
+    let profile = cleanProfileDisplay(store.getProfile() || {});
     if (!profile.verified) profile = { ...profile, verified: { wallet: '', twitter: '', discord: '', wechat: '' } };
     if (!profile.highlights) profile = { ...profile, highlights: [] };
     if (!profile.avatar && profile.name) {
-      profile = { ...profile, avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name}&backgroundColor=transparent` };
+      profile = { ...profile, avatar: avatarUrlFor('notionists', profile.name) };
     }
     const isSetup = store.isProfileSetup();
     if (isSetup) {
@@ -338,17 +360,14 @@ Page({
   setAvatarMode(e) {
     const mode = e.currentTarget.dataset.mode;
     let avatar = this.data.editAvatar;
-    if (mode === 'generated') {
-      avatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${this.data.editAvatarSeed}&backgroundColor=transparent`;
+    if (mode === 'generated' && (!avatar || !avatar.includes('dicebear'))) {
+      avatar = avatarUrlFor('notionists', this.data.editAvatarSeed || AVATAR_SEEDS[0]);
     }
     this.setData({ avatarMode: mode, editAvatar: avatar });
   },
   selectAvatarSeed(e) {
-    const seed = e.currentTarget.dataset.seed;
-    this.setData({
-      editAvatarSeed: seed,
-      editAvatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${seed}&backgroundColor=transparent`,
-    });
+    const { url, seed } = e.currentTarget.dataset;
+    this.setData({ editAvatarSeed: seed || this.data.editAvatarSeed, editAvatar: url });
   },
 
   // Verified Accounts
@@ -400,9 +419,8 @@ Page({
         discord: this.data.editDiscord,
         wechat: this.data.editWechat,
       },
-      avatar: this.data.avatarMode === 'custom' && this.data.editAvatar
-        ? this.data.editAvatar
-        : `https://api.dicebear.com/7.x/notionists/svg?seed=${this.data.editAvatarSeed}&backgroundColor=transparent`,
+      avatar: this.data.editAvatar
+        || avatarUrlFor('notionists', this.data.editAvatarSeed || AVATAR_SEEDS[0]),
     };
     store.setProfile(profile);
     this.setData({ isEditing: false });
@@ -442,6 +460,7 @@ Page({
       // Contact details (verified.wechat etc.) are private by default: they must
       // never travel inside the share link, only through owner-approved exchange.
       const publicProfile = { ...profile, verified: undefined };
+      if (publicProfile.avatar) publicProfile.avatar = publicProfile.avatar.replace('/svg?', '/png?');
       const data = encodeURIComponent(JSON.stringify(publicProfile));
       // 标题即名片的自我表达：这是「我的 AI 名片」，并告诉对方能做什么
       const title = `${profile.name}的 AI 名片 · 先和我的 Vibe 聊聊`;
