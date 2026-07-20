@@ -771,14 +771,16 @@ The target is:
 
 ## 5.1 Establish The Open Source Contract
 
-Status: `[~]`
+Status: `[x]`
 
-Progress:
+Completion:
 
-- Started 2026-07-21 on branch `feature/task-5.1-open-source-contract` (stacked on `feature/task-4.5-personal-now`)
-- Coordinating agent owns; one implementation sub-agent (root + docs only)
-- Current phase: license decision, governance docs, secret/personal-data audit, README modes section
-- Remaining: audit verification, lint/build, completion entry
+- 2026-07-21, on branch `feature/task-5.1-open-source-contract` (stacked on `feature/task-4.5-personal-now`).
+- License split: AGPL-3.0-only for the runnable product/hosted Core (root `LICENSE`, `packages/miniprogram` + 10 cloud functions, `packages/web`); MIT for integration surfaces (`packages/shared`, `packages/contracts`). Every first-party package has an explicit license file and/or `license` field in `package.json`.
+- Governance docs created: `CONTRIBUTING.md` (setup, validation commands, lane ownership, contract-first rule, commit conventions, DoD), `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1), `SECURITY.md` (private reporting via GitHub Security Advisories + placeholder email; product-specific issue list: memory-visibility leaks, public Card contact exposure, prompt injection, cloud-function permission bypass, committed secrets), `docs/engineering/OPEN_SOURCE.md` (per-package license table + rationale, trademark/naming rules, release process, never-commit list, "local/self-hosted need no paid license or official account; no proprietary server mandatory" statements).
+- `README.md` gained a "Runtime Modes And Licensing" section describing Local / Self-Hosted / VibeCard Cloud honestly: the competition MVP today runs on WeChat Cloud Development; Local/Self-Hosted modes are the post-competition roadmap now landing.
+- Secret & personal-data audit over all 286 tracked text files: no private keys, no real API keys, no committed `.env` (only placeholder `.env.example` files); fixtures are fictional (林舟/苏晴/王拓, `*.example` emails, sentinel test values). One low-severity flag: the real WeChat AppID `wxa79d41c8255ff90d` in `packages/miniprogram/project.config.json` (semi-public, required by tooling) — conscious decision needed before making the repo public. Contact emails are `*.vibecard.example` placeholders pending a real project contact.
+- Validation: `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅. No code behavior changed; e2e/test suites unaffected.
 
 Owner: coordinating agent
 
