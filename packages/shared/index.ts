@@ -122,6 +122,37 @@ export type {
   CardDraftValidation,
 } from './agent-schema';
 
+// Provider-neutral model boundary (task 5.4, ARCHITECTURE §6): capability
+// declarations, typed provider errors, and the validated AgentModel wrapper.
+export {
+  MODEL_CAPABILITIES,
+  TEXT_STRUCTURED_CAPABILITIES,
+  PROVIDER_ERROR_CODES,
+  ModelProviderError,
+  isModelProviderError,
+  providerSupports,
+  requireProviderCapability,
+  embedWithProvider,
+  createAgentModel,
+} from './model-provider';
+export type {
+  ModelCapability,
+  ModelProviderCapabilities,
+  ProviderErrorCode,
+  ChatMessage,
+  CompletionInput,
+  ModelProvider,
+  ModelCallOutcome,
+  AgentModel,
+  AgentModelInput,
+  OwnerModelInput,
+  CardDraftModelResult,
+} from './model-provider';
+
+// Reference deterministic mock provider (task 5.4): zero keys, zero network,
+// byte-identical to the cloud-function mock mirror.
+export { createMockModelProvider } from './mock-provider';
+
 // Pure v1 profile migration mapping (ARCHITECTURE §9).
 export {
   V1_CONTACT_KEYS,

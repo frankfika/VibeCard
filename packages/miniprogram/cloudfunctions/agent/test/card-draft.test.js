@@ -71,7 +71,7 @@ test('completely empty model output is rejected', () => {
   assert.equal(validateCardDraft(null).error, 'not_an_object');
 });
 
-test('invalid model JSON -> typed invalid_model_output; provider down -> provider_unavailable', async () => {
+test('invalid model JSON -> typed invalid_model_output; provider down -> model_unavailable', async () => {
   const badJson = { async complete() { return 'no json'; } };
   const outcome = await runCardDraft({ provider: badJson, memories: CONFIRMED });
   assert.equal(outcome.ok, false);
@@ -80,5 +80,5 @@ test('invalid model JSON -> typed invalid_model_output; provider down -> provide
   const down = { async complete() { throw new Error('provider_timeout'); } };
   const downOutcome = await runCardDraft({ provider: down, memories: CONFIRMED });
   assert.equal(downOutcome.ok, false);
-  assert.equal(downOutcome.error.code, 'provider_unavailable');
+  assert.equal(downOutcome.error.code, 'model_unavailable');
 });

@@ -8,6 +8,7 @@
  */
 
 const { validateOwnerAgentResult, validateVisitorAgentResult, validateConnectionSummary, validateCardDraft, typedError, ok } = require('./schema');
+const { isProviderError } = require('./providers');
 
 const OWNER_SYSTEM_PROMPT = [
   '你是用户的私有 Vibe：温暖、敏锐、简洁，从不谄媚。',
@@ -41,8 +42,24 @@ function normalizeMessages(messages) {
   return normalized.length > 0 ? normalized : null;
 }
 
+/**
+ * Map a thrown provider failure to a stable typed error (ARCHITECTURE §12).
+ * Typed ProviderErrors pass their code through; anything else is reported as
+ * model_unavailable with a static message — raw provider errors, keys, and
+ * stack traces never reach the client.
+ */
+function providerFailure(error) {
+  if (isProviderError(error)) return typedError(error.code, error.message);
+  return typedError('model_unavailable', 'the model is temporarily unavailable');
+}
+
 async function callAndValidate(provider, system, messages, validate = validateOwnerAgentResult) {
-  const raw = await provider.complete({ system, messages });
+  let raw;
+  try {
+    raw = await provider.complete({ system, messages });
+  } catch (error) {
+    return { providerError: providerFailure(error) };
+  }
   let parsed;
   try {
     parsed = JSON.parse(raw);
@@ -69,9 +86,11 @@ async function runOwnerAgent({ provider, memories, messages }) {
   const system = `${OWNER_SYSTEM_PROMPT}\n\n已确认的记忆（只有用户确认过的内容）：\n${buildMemoryContext(memories)}`;
 
   let attempt = await callAndValidate(provider, system, normalized);
+  if (attempt.providerError) return attempt.providerError;
   if (attempt.error) {
     // Retry once with the same validated contract, then give up as a typed error.
     attempt = await callAndValidate(provider, system, normalized);
+    if (attempt.providerError) return attempt.providerError;
     if (attempt.error) {
       return typedError('invalid_model_output', 'model output failed schema validation');
     }
@@ -133,7 +152,7 @@ async function runCardDraft({ provider, memories, currentCard }) {
   try {
     raw = await provider.complete({ system, messages });
   } catch (error) {
-    return typedError('provider_unavailable', 'the model is temporarily unavailable');
+    return providerFailure(error);
   }
 
   let parsed;
@@ -228,9 +247,11 @@ async function runVisitorAgent({ provider, card, publicMemories, agentMemories, 
   ].join('\n');
 
   let attempt = await callAndValidate(provider, system, normalized, validateVisitorAgentResult);
+  if (attempt.providerError) return attempt.providerError;
   if (attempt.error) {
     // Retry once with the same validated contract, then give up as a typed error.
     attempt = await callAndValidate(provider, system, normalized, validateVisitorAgentResult);
+    if (attempt.providerError) return attempt.providerError;
     if (attempt.error) {
       return typedError('invalid_model_output', 'model output failed schema validation');
     }
@@ -281,8 +302,10 @@ async function runConnectionSummary({ provider, request, conversationExcerpt }) 
   const messages = [{ role: 'user', content: '请基于以上证据生成连接摘要。' }];
 
   let attempt = await callAndValidate(provider, system, messages, validateConnectionSummary);
+  if (attempt.providerError) return attempt.providerError;
   if (attempt.error) {
     attempt = await callAndValidate(provider, system, messages, validateConnectionSummary);
+    if (attempt.providerError) return attempt.providerError;
     if (attempt.error) {
       return typedError('invalid_model_output', 'model output failed schema validation');
     }

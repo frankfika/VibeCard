@@ -26,6 +26,8 @@ const CORE_FILES = [
   'public-card.ts',
   'connection.ts',
   'agent-schema.ts',
+  'model-provider.ts',
+  'mock-provider.ts',
   'migration.ts',
   'archive.ts',
   'index.ts',
