@@ -419,7 +419,9 @@ Page({
   noop() {},
   goHome() {
     nav.showTabBar();
-    nav.switchTab('/pages/card/card');
+    // 分享卡片打开的就是 tab 页本体，switchTab 到当前 tab 不会重载；
+    // 用 reLaunch 强制全新加载，访客才能进入自己的名片/onboarding
+    nav.reLaunch('/pages/card/card');
   },
 
   // 访客视图入口：先和主人的 AI 分身聊聊（任务 0.4 mock + 任务 2.5 云链路）
@@ -485,95 +487,102 @@ Page({
         canvas.width = width;
         canvas.height = height;
 
-        // 浅色背景 + 白色卡片，与 App 内视觉一致
-        ctx.fillStyle = '#f7f7f8';
+        // 大胆 indigo 渐变底 + 白字，年轻有趣、居中排版
+        const bg = ctx.createLinearGradient(0, 0, width, height);
+        bg.addColorStop(0, '#6366f1');
+        bg.addColorStop(0.55, '#818cf8');
+        bg.addColorStop(1, '#a5b4fc');
+        ctx.fillStyle = bg;
         ctx.fillRect(0, 0, width, height);
 
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        drawRoundRectPath(ctx, 40, 40, width - 80, height - 80, 32);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(17,17,19,0.06)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        // 装饰气泡（半透明白圆，制造趣味层次）
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath(); ctx.arc(width - 60, 60, 140, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(80, height - 60, 180, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.beginPath(); ctx.arc(width - 180, height - 100, 46, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(150, 110, 30, 0, Math.PI * 2); ctx.fill();
 
         const renderContent = (img) => {
-          // 头像（圆形，indigo 渐变兜底）
-          const avatarCx = 160;
-          const avatarCy = 170;
-          const avatarR = 70;
+          const cx = width / 2;
+
+          // 头像：白色圆环 + indigo 实心兜底
+          const avatarCy = 158;
+          const avatarR = 76;
+          ctx.fillStyle = 'rgba(255,255,255,0.35)';
+          ctx.beginPath(); ctx.arc(cx, avatarCy, avatarR + 10, 0, Math.PI * 2); ctx.fill();
           if (img) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2);
+            ctx.arc(cx, avatarCy, avatarR, 0, Math.PI * 2);
             ctx.clip();
-            ctx.drawImage(img, avatarCx - avatarR, avatarCy - avatarR, avatarR * 2, avatarR * 2);
+            ctx.drawImage(img, cx - avatarR, avatarCy - avatarR, avatarR * 2, avatarR * 2);
             ctx.restore();
           } else {
-            const grd = ctx.createLinearGradient(avatarCx - avatarR, avatarCy - avatarR, avatarCx + avatarR, avatarCy + avatarR);
-            grd.addColorStop(0, '#818cf8');
-            grd.addColorStop(1, '#6366f1');
-            ctx.fillStyle = grd;
-            ctx.beginPath();
-            ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillStyle = '#4f46e5';
+            ctx.beginPath(); ctx.arc(cx, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
             const initial = profile.name ? profile.name.charAt(0).toUpperCase() : '?';
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 64px sans-serif';
+            ctx.font = 'bold 68px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(initial, avatarCx, avatarCy + 4);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(initial, cx, avatarCy + 4);
           }
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'alphabetic';
 
-          // 名字（宽度过长时截断，避免溢出卡片）
-          const textX = 270;
-          const textMaxWidth = width - 80 - textX - 30;
-          ctx.fillStyle = '#16161a';
-          ctx.font = 'bold 52px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.fillText(fitCanvasText(ctx, profile.name, textMaxWidth), textX, 155);
+          // 名字（超大粗体白字，过长截断）
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 58px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+          ctx.fillText(fitCanvasText(ctx, profile.name, 620), cx, 316);
 
           // Handle
           if (profile.handle) {
-            ctx.fillStyle = '#8e8e93';
-            ctx.font = '28px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            ctx.fillText(fitCanvasText(ctx, profile.handle, textMaxWidth), textX, 200);
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            ctx.font = '26px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+            ctx.fillText(fitCanvasText(ctx, profile.handle, 500), cx, 356);
           }
 
-          // 标签（chips，超出右边界即停止，不换行不重叠）
-          let tagX = textX;
-          const tagY = 224;
-          const tagMaxRight = width - 80 - 30;
+          // 标签：半透明白 chips，整体居中
           ctx.font = '24px -apple-system, SF Pro Display, PingFang SC, sans-serif';
           const tags = profile.tags || [];
-          const allTags = profile.event ? [{ label: profile.event }, ...tags] : tags;
-          for (const tag of allTags.slice(0, 4)) {
-            const label = String(tag.label || '');
-            if (!label) continue;
-            const chipWidth = ctx.measureText(label).width + 32;
-            if (tagX + chipWidth > tagMaxRight) break;
-            ctx.fillStyle = '#eceefe';
+          const allTags = (profile.event ? [{ label: profile.event }, ...tags] : tags)
+            .map(t => String(t.label || '')).filter(Boolean);
+          const chipGap = 14;
+          const chipHeight = 42;
+          const chips = [];
+          let totalWidth = 0;
+          for (const label of allTags.slice(0, 4)) {
+            const w = ctx.measureText(label).width + 32;
+            if (totalWidth + w + (chips.length ? chipGap : 0) > 600) break;
+            totalWidth += w + (chips.length ? chipGap : 0);
+            chips.push({ label, w });
+          }
+          let tagX = cx - totalWidth / 2;
+          const tagY = 384;
+          for (const chip of chips) {
+            ctx.fillStyle = 'rgba(255,255,255,0.22)';
             ctx.beginPath();
-            drawRoundRectPath(ctx, tagX, tagY, chipWidth, 44, 22);
+            drawRoundRectPath(ctx, tagX, tagY, chip.w, chipHeight, chipHeight / 2);
             ctx.fill();
-            ctx.fillStyle = '#4f46e5';
-            ctx.fillText(label, tagX + 16, tagY + 31);
-            tagX += chipWidth + 16;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(chip.label, tagX + chip.w / 2, tagY + 30);
+            tagX += chip.w + chipGap;
           }
 
-          // 中部：简介优先，其次最新动态，再次 lookingFor
-          const midText = profile.bio || profile.latestMoment || profile.lookingFor || '';
-          if (midText) {
-            ctx.fillStyle = '#3f3f46';
-            ctx.font = '28px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            const words = String(midText).split('');
+          // 一句话钩子：简介 > 最新动态 > lookingFor（居中，最多两行）
+          const hook = profile.bio || profile.latestMoment
+            || (profile.lookingFor ? '想认识：' + profile.lookingFor : '');
+          if (hook) {
+            ctx.fillStyle = 'rgba(255,255,255,0.92)';
+            ctx.font = '27px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+            const words = String(hook).split('');
             const lines = [];
             let line = '';
             let truncated = false;
             for (let n = 0; n < words.length; n++) {
               const testLine = line + words[n];
-              if (ctx.measureText(testLine).width > 570 && line) {
+              if (ctx.measureText(testLine).width > 560 && line) {
                 lines.push(line);
                 line = words[n];
                 if (lines.length === 2) { truncated = true; break; }
@@ -582,29 +591,18 @@ Page({
               }
             }
             if (!truncated && line && lines.length < 2) lines.push(line);
-            let y = 350;
+            let y = 486;
             lines.slice(0, 2).forEach((l, i) => {
               const isLast = truncated && i === 1;
-              ctx.fillText(isLast ? fitCanvasText(ctx, l, 540) : l, 90, y);
-              y += 44;
+              ctx.fillText(isLast ? fitCanvasText(ctx, l, 530) : l, cx, y);
+              y += 42;
             });
           }
 
-          // Looking For 独立一行（与中部文字拉开距离）
-          if (profile.lookingFor && (profile.bio || profile.latestMoment)) {
-            ctx.fillStyle = '#6366f1';
-            ctx.font = 'bold 22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            ctx.fillText('LOOKING FOR', 90, 470);
-            ctx.fillStyle = '#16161a';
-            ctx.font = 'bold 28px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-            ctx.fillText(fitCanvasText(ctx, profile.lookingFor, 570), 90, 508);
-          }
-
           // 底部品牌
-          ctx.fillStyle = '#b6b6bd';
-          ctx.font = '22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('VibeCard · 会越来越懂你的 AI 名片', width / 2, height - 66);
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.font = 'bold 22px -apple-system, SF Pro Display, PingFang SC, sans-serif';
+          ctx.fillText('VibeCard · 会越来越懂你的 AI 名片', cx, height - 34);
           ctx.textAlign = 'left';
 
           // Export
