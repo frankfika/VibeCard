@@ -223,5 +223,76 @@ export type {
 export { createInMemoryRepositories, createFixtureRepositories } from './in-memory-store';
 export type { InMemorySeed } from './in-memory-store';
 
+// Structured memory retrieval (task 5.6, ARCHITECTURE §7/§18 stage 1): the
+// default path — deterministic, needs no embeddings or vector store.
+export {
+  DEFAULT_RETRIEVAL_LIMIT,
+  RetrievalInputError,
+  permissionFilteredCandidates,
+  queryTerms,
+  keywordScore,
+  recencyScore,
+  retrieveMemories,
+} from './retrieval';
+export type {
+  RetrievalAudience,
+  RetrievalInput,
+  RetrievedMemory,
+  VisibilityDecision,
+} from './retrieval';
+
+// RetrievalProvider seam (task 5.6, stages 2–3): optional embeddings behind
+// the interface, an owner-scoped vector-store interface (reference in-memory
+// implementation only — we do not build a vector database), and optional
+// reranking. Semantic retrieval never changes Core records.
+export {
+  RetrievalProviderError,
+  embeddingProviderFromModel,
+  createHashEmbeddingProvider,
+  createInMemoryVectorStore,
+  createStructuredRetrievalProvider,
+  createSemanticRetrievalProvider,
+  indexMemoryEmbedding,
+  ownerNamespace,
+  passThroughReranker,
+  createKindBoostReranker,
+  retrieveWithOptionalRerank,
+} from './retrieval-provider';
+export type {
+  EmbeddingProvider,
+  VectorEntry,
+  VectorHit,
+  VectorStore,
+  RetrievalProvider,
+  SemanticRetrievalProviderOptions,
+  Reranker,
+} from './retrieval-provider';
+
+// Knowledge-source adapters (task 5.6): file/note/link/external ingestion
+// with deterministic chunking and full provenance; chunk retrieval applies
+// the same visibility-before-retrieval discipline (owner-private default).
+export {
+  DEFAULT_CHUNK_SIZE,
+  chunkContent,
+  fileKnowledgeAdapter,
+  noteKnowledgeAdapter,
+  linkKnowledgeAdapter,
+  externalKnowledgeAdapter,
+  KNOWLEDGE_SOURCE_ADAPTERS,
+  retrieveKnowledgeChunks,
+} from './knowledge';
+export type {
+  KnowledgeSourceKind,
+  KnowledgeProvenance,
+  KnowledgeChunk,
+  KnowledgeIngestionResult,
+  KnowledgeIngestInput,
+  KnowledgeSourceAdapter,
+  KnowledgeAudience,
+  KnowledgeVisibilityDecision,
+  RetrievedKnowledgeChunk,
+  KnowledgeRetrievalInput,
+} from './knowledge';
+
 export * as vibeFixtures from './fixtures/vibe';
 export * as nowFixtures from './fixtures/now';
