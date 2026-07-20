@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Send, X } from 'lucide-react';
 import { vibeFixtures } from '@shared';
+import type { NowItem } from '@shared';
 
 /**
  * VisitorVibeChat (task 0.4 mock story) — the public-facing Vibe.
@@ -29,22 +30,61 @@ interface ChatMessage {
 
 type Stage = 'chat' | 'preview' | 'done';
 
-const suggestions: { q: string; a: (ownerName: string) => string }[] = [
-  {
-    q: '他为什么做这个？',
-    a: () => `他最近在做的方向是：${vibeFixtures.fixtureOwnerCard.currentFocus}`,
-  },
-  {
-    q: '他可以帮别人什么？',
-    a: () => `他提到过自己能帮到这些：${vibeFixtures.fixtureOwnerCard.canHelpWith.join('、')}。`,
-  },
-  {
-    q: '他现在想认识什么样的人？',
-    a: () => `他最近想认识：${vibeFixtures.fixtureOwnerCard.wantsToMeet.join('、')}。`,
-  },
-];
+/**
+ * Task 4.5 grounding: recent-context questions are answered ONLY from
+ * currently published, non-expired Now items (preferred), then the public
+ * current-focus memory. If neither exists, the Vibe says it doesn't have a
+ * recent public update — it never invents one, and archived/hidden/deleted/
+ * expired items are never described as current.
+ */
+const NO_RECENT_UPDATE = '他最近还没有公开动态，我不想替他猜。';
 
-export default function VisitorVibeChat({ ownerName, onClose }: { ownerName: string; onClose: () => void }) {
+const RECENT_QUESTION = /最近|近况|在做|动态/;
+
+export default function VisitorVibeChat({
+  ownerName,
+  onClose,
+  nowItems = [],
+  currentFocus = vibeFixtures.fixtureOwnerCard.currentFocus,
+}: {
+  ownerName: string;
+  onClose: () => void;
+  /** Active (published, non-expired) Now snapshot from the public Card. */
+  nowItems?: NowItem[];
+  /** Public current-focus memory text; empty string means none. */
+  currentFocus?: string;
+}) {
+  const recentAnswer = (): string => {
+    if (nowItems.length > 0) {
+      return `他最近的公开动态：${nowItems.map(item => item.text).join('；')}`;
+    }
+    if (currentFocus) {
+      return `他最近在做的方向是：${currentFocus}`;
+    }
+    return NO_RECENT_UPDATE;
+  };
+
+  const suggestions: { q: string; a: (ownerName: string) => string }[] = [
+    {
+      q: '他最近在做什么？',
+      a: () => recentAnswer(),
+    },
+    {
+      q: '他为什么做这个？',
+      a: () =>
+        currentFocus
+          ? `他最近在做的方向是：${currentFocus}`
+          : NO_RECENT_UPDATE,
+    },
+    {
+      q: '他可以帮别人什么？',
+      a: () => `他提到过自己能帮到这些：${vibeFixtures.fixtureOwnerCard.canHelpWith.join('、')}。`,
+    },
+    {
+      q: '他现在想认识什么样的人？',
+      a: () => `他最近想认识：${vibeFixtures.fixtureOwnerCard.wantsToMeet.join('、')}。`,
+    },
+  ];
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'open',
@@ -83,8 +123,14 @@ export default function VisitorVibeChat({ ownerName, onClose }: { ownerName: str
     setInput('');
     pushVisitor(text);
     if (!askedReason) {
-      // A free-form question the fixtures cannot ground -> honest uncertainty.
-      pushVibe('这件事他还没有告诉我，我不想替他猜。你可以换个和他有关的问题，或者直接告诉我你为什么想认识他。');
+      if (RECENT_QUESTION.test(text)) {
+        // Task 4.5: recent-context questions are grounded in the active Now
+        // snapshot (then public current focus), never invented.
+        pushVibe(recentAnswer());
+      } else {
+        // A free-form question the fixtures cannot ground -> honest uncertainty.
+        pushVibe('这件事他还没有告诉我，我不想替他猜。你可以换个和他有关的问题，或者直接告诉我你为什么想认识他。');
+      }
       setTimeout(inviteReason, 350);
     } else {
       // Treat the message as the connection reason and move to confirmation.

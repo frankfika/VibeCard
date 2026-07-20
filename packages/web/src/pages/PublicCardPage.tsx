@@ -7,6 +7,9 @@ import {
 import { useAccount } from 'wagmi';
 
 import VisitorVibeChat from '../components/vibe/VisitorVibeChat';
+import type { NowItem } from '@shared';
+import { vibeFixtures } from '@shared';
+import { NOW_TOPIC_LABELS, latestActiveNow, loadNowItems } from '../lib/now';
 
 interface SharedProfile {
   name: string;
@@ -22,6 +25,14 @@ interface SharedProfile {
   event: string;
   /** Task 3.4: absent means enabled (backward compatible with old share links). */
   agentEnabled?: boolean;
+  /**
+   * Task 4.5: optional owner-published Now snapshot embedded at share time.
+   * When absent (older links), the fixture demo falls back to the local
+   * demo store; either way only published, non-expired items are shown.
+   */
+  nowItems?: NowItem[];
+  /** Optional public current-focus text used for visitor Vibe grounding. */
+  currentFocus?: string;
   highlights: { id: number; title: string; type: string; icon: string; link: string }[];
   threads: { id: string; content: string; images?: string[]; tags: string[]; timestamp: number }[];
   contacts?: { id?: string; platform: string; value: string; url: string }[];
@@ -162,6 +173,16 @@ export default function PublicCardPage() {
 
   const agentEnabled = profile.agentEnabled !== false;
 
+  // Task 4.5: the public Now snapshot — newest 3 published, non-expired.
+  // Embedded share snapshots win; the fixture demo falls back to the local
+  // demo store so owner and visitor surfaces show the same published state.
+  const nowSource = Array.isArray(profile.nowItems) ? profile.nowItems : loadNowItems();
+  const activeNow = latestActiveNow(nowSource, Date.now(), 3);
+  const currentFocus =
+    typeof profile.currentFocus === 'string'
+      ? profile.currentFocus
+      : vibeFixtures.fixtureOwnerCard.currentFocus;
+
   const avatarUrl =
     profile.avatar ||
     `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(profile.name)}&backgroundColor=transparent`;
@@ -200,6 +221,7 @@ export default function PublicCardPage() {
             avatarUrl={avatarUrl}
             isOwner={isOwner}
             agentEnabled={agentEnabled}
+            nowItems={activeNow}
             simpleHref={buildUrl(false)}
             onChat={() => setShowVibeChat(true)}
           />
@@ -209,6 +231,7 @@ export default function PublicCardPage() {
             avatarUrl={avatarUrl}
             isOwner={isOwner}
             agentEnabled={agentEnabled}
+            nowItems={activeNow}
             fullHref={buildUrl(true)}
             onChat={() => setShowVibeChat(true)}
           />
@@ -217,7 +240,12 @@ export default function PublicCardPage() {
 
       <AnimatePresence>
         {showVibeChat && (
-          <VisitorVibeChat ownerName={profile.name || '他'} onClose={() => setShowVibeChat(false)} />
+          <VisitorVibeChat
+            ownerName={profile.name || '他'}
+            nowItems={activeNow}
+            currentFocus={currentFocus}
+            onClose={() => setShowVibeChat(false)}
+          />
         )}
       </AnimatePresence>
 
@@ -234,11 +262,37 @@ export default function PublicCardPage() {
   );
 }
 
+/** Task 4.5: the public 最近动态 list. Empty state renders nothing — no
+ *  invented recent activity. Items are pre-filtered to the active snapshot. */
+function PublicNowList({ items }: { items: NowItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-5 text-left" data-testid="public-now-section">
+      <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-2">最近动态</h3>
+      <ul className="space-y-2">
+        {items.map(item => (
+          <li
+            key={item.id}
+            data-testid="public-now-item"
+            className="flex items-start gap-2.5 rounded-[14px] bg-white/[0.05] border border-white/10 px-3 py-2.5"
+          >
+            <span className="shrink-0 mt-0.5 rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-white/60">
+              {NOW_TOPIC_LABELS[item.topic]}
+            </span>
+            <span className="text-[13px] font-medium text-white/90 leading-relaxed">{item.text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function SimpleCardView({
   profile,
   avatarUrl,
   isOwner,
   agentEnabled,
+  nowItems,
   fullHref,
   onChat,
 }: {
@@ -246,6 +300,7 @@ function SimpleCardView({
   avatarUrl: string;
   isOwner: boolean;
   agentEnabled: boolean;
+  nowItems: NowItem[];
   fullHref: string;
   onChat: () => void;
 }) {
@@ -311,6 +366,8 @@ function SimpleCardView({
               {profile.bio}
             </p>
           )}
+
+          <PublicNowList items={nowItems} />
         </div>
 
         <div className="px-5 pb-6 space-y-2.5">
@@ -352,6 +409,7 @@ function FullCardView({
   avatarUrl,
   isOwner,
   agentEnabled,
+  nowItems,
   simpleHref,
   onChat,
 }: {
@@ -359,6 +417,7 @@ function FullCardView({
   avatarUrl: string;
   isOwner: boolean;
   agentEnabled: boolean;
+  nowItems: NowItem[];
   simpleHref: string;
   onChat: () => void;
 }) {
@@ -469,6 +528,9 @@ function FullCardView({
               </div>
             </div>
           )}
+
+          {/* Task 4.5: owner-confirmed recent updates, before legacy threads. */}
+          <PublicNowList items={nowItems} />
 
           {/* Threads Box */}
           {profile.threads?.length > 0 && (
