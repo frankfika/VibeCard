@@ -915,7 +915,17 @@ Dependencies: 5.2
 
 ## 5.4 Add Model Provider Adapters
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-21, on branch `feature/task-5.4-model-adapters`.
+- Core (`packages/shared/model-provider.ts`): provider-neutral `ModelProvider` interface (`complete` + optional `embed`) with capability declaration (`text/structuredOutput/embeddings/vision/audio`); `createAgentModel(provider)` exposes the four typed agent operations (`ownerMessage`/`visitorMessage`/`generateCardDraft`/`summarizeConnection`) returning validated Core results or typed errors; invalid output retries exactly once → `invalid_model_output`; unsupported capability → typed `unsupported_capability`, never silent fallback; error codes `model_unavailable | rate_limited | permission_denied | invalid_model_output | unsupported_capability`. `mock-provider.ts` is a platform-free port of the cloud mock (byte-identical, parity-tested).
+- Cloud agent (`cloudfunctions/agent/lib/providers.js` rewritten): deterministic mock (default) + OpenAI-compatible HTTP adapter (http/https, `/v1` base handling, keyless local endpoints, `AI_API_HEADERS`, timeout) behind the same interface; status mapping 429→rate_limited, 401/403→permission_denied, else model_unavailable; `safeErrorForLog` redacts bearer/`sk-…`/key params; keys live only in cloud-function env — never client-side, never logged.
+- Config-driven selection (`AI_PROVIDER`/`AI_API_BASE`/`AI_MODEL`/`AI_API_KEY`/`AI_TIMEOUT_MS`): mock ↔ OpenAI-compatible ↔ BYOK ↔ local/private (Ollama/vLLM/llama.cpp as OpenAI-compatible endpoints) requires zero business-logic or client-page changes (test-proven). Self-hosted users never need VibeCard Cloud.
+- Docs: `docs/engineering/MODEL_ADAPTERS.md` (interface, capabilities, setup per mode, error taxonomy, key-handling/logging rules).
+- Intentional deviation: agent action layer migrated `provider_unavailable` → `model_unavailable` to match ARCHITECTURE §12 vocabulary (in-lane test assertions updated).
+- Validation: Core tests **102/102** (+23: model-provider 16, parity +4, platform-free coverage); agent cloud tests **71/71** (+14 provider tests over a local stub HTTP server — no real API calls); memory 17/17, card 13/13, now 16/16, requests 24/24, content-check 7/7; miniprogram page tests 50/50; `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅.
 
 Owner: AI
 

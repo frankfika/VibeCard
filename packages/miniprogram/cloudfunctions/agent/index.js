@@ -21,7 +21,7 @@
  */
 
 const cloud = require('wx-server-sdk');
-const { getProvider } = require('./lib/providers');
+const { getProvider, isProviderError, safeErrorForLog } = require('./lib/providers');
 const { runOwnerAgent, extractMemoryProposal, runCardDraft, runVisitorAgent, runConnectionSummary } = require('./lib/agent');
 const { typedError } = require('./lib/schema');
 const limits = require('./lib/limits');
@@ -106,9 +106,11 @@ exports.main = async (event) => {
         return typedError('invalid_action', 'unknown action');
     }
   } catch (error) {
-    // Provider/network failures surface as a typed error; details stay server-side.
-    console.error('agent function error:', error && error.message);
-    return typedError('provider_unavailable', 'the model is temporarily unavailable');
+    // Provider/network failures surface as a stable typed error (§12). The
+    // log line is redacted: no keys, no prompt text, no provider bodies.
+    console.error('agent function error:', safeErrorForLog(error));
+    if (isProviderError(error)) return typedError(error.code, error.message);
+    return typedError('model_unavailable', 'the model is temporarily unavailable');
   }
 };
 

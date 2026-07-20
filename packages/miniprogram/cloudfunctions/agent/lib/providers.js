@@ -1,17 +1,94 @@
 /**
- * AI provider boundary (task 1.2).
+ * AI provider boundary (tasks 1.2, 5.4).
  *
- * A provider is anything with `complete({ system, messages }) -> string`
+ * A provider is anything matching the Core `ModelProvider` contract:
+ * `name`, `capabilities`, and `complete({ system, messages }) -> string`
  * returning raw model text (expected to be JSON, validated downstream).
  *
  * - Mock provider: fully deterministic, used for tests and as a no-key
  *   fallback so the demo never hard-fails.
- * - HTTP provider: OpenAI-compatible chat-completions endpoint, configured
- *   via cloud env vars (AI_API_BASE / AI_API_KEY / AI_MODEL). The key never
- *   leaves the cloud function and is never logged.
+ * - HTTP provider: OpenAI-compatible chat-completions endpoint (managed
+ *   cloud model, BYOK, or a local/self-hosted server such as Ollama, vLLM,
+ *   or llama.cpp). Configured via cloud env vars; the key never leaves the
+ *   cloud function and is never logged.
+ *
+ * Error taxonomy (ARCHITECTURE §12): provider/network failures reject with a
+ * typed `ProviderError` whose code is one of PROVIDER_ERROR_CODES. Raw
+ * provider error bodies, keys, and stack traces never surface.
+ *
+ * This file is the platform adapter mirror of the Core
+ * `packages/shared/model-provider.ts` + `mock-provider.ts`; parity of error
+ * codes and mock outputs is enforced by `packages/shared/test/parity.test.ts`.
  */
 
+const http = require('http');
 const https = require('https');
+
+/* ---------------------------------------------------------------------------
+ * Typed provider errors (mirror of the Core vocabulary)
+ * ------------------------------------------------------------------------- */
+
+const PROVIDER_ERROR_CODES = [
+  'model_unavailable',
+  'rate_limited',
+  'permission_denied',
+  'invalid_model_output',
+  'unsupported_capability',
+];
+
+class ProviderError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'ProviderError';
+    this.code = code;
+  }
+}
+
+function isProviderError(error) {
+  return !!error && typeof error.code === 'string' && PROVIDER_ERROR_CODES.includes(error.code);
+}
+
+const TEXT_STRUCTURED_CAPABILITIES = {
+  text: true,
+  structuredOutput: true,
+  embeddings: false,
+  vision: false,
+  audio: false,
+};
+
+function providerSupports(provider, capability) {
+  return !!provider && !!provider.capabilities && provider.capabilities[capability] === true;
+}
+
+/**
+ * Fail clearly on an undeclared capability — never a silent fallback.
+ * Mirror of the Core `requireProviderCapability`.
+ */
+function requireProviderCapability(provider, capability) {
+  if (!providerSupports(provider, capability)) {
+    throw new ProviderError('unsupported_capability', `provider does not support ${capability}`);
+  }
+}
+
+/**
+ * Redaction for log lines: strip anything that looks like a bearer token or
+ * common API-key shape, and truncate. Provider errors already carry static
+ * messages; this is the safety net for foreign errors.
+ */
+function safeErrorForLog(error) {
+  if (!error) return 'unknown_error';
+  if (isProviderError(error)) return `provider_${error.code}`;
+  const message = typeof error.message === 'string' ? error.message : 'unknown_error';
+  return message
+    .replace(/bearer\s+\S+/gi, 'bearer [redacted]')
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]')
+    .replace(/[?&](api[-_]?key|key|token)=\S+/gi, '$1=[redacted]')
+    .slice(0, 200);
+}
+
+/* ---------------------------------------------------------------------------
+ * Deterministic mock provider
+ * ------------------------------------------------------------------------- */
 
 const MEMORY_WORTHY = ['想认识', '最近', '喜欢', '不喜欢', '不希望', '不要', '边界', '在做', '记住'];
 
@@ -105,6 +182,7 @@ function mockConnectionSummary(system) {
 function createMockProvider() {
   return {
     name: 'mock',
+    capabilities: { ...TEXT_STRUCTURED_CAPABILITIES },
     async complete({ system, messages }) {
       // Deterministic Card draft for the draft-generation path.
       if (system && system.includes('VibeCard 起草更新建议')) {
@@ -164,9 +242,53 @@ function createMockProvider() {
   };
 }
 
-function createHttpProvider({ baseUrl, apiKey, model, timeoutMs = 15000 }) {
+/* ---------------------------------------------------------------------------
+ * OpenAI-compatible HTTP provider
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Resolve the chat-completions URL. A base URL ending in `/v1` (the native
+ * shape served by Ollama, vLLM, and llama.cpp) gets `/chat/completions`
+ * appended; any other base gets the full `/v1/chat/completions` path.
+ */
+function resolveChatCompletionsUrl(baseUrl) {
+  const base = String(baseUrl).replace(/\/+$/, '');
+  return base.endsWith('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
+}
+
+/** Map an HTTP status to a stable typed error. The response body is discarded. */
+function errorForStatus(statusCode) {
+  if (statusCode === 429) return new ProviderError('rate_limited', 'provider rate limit reached');
+  if (statusCode === 401 || statusCode === 403) {
+    return new ProviderError('permission_denied', 'provider rejected the configured credentials');
+  }
+  return new ProviderError('model_unavailable', 'the model is temporarily unavailable');
+}
+
+/**
+ * OpenAI-compatible chat-completions provider.
+ *
+ * - `apiKey` is optional so keyless local endpoints (Ollama, llama.cpp)
+ *   work; when present it is sent as a bearer token and never logged.
+ * - `headers` merges extra static headers (e.g. a router's tracking header);
+ *   they come from trusted runtime config, never from client input.
+ * - http:// bases are allowed for loopback/LAN model servers; managed keys
+ *   should always use https:// bases.
+ */
+function createHttpProvider({ baseUrl, apiKey, model, headers = {}, timeoutMs = 15000 }) {
+  if (!baseUrl || !model) {
+    throw new ProviderError('model_unavailable', 'http provider requires baseUrl and model');
+  }
+  const endpoint = resolveChatCompletionsUrl(baseUrl);
+  const url = new URL(endpoint);
+  const transport = url.protocol === 'http:' ? http : https;
+
   return {
     name: 'http',
+    capabilities: { ...TEXT_STRUCTURED_CAPABILITIES },
+    endpoint,
+    model,
+    hasKey: !!apiKey,
     async complete({ system, messages }) {
       const body = JSON.stringify({
         model,
@@ -178,44 +300,47 @@ function createHttpProvider({ baseUrl, apiKey, model, timeoutMs = 15000 }) {
         response_format: { type: 'json_object' },
       });
 
-      const url = new URL('/v1/chat/completions', baseUrl);
-
       return new Promise((resolve, reject) => {
-        const req = https.request(
+        const req = transport.request(
           {
             method: 'POST',
             hostname: url.hostname,
-            path: url.pathname,
-            port: url.port || 443,
+            path: url.pathname + url.search,
+            port: url.port || (url.protocol === 'http:' ? 80 : 443),
             headers: {
               'Content-Type': 'application/json',
+              ...headers,
               // The key is only ever used here, server-side, and never logged.
-              Authorization: `Bearer ${apiKey}`,
+              ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
               'Content-Length': Buffer.byteLength(body),
             },
             timeout: timeoutMs,
           },
           (res) => {
+            // Drain and discard error bodies: they can echo request material
+            // and must never reach logs or clients.
             let raw = '';
             res.on('data', (chunk) => { raw += chunk; });
             res.on('end', () => {
               if (res.statusCode < 200 || res.statusCode >= 300) {
-                reject(new Error(`provider_http_${res.statusCode}`));
+                reject(errorForStatus(res.statusCode));
                 return;
               }
               try {
                 const parsed = JSON.parse(raw);
                 const content = parsed.choices?.[0]?.message?.content;
-                if (typeof content !== 'string') reject(new Error('provider_bad_envelope'));
+                if (typeof content !== 'string') reject(new ProviderError('invalid_model_output', 'provider returned an unrecognized envelope'));
                 else resolve(content);
               } catch {
-                reject(new Error('provider_bad_envelope'));
+                reject(new ProviderError('invalid_model_output', 'provider returned an unrecognized envelope'));
               }
             });
           },
         );
-        req.on('timeout', () => { req.destroy(new Error('provider_timeout')); });
-        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(new ProviderError('model_unavailable', 'provider request timed out')); });
+        req.on('error', (error) => {
+          reject(isProviderError(error) ? error : new ProviderError('model_unavailable', 'the model is temporarily unavailable'));
+        });
         req.write(body);
         req.end();
       });
@@ -223,17 +348,62 @@ function createHttpProvider({ baseUrl, apiKey, model, timeoutMs = 15000 }) {
   };
 }
 
+/* ---------------------------------------------------------------------------
+ * Configuration-driven provider selection
+ * ------------------------------------------------------------------------- */
+
 /**
- * Pick a provider from the cloud environment. Without a configured key the
- * mock provider keeps everything deterministic — secrets never ship to any
- * client.
+ * Pick a provider from the cloud environment. Without a configured endpoint
+ * the mock provider keeps everything deterministic — secrets never ship to
+ * any client.
+ *
+ * Configuration (all server-side only):
+ *   AI_PROVIDER        'mock' | 'openai-compatible' (default: auto)
+ *   AI_API_BASE        endpoint base, e.g. https://api.example.com or
+ *                      http://localhost:11434/v1 (Ollama)
+ *   AI_MODEL           model name served by the endpoint
+ *   AI_API_KEY         optional bearer key (BYOK); omit for keyless local
+ *   AI_API_HEADERS     optional JSON object of extra static headers
+ *   AI_TIMEOUT_MS      optional request timeout (default 15000)
+ *
+ * The same shape serves managed keys, BYOK, and local/self-hosted endpoints;
+ * self-hosted deployments never need to call VibeCard Cloud.
  */
 function getProvider(env = process.env) {
   if (env.AI_PROVIDER === 'mock') return createMockProvider();
-  if (env.AI_API_BASE && env.AI_API_KEY && env.AI_MODEL) {
-    return createHttpProvider({ baseUrl: env.AI_API_BASE, apiKey: env.AI_API_KEY, model: env.AI_MODEL });
+  const wantsHttp = env.AI_PROVIDER === 'openai-compatible' || env.AI_PROVIDER === 'http';
+  if (env.AI_API_BASE && env.AI_MODEL && (env.AI_API_KEY || wantsHttp)) {
+    let extraHeaders = {};
+    if (env.AI_API_HEADERS) {
+      try {
+        const parsed = JSON.parse(env.AI_API_HEADERS);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) extraHeaders = parsed;
+      } catch {
+        // Malformed optional headers must not take the agent down; ignore them.
+      }
+    }
+    const timeoutMs = Number.parseInt(env.AI_TIMEOUT_MS || '', 10);
+    return createHttpProvider({
+      baseUrl: env.AI_API_BASE,
+      apiKey: env.AI_API_KEY || '',
+      model: env.AI_MODEL,
+      headers: extraHeaders,
+      timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 15000,
+    });
   }
   return createMockProvider();
 }
 
-module.exports = { createMockProvider, createHttpProvider, getProvider };
+module.exports = {
+  PROVIDER_ERROR_CODES,
+  ProviderError,
+  isProviderError,
+  TEXT_STRUCTURED_CAPABILITIES,
+  providerSupports,
+  requireProviderCapability,
+  safeErrorForLog,
+  resolveChatCompletionsUrl,
+  createMockProvider,
+  createHttpProvider,
+  getProvider,
+};

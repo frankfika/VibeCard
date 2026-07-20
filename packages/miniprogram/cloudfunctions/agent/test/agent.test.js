@@ -58,7 +58,7 @@ test('schema-invalid model output (bad kind) is rejected', async () => {
   assert.equal(outcome.error.code, 'invalid_model_output');
 });
 
-test('provider failure surfaces as provider_unavailable from the function entry', async () => {
+test('provider failure surfaces as model_unavailable from the function entry', async () => {
   const failing = { async complete() { throw new Error('provider_timeout'); } };
   await assert.rejects(failing.complete({}), /provider_timeout/);
 
