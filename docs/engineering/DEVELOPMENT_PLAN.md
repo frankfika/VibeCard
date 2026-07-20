@@ -1002,7 +1002,14 @@ Dependencies: 5.2 and 5.3
 
 ## 5.6 Add Optional Retrieval And Knowledge Adapters
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.6-retrieval-adapters` (off `main` @ 78354d6)
+- Owner: AI + Data lanes (`packages/shared/` Core interfaces + reference implementations); one implementation sub-agent; coordinating agent integrates
+- Current phase: structured retrieval (filters/recency/kind/keyword), RetrievalProvider + embedding/vector-store interfaces, provenance, knowledge-source adapters
+- Remaining: injection/isolation tests, removability proof, validation, completion entry
 
 Owner: AI and Data
 
