@@ -1,0 +1,27 @@
+# One-command self-hosted VibeCard stack (task 5.7).
+#
+#   cp deploy/.env.example deploy/.env   # set VIBECARD_OWNER_TOKEN
+#   docker compose -f deploy/docker-compose.yml up --build
+#
+# No VibeCard Cloud account or key is required. Defaults use the
+# deterministic mock model; point AI_API_BASE at any OpenAI-compatible
+# endpoint (managed, BYOK, or a local Ollama/vLLM/llama.cpp server) for a
+# real model. See docs/engineering/SELF_HOSTING.md.
+
+services:
+  vibecard-server:
+    build:
+      context: ..                       # repository root (workspace install)
+      dockerfile: packages/server/Dockerfile
+    image: vibecard-server:local
+    env_file:
+      - .env
+    ports:
+      # Localhost-only by default; put a reverse proxy in front to expose.
+      - "127.0.0.1:${PORT:-8787}:8787"
+    volumes:
+      - vibecard-data:/data
+    restart: unless-stopped
+
+volumes:
+  vibecard-data:
