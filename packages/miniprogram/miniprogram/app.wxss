@@ -9,29 +9,29 @@ view, scroll-view, text, image, button, input, textarea, navigator {
 }
 
 page {
-  /* 背景 - 对齐 Web 端 */
-  --color-bg: #ffffff;
+  /* 背景 - 硅谷风浅灰底 */
+  --color-bg: #f7f7f8;
   --color-bg-elevated: #ffffff;
   --color-bg-card: #ffffff;
-  --color-surface: #f5f5f5;
-  --color-border: #e8e8e8;
-  --color-border-light: #f5f5f5;
+  --color-surface: #f1f1f4;
+  --color-border: #eaeaee;
+  --color-border-light: #f1f1f4;
 
-  /* 文本 - 对齐 Web 端 */
-  --color-text: #0a0a0a;
-  --color-text-secondary: #737373;
-  --color-text-tertiary: #a3a3a3;
+  /* 文本 */
+  --color-text: #16161a;
+  --color-text-secondary: #6b6b72;
+  --color-text-tertiary: #a8a8b0;
 
-  /* 主色 - 对齐 Web 端 */
-  --color-primary: #0a0a0a;
-  --color-primary-dark: #000000;
-  --color-primary-light: #e5e5e5;
-  --color-primary-soft: #f5f5f5;
+  /* 主色 - indigo 单强调 */
+  --color-primary: #6366f1;
+  --color-primary-dark: #4f46e5;
+  --color-primary-light: #eceefe;
+  --color-primary-soft: #f4f4fe;
 
-  /* 强调色 - 与主色统一，去掉蓝色 */
-  --color-accent: #0a0a0a;
-  --color-accent-dark: #000000;
-  --color-accent-soft: rgba(0, 0, 0, 0.04);
+  /* 强调色 - 与主色统一 */
+  --color-accent: #6366f1;
+  --color-accent-dark: #4f46e5;
+  --color-accent-soft: rgba(99, 102, 241, 0.08);
 
   /* 圆角 - 增大以匹配 Web 端 */
   --radius-sm: 16rpx;

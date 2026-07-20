@@ -7,8 +7,7 @@
 
     <!-- 空收件箱 -->
     <view wx:if="{{requestsList.length === 0}}" class="empty">
-      <view class="empty-icon">📥</view>
-      <view class="empty-title">还没有人想认识你</view>
+            <view class="empty-title">还没有人想认识你</view>
       <view class="empty-desc">分享你的 Card，真正理解你的人会带着具体的理由来找你。是否认识，永远由你决定。</view>
     </view>
 
@@ -104,7 +103,7 @@
 
   <!-- ========== 完成态 ========== -->
   <view wx:if="{{view === 'connected'}}" class="result-wrap">
-    <view class="result-icon">✨</view>
+    <view class="result-icon">✓</view>
     <view class="result-title">Vibe matched.</view>
     <view class="result-desc">你们因为一个具体的理由认识了彼此。</view>
     <view wx:if="{{sharedContacts.length > 0}}" class="result-shared">

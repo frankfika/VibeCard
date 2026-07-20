@@ -15,7 +15,7 @@
       <view wx:if="{{memories.length === 0}}" class="memory-empty">还没有记住任何事。聊点什么吧。</view>
     </scroll-view>
     <view class="card-draft-entry {{cardDraftLoading ? 'card-draft-entry-loading' : ''}}" bindtap="onGenerateCardDraft">
-      {{cardDraftLoading ? 'Vibe 正在起草…' : '✨ 让 Vibe 更新我的 Card'}}
+      {{cardDraftLoading ? 'Vibe 正在起草…' : '让 Vibe 更新我的 Card'}}
     </view>
   </view>
 
@@ -76,7 +76,7 @@
 
   <!-- 底部输入栏（位于 tabBar 之上） -->
   <view class="input-bar">
-    <input class="input-field" placeholder="和你的 Vibe 聊聊…" placeholder-style="color: #b8ab9e;" value="{{inputValue}}" bindinput="onInput" bindconfirm="onSend" confirm-type="send" />
+    <input class="input-field" placeholder="和你的 Vibe 聊聊…" placeholder-style="color: #a8a8b0;" value="{{inputValue}}" bindinput="onInput" bindconfirm="onSend" confirm-type="send" />
     <view class="send-btn {{inputValue ? 'send-btn-active' : ''}}" bindtap="onSend">发送</view>
   </view>
 </view>

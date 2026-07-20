@@ -51,7 +51,7 @@
   position: absolute;
   inset: 0;
   border-radius: 32rpx;
-  background: rgba(10, 10, 10, 0.08);
+  background: rgba(99, 102, 241, 0.10);
   transform: scale(1);
   opacity: 1;
 }
@@ -59,13 +59,9 @@
 .tab-icon {
   position: relative;
   z-index: 1;
-  font-size: 40rpx;
-  line-height: 1;
+  width: 44rpx;
+  height: 44rpx;
   transition: all 0.3s ease-out;
-}
-
-.tab-item-active .tab-icon {
-  transform: scale(1.1) translateY(-2rpx);
 }
 
 .tab-label {
@@ -79,11 +75,11 @@
 }
 
 .tab-item:not(.tab-item-active) .tab-label {
-  color: #737373;
-  opacity: 0.7;
+  color: #8e8e93;
+  opacity: 0.85;
 }
 
 .tab-item-active .tab-label {
-  color: #0a0a0a;
+  color: #6366f1;
   opacity: 1;
 }

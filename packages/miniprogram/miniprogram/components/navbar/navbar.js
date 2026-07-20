@@ -3,7 +3,7 @@ Component({
     title: { type: String, value: '' },
     showBack: { type: Boolean, value: false },
     backDelta: { type: Number, value: 1 },
-    background: { type: String, value: 'rgba(251,247,242,0.85)' },
+    background: { type: String, value: 'rgba(247,247,248,0.85)' },
     blur: { type: String, value: '40rpx' },
     // 深色页面（如访客分身对话）使用，默认 false 不影响既有页面
     dark: { type: Boolean, value: false }
