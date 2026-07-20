@@ -1041,7 +1041,18 @@ Dependencies: 5.4 and 5.5
 
 ## 5.7 Ship A One-Command Self-Hosted Stack
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion:
+
+- 2026-07-21, on branch `feature/task-5.7-self-hosted-stack`. Milestone 5 is complete: a technical user can run the full core product without the official service and move data in/out without vendor lock-in.
+- New `packages/server/` (zero runtime deps, Node 24 built-ins): open server composing Core + local-store (node:sqlite, migrations at startup) + config-driven model providers (mock default; OpenAI-compatible/BYOK/local via env — no VibeCard Cloud key required). H5-ready JSON API under `/api/v1` (CORS-enabled): owner identity create/import `.vibe`, My Vibe chat with memory/Now proposals, memory confirm/edit/reject/pause/resume/delete, Card draft+publish, full Now lifecycle, contacts CRUD, requests inbox/summary/action (connect requires owner-owned contact ids), private/public export, delete-all guarded by `export_required`; public endpoints: Card projection (≤3 active Now, no contacts by construction), visitor chat (visitor_quote/visitor_boundary retrieval only, 6-round cap, `forbiddenForVisitor` second net), request submission (Core 24h gate + weak-reason rejection), contact unlock only after owner connect.
+- Security defaults: single-owner bearer token (constant-time compare; ephemeral + warning when unset; all owner families 401-tested), localhost bind default, in-memory token-bucket rate limits per visitor+IP on top of the Core pair gate, pluggable `moderate(text)` hook that **fails closed** (hook throw → 503 `moderation_unavailable`, negative verdict → 403, nothing stored), provider-style log redaction, no stack traces in responses.
+- Backup/restore: backup = private `.vibe` export (HTTP or `npm run backup --prefix packages/server`) + optional sqlite copy; restore CLI rejects public archives and non-forced overwrites; delete-all refuses until a private export is newer than the last write. Backup/restore round-trip test proves Core fixture state preserved deep-equal.
+- Deploy assets: `deploy/docker-compose.yml` (node:24, `/data` volume, localhost-mapped port, validated with `docker compose config`), `deploy/.env.example` (all vars documented, no secrets), `packages/server/Dockerfile` with healthcheck, `docs/engineering/SELF_HOSTING.md` (quickstart, config, API map, security, moderation hook API, backup/upgrade, "no VibeCard Cloud account or key required").
+- Automated smoke test spawns the real server on an ephemeral port: health → import fixture archive → publish Card+Now → visitor open/chat (mock provider) → request → inbox+summary → connect with contact → visitor sees unlock (stranger 404) → backup → restore into fresh server → fixture state preserved → delete-all.
+- Validation: server tests **13/13**; shared **132/132**; local-store **48/48**; miniprogram page tests 50/50; cloud functions memory 17/17, agent 71/71, card 13/13, now 16/16, requests 24/24, content-check 7/7; web e2e **70/70**; `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅; sanity boot `/healthz` OK, nothing left running.
+- Recorded deviations: blocked-users list lives in a JSON sidecar (repositories have no profile/blocked store — documented); default moderation hook is a passthrough with the fail-closed contract enforced around it; `packages/server` is intentionally not a root workspace (scripts via `npm --prefix packages/server`).
 
 Owner: Infrastructure
 
