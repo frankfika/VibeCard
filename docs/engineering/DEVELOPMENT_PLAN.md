@@ -821,7 +821,14 @@ Dependencies: Milestone 4
 
 ## 5.2 Extract A Platform-Independent Core
 
-Status: `[ ]`
+Status: `[~]`
+
+Progress:
+
+- Started 2026-07-21 on branch `feature/task-5.2-platform-core` (off `main` @ 4ae80b9)
+- Owner: Core lane (`packages/shared/`); one implementation sub-agent; coordinating agent integrates
+- Current phase: survey existing platform coupling, extract pure domain rules into the Core, add Node + browser-compatible tests, refactor clients to consume Core logic
+- Remaining: client consumption parity, permission tests, v1 migration check, validation, completion entry
 
 Owner: Core
 
