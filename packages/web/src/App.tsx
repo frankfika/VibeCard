@@ -173,7 +173,8 @@ export default function App() {
             </AnimatePresence>
           </div>
 
-          {/* Mobile Bottom Tab Bar */}
+          {/* Mobile Bottom Tab Bar — stays visible during onboarding so
+              the new user keeps their bearings, but clicks are no-ops. */}
           {!isSharedView && (
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
               <div className="h-6 bg-gradient-to-t from-background/80 to-transparent" />

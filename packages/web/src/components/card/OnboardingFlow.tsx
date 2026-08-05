@@ -153,23 +153,23 @@ export default function OnboardingFlow({
 
                 <div className="text-center space-y-3">
                   <h1 className="text-[32px] font-black text-foreground leading-tight tracking-tight">vibecard</h1>
-                  <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[260px] mx-auto">
-                    你的 Web3 社交名片。一张卡片，连接无限可能。
+                  <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[280px] mx-auto">
+                    一张会越来越懂你的 AI 名片。先和 Vibe 聊几句，它会慢慢记住你。
                   </p>
                 </div>
 
-                <div className="w-full max-w-[280px] bg-secondary/50 rounded-2xl p-5 space-y-4">
+                <div className="w-full max-w-[300px] bg-secondary/50 rounded-2xl p-5 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center text-[13px] font-bold text-foreground shrink-0 shadow-sm">1</div>
-                    <div className="text-[14px] font-semibold text-foreground">创建专属名片</div>
+                    <div className="text-[14px] font-semibold text-foreground">跟 Vibe 聊几句</div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center text-[13px] font-bold text-foreground shrink-0 shadow-sm">2</div>
-                    <div className="text-[14px] font-semibold text-foreground">完善身份信息</div>
+                    <div className="text-[14px] font-semibold text-foreground">选你想公开的那一面</div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center text-[13px] font-bold text-foreground shrink-0 shadow-sm">3</div>
-                    <div className="text-[14px] font-semibold text-foreground">一键分享社交</div>
+                    <div className="text-[14px] font-semibold text-foreground">别人先和你的 Vibe 聊</div>
                   </div>
                 </div>
               </div>
@@ -180,9 +180,9 @@ export default function OnboardingFlow({
             <div className="flex flex-col min-h-full pt-4">
               <div className="flex-1 space-y-5">
                 <div>
-                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">你是谁</h2>
+                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">先让我认识你</h2>
                   <p className="text-[13px] text-muted-foreground font-medium">
-                    名字和一句话介绍会显示在名片顶部。
+                    Vibe 会记住这些，也会出现在你公开的 Card 上。
                   </p>
                 </div>
                 <div className="flex flex-col items-center">
@@ -236,9 +236,9 @@ export default function OnboardingFlow({
             <div className="flex flex-col h-full pt-4">
               <div className="flex-1 space-y-6">
                 <div>
-                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">关于你</h2>
+                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">再多说一点</h2>
                   <p className="text-[13px] text-muted-foreground font-medium">
-                    简短有力的介绍更容易被记住。
+                    写一段让自己也满意的话，Vibe 会拿它来理解你。
                   </p>
                 </div>
                 <div className="space-y-4">
@@ -305,9 +305,9 @@ export default function OnboardingFlow({
             <div className="flex flex-col h-full pt-4">
               <div className="flex-1 space-y-6">
                 <div>
-                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">身份标签</h2>
+                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">你是什么样的人</h2>
                   <p className="text-[13px] text-muted-foreground font-medium">
-                    最多选择 5 个，支持自定义和 emoji。
+                    最多 5 个，支持自定义和 emoji，Vibe 会拿这些去理解别人和你有什么交集。
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -375,9 +375,9 @@ export default function OnboardingFlow({
             <div className="flex flex-col h-full pt-4">
               <div className="flex-1 space-y-6">
                 <div>
-                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">高光时刻</h2>
+                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">值得被记住的几件事</h2>
                   <p className="text-[13px] text-muted-foreground font-medium">
-                    至少填写一个，让名片更有记忆点。
+                    至少填一个，Vibe 会在聊到相关话题时回想起来。
                   </p>
                 </div>
                 <div className="space-y-3">
@@ -422,14 +422,14 @@ export default function OnboardingFlow({
             <div className="flex flex-col h-full pt-4">
               <div className="flex-1 space-y-6">
                 <div>
-                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">场景 & 诉求</h2>
+                  <h2 className="text-[24px] font-bold text-foreground mb-1 tracking-tight">想遇见谁 / 最近在哪</h2>
                   <p className="text-[13px] text-muted-foreground font-medium">
-                    都可跳过，但填了更精准。
+                    都可以跳过，但写了更精准——Vibe 会拿这些去找真正同频的人。
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-[12px] font-bold uppercase tracking-widest text-muted-foreground">最近活动 / 会议（选填）</label>
+                  <label className="block text-[12px] font-bold uppercase tracking-widest text-muted-foreground">最近在哪儿出现（选填）</label>
                   <div className="rounded-[16px] border border-border bg-card/60 backdrop-blur-sm flex items-center px-3 py-2.5">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground shrink-0 mr-2">
                       <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -440,15 +440,15 @@ export default function OnboardingFlow({
                     <input
                       value={event}
                       onChange={e => setEvent(e.target.value)}
-                      placeholder="如 ETHGlobal Singapore 2024"
+                      placeholder="如 一次线下活动 / 你常出没的地方"
                       className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-muted-foreground/50"
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground/70">会作为 tag 出现在名片顶部，方便线下相遇时识别。</p>
+                  <p className="text-[11px] text-muted-foreground/70">会作为 tag 出现在名片顶部，让线下相遇时容易认出你。</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-[12px] font-bold uppercase tracking-widest text-muted-foreground">想找什么搭子（选填）</label>
+                  <label className="block text-[12px] font-bold uppercase tracking-widest text-muted-foreground">想遇见什么样的人（选填）</label>
                   <div className="rounded-[16px] border border-border bg-card/60 backdrop-blur-sm flex items-center px-3 py-2.5">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground shrink-0 mr-2">
                       <circle cx="11" cy="11" r="8" />
@@ -457,7 +457,7 @@ export default function OnboardingFlow({
                     <input
                       value={lookingFor}
                       onChange={e => setLookingFor(e.target.value)}
-                      placeholder="如 co-founder / 投资人 / 跑友"
+                      placeholder="如 也做 AI 记忆产品的人 / 跑友 / 投资人"
                       className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-muted-foreground/50"
                     />
                   </div>
