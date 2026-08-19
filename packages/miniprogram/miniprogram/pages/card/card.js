@@ -2,6 +2,7 @@ const store = require('../../utils/store.js');
 const nav = require('../../utils/nav.js');
 const cloud = require('../../utils/cloud.js');
 const nowHelper = require('../../utils/now.js');
+const track = require('../../utils/track.js');
 
 // 最近动态（任务 4.5）：云端/分享负载里来的都是已投影的公开字段
 // { id, text, topic, publishedAt }，这里只补展示标签，绝不补充内容
@@ -127,6 +128,7 @@ Page({
   },
 
   onLoad(options) {
+    track.event('page_view', { page: 'card', shared: !!options.shared });
     if (options.shared) {
       try {
         const sharedProfile = cleanProfileDisplay(JSON.parse(decodeURIComponent(options.shared)));
@@ -485,6 +487,7 @@ Page({
   // 访客视图入口：先和主人的 AI 分身聊聊（任务 0.4 mock + 任务 2.5 云链路）
   // 分享资料里带 ownerId/openid 时透传给分身页，走真实云对话；否则回退 fixture 演示
   goVisitorChat() {
+    track.event('cta_click', { cta_id: 'go_visitor_chat', view: this.data.isSharedView ? 'visitor' : 'owner' });
     const p = this.data.profile || {};
     const ownerId = p.ownerId || p.openid || '';
     const query = ownerId ? '?ownerId=' + encodeURIComponent(ownerId) : '';
@@ -538,6 +541,19 @@ Page({
     } catch (e) {
       return { title: 'VibeCard · 一张会越来越懂你的 AI 名片', path: '/pages/card/card' };
     }
+  },
+
+  // 朋友圈分享（v2 获客，2026-08-16）：访客点开仍是主人名片入口
+  onShareTimeline() {
+    const profile = this.data.profile || {};
+    const title = profile.name
+      ? `${profile.name}的 AI 名片 · 先和我的 Vibe 聊聊`
+      : 'VibeCard · 一张会越来越懂你的 AI 名片';
+    return {
+      title,
+      query: '',
+      imageUrl: profile.avatar || '',
+    };
   },
 
   drawShareCanvas(profile) {

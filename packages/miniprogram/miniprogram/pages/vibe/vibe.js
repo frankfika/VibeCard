@@ -15,6 +15,7 @@ const fixtures = require('../../data/vibe-fixtures.js');
 const cloud = require('../../utils/cloud.js');
 const store = require('../../utils/store.js');
 const nowHelper = require('../../utils/now.js');
+const track = require('../../utils/track.js');
 
 const NOW_TOPICS = nowHelper.NOW_ITEM_TOPICS.map((topic) => ({
   value: topic,
@@ -53,6 +54,7 @@ Page({
   },
 
   onLoad() {
+    track.event('page_view', { page: 'vibe' });
     this.demoMode = false;
     this.conversationId = '';
     this.sending = false;
@@ -195,7 +197,7 @@ Page({
       return;
     }
     try {
-      await cloud.callFunction('now', { action: 'createNowDraft', text, topic });
+      await cloud.callFunction('now', { action: 'createNowDraft', text, topic }, { idempotent: false });
       this.setData({ nowComposer: '' });
       await this.loadNowItems();
       wx.showToast({ title: '已存为草稿', icon: 'none' });
@@ -280,7 +282,7 @@ Page({
       return true;
     }
     try {
-      await cloud.callFunction('now', Object.assign({ action }, payload));
+      await cloud.callFunction('now', Object.assign({ action }, payload), { idempotent: false });
       await this.loadNowItems();
       return true;
     } catch (err) {
@@ -390,7 +392,7 @@ Page({
     // 被拒绝的提议软删除，之后不会进入任何检索（listMemories 只取 confirmed）
     if (!this.demoMode && p.memoryId) {
       try {
-        await cloud.callFunction('memory', { action: 'deleteMemory', memoryId: p.memoryId });
+        await cloud.callFunction('memory', { action: 'deleteMemory', memoryId: p.memoryId }, { idempotent: false });
       } catch (err) {
         console.warn('[vibe] deleteMemory failed:', err && err.message);
       }
@@ -422,9 +424,10 @@ Page({
       return true;
     }
     try {
-      await cloud.callFunction('memory', { action: 'confirmMemory', memoryId, content });
+      await cloud.callFunction('memory', { action: 'confirmMemory', memoryId, content }, { idempotent: false });
       await this.loadMemories();
       this.appendVibeMessage('我记住了：' + content);
+      track.event('memory_confirmed', { memory_id: memoryId });
       return true;
     } catch (err) {
       console.warn('[vibe] confirmMemory failed:', err && err.message);
@@ -532,7 +535,7 @@ Page({
             visibility: result.memoryProposal.suggestedVisibility || 'private',
             sourceConversationId: this.conversationId || '',
             sourceMessageIds: result.memoryProposal.sourceMessageIds || [],
-          });
+          }, { idempotent: false });
           const proposal = {
             id: nextMessageId('proposal'),
             memoryId: created.memory && created.memory._id,
@@ -555,7 +558,7 @@ Page({
             text: result.nowProposal.text,
             topic: result.nowProposal.topic,
             expiresAt: result.nowProposal.expiresAt !== undefined ? result.nowProposal.expiresAt : null,
-          });
+          }, { idempotent: false });
           const nowProposal = {
             id: nextMessageId('now-proposal'),
             nowId: created.nowItem && created.nowItem._id,
@@ -612,7 +615,7 @@ Page({
         mode: 'owner',
         role,
         content: text,
-      });
+      }, { idempotent: false });
       if (res && res.conversationId) this.conversationId = res.conversationId;
     } catch (err) {
       // 持久化失败不阻塞聊天
@@ -722,10 +725,27 @@ Page({
     store.setProfile(updates);
     this.setData({ cardDraft: null });
     wx.showToast({ title: '已更新你的 Card', icon: 'none' });
+    track.event('card_draft_accepted', { rows: (panel.rows || []).map((r) => r.key) });
   },
 
   onRejectCardDraft() {
     // 放弃草稿：已发布的 Card 保持原样
     this.setData({ cardDraft: null });
+  },
+
+  // 分享给朋友（v2 获客，2026-08-16）：把人引到主人的 Vibe 入口
+  onShareAppMessage() {
+    return {
+      title: '我在和我的 AI 分身聊天，它真的在记住我 · VibeCard',
+      path: '/pages/vibe/vibe',
+    };
+  },
+
+  // 分享到朋友圈
+  onShareTimeline() {
+    return {
+      title: '我在和我的 AI 分身聊天，它真的在记住我 · VibeCard',
+      query: '',
+    };
   },
 });

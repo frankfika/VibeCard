@@ -4,14 +4,26 @@
  */
 
 /**
- * Call a cloud function with error handling, timeout and retry
+ * Call a cloud function with error handling, timeout and retry.
+ *
+ * 安全重试策略（v2，2026-08-16）：
+ *   - 默认按「读操作」处理：允许重试（GET 类，重复读不会改变状态）。
+ *   - 写/非幂等调用必须显式声明 `idempotent: false`，此时默认 retries=0，
+ *     避免重复 createMemoryProposal / createRequest / connect 等产生重复数据。
+ *   - 调用方可显式覆盖 retries；显式声明优先级最高。
+ *
  * @param {string} name - Cloud function name
  * @param {Object} data - Data to pass to the function
- * @param {Object} options - Optional { timeout: ms, retries: count }
+ * @param {Object} options - Optional { timeout: ms, retries: count, idempotent: bool }
  * @returns {Promise<any>} Function result
  */
 async function callFunction(name, data = {}, options = {}) {
-  const { timeout = 15000, retries = 2 } = options;
+  const isWrite = options.idempotent === false;
+  // 显式 retries 优先；未显式指定时：读操作默认 2，写操作默认 0
+  const retries = (typeof options.retries === 'number')
+    ? options.retries
+    : (isWrite ? 0 : 2);
+  const { timeout = 15000 } = options;
 
   return new Promise((resolve, reject) => {
     let attempts = 0;

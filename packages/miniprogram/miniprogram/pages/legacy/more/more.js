@@ -54,11 +54,11 @@ Page({
   },
 
   goDiscover() {
-    nav.navigateTo('/pages/discover/discover');
+    nav.navigateTo('/pages/legacy/discover/discover');
   },
 
   goGames() {
-    nav.navigateTo('/pages/games/games');
+    nav.navigateTo('/pages/legacy/games/games');
   },
 
   goCard() {

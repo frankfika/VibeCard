@@ -97,7 +97,7 @@ Page({
   },
 
   openPublish() {
-    nav.navigateTo('/pages/thread-publish/thread-publish');
+    nav.navigateTo('/pages/legacy/thread-publish/thread-publish');
   },
 
   previewImage(e) {

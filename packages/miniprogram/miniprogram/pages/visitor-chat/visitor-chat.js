@@ -18,6 +18,8 @@
 const fixtures = require('../../data/vibe-fixtures.js');
 const cloud = require('../../utils/cloud.js');
 const nowHelper = require('../../utils/now.js');
+const subscribe = require('../../utils/subscribe.js');
+const track = require('../../utils/track.js');
 
 const fixtureCard = fixtures.fixtureOwnerCard;
 
@@ -93,6 +95,7 @@ Page({
   },
 
   onLoad(options) {
+    track.event('page_view', { page: 'visitor_chat', has_owner: !!((options && options.ownerId)) });
     this.demoMode = true;
     this.sending = false;
     this.ownerId = (options && options.ownerId) || '';
@@ -388,6 +391,17 @@ Page({
     }
     if (this.sending) return;
     this.sending = true;
+
+    // 订阅消息（v2 获客 + 留存，2026-08-16）：在用户点击「提交」的同一交互里
+    // 请求「对方有新请求」的订阅授权，授权失败/拒绝绝不阻塞提交。
+    // 必须在 await 之前的同步阶段触发 wx.requestSubscribeMessage。
+    let subscribePromise = null;
+    try {
+      subscribePromise = subscribe.requestSubscribe('OWNER_NEW_REQUEST');
+    } catch (e) {
+      console.warn('[visitor-chat] subscribe pre-call failed:', e && e.message);
+    }
+
     try {
       const res = await cloud.callFunction('requests', {
         action: 'createRequest',
@@ -395,8 +409,13 @@ Page({
         visitorSummary: '一位通过 AI 分身对话而来的访客',
         reason: this.data.preview.reason,
         possibleSharedContext: [],
-      });
+      }, { idempotent: false });
       if (res && res.ok === true) {
+        // 等订阅结果回来（即使失败也无妨），再显示完成态
+        if (subscribePromise) {
+          try { await subscribePromise; } catch (e) {}
+        }
+        track.event('request_submitted', { owner_id: this.ownerId });
         this.setDone('已送达', '你的理由已经交给他的 Vibe，是否认识由他决定。', '如果他有兴趣，他会选一种联系方式给你。');
         return;
       }
@@ -436,5 +455,27 @@ Page({
 
   setDone(title, desc, sub) {
     this.setData({ stage: 'done', doneTitle: title, doneDesc: desc, doneSub: sub });
+  },
+
+  // 分享给朋友（v2 获客）：访客把这个名片入口分享给更多可能认识主人的人
+  onShareAppMessage() {
+    const ownerId = this.ownerId || '';
+    const path = ownerId
+      ? '/pages/visitor-chat/visitor-chat?ownerId=' + encodeURIComponent(ownerId)
+      : '/pages/visitor-chat/visitor-chat';
+    return {
+      title: '我先和他的 AI 分身聊了聊，挺有意思 · VibeCard',
+      path,
+    };
+  },
+
+  // 分享到朋友圈
+  onShareTimeline() {
+    const ownerId = this.ownerId || '';
+    const query = ownerId ? 'ownerId=' + encodeURIComponent(ownerId) : '';
+    return {
+      title: '我先和他的 AI 分身聊了聊，挺有意思 · VibeCard',
+      query,
+    };
   },
 });

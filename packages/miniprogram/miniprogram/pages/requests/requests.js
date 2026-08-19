@@ -12,6 +12,8 @@
  */
 const fixtures = require('../../data/vibe-fixtures.js');
 const cloud = require('../../utils/cloud.js');
+const subscribe = require('../../utils/subscribe.js');
+const track = require('../../utils/track.js');
 
 // agent.summarizeConnection 的 recommendation 文案映射
 const RECOMMENDATION_TEXT = {
@@ -82,6 +84,7 @@ Page({
   },
 
   onLoad() {
+    track.event('page_view', { page: 'requests' });
     this.demoMode = false;
     this.loadInbox({ allowFallback: true });
   },
@@ -295,13 +298,23 @@ Page({
 
     if (this.data.acting) return;
     this.setData({ acting: true });
+
+    // 订阅消息（v2 留存）：主人通过连接时，请求「通知访客」的订阅授权。
+    // 必须在用户点击「确认分享联系方式」的同步上下文里触发，且先于 await。
+    let subscribePromise = null;
+    try {
+      subscribePromise = subscribe.requestSubscribe('VISITOR_REQUEST_ACCEPTED');
+    } catch (e) {
+      console.warn('[requests] subscribe pre-call failed:', e && e.message);
+    }
+
     try {
       const res = await cloud.callFunction('requests', {
         action: 'actOnRequest',
         requestId: this.data.currentRequest.id,
         decision: 'connect',
         sharedContactMethodIds: selected.map((c) => c.id),
-      });
+      }, { idempotent: false });
       if (!res || res.ok !== true) {
         const code = res && res.error && res.error.code;
         wx.showToast({
@@ -319,6 +332,11 @@ Page({
         view: 'connected',
         sharedContacts: res.result.sharedContacts || [],
       });
+      track.event('connection_made', { request_id: this.data.currentRequest && this.data.currentRequest.id });
+      // 等订阅结果回来（失败也无妨），不阻塞页面
+      if (subscribePromise) {
+        try { await subscribePromise; } catch (e) {}
+      }
     } catch (err) {
       console.warn('[requests] connect failed:', err && err.message);
       wx.showToast({ title: '操作失败，稍后再试', icon: 'none' });
@@ -350,7 +368,7 @@ Page({
         action: 'actOnRequest',
         requestId: this.data.currentRequest.id,
         decision,
-      });
+      }, { idempotent: false });
       if (!res || res.ok !== true) {
         const code = res && res.error && res.error.code;
         wx.showToast({
@@ -414,7 +432,7 @@ Page({
       const res = await cloud.callFunction('requests', {
         action: 'blockVisitor',
         requestId: req.id,
-      });
+      }, { idempotent: false });
       if (!res || res.ok !== true) {
         const code = res && res.error && res.error.code;
         wx.showToast({
@@ -455,5 +473,21 @@ Page({
       vibeTake: FIXTURE_VIBE_TAKE,
     });
     this.loadFixtureDemo();
+  },
+
+  // 分享给朋友（v2 获客）：邀请同伴来发请求
+  onShareAppMessage() {
+    return {
+      title: '把你的 AI 名片分享出去，让对的人来找你 · VibeCard',
+      path: '/pages/card/card',
+    };
+  },
+
+  // 分享到朋友圈
+  onShareTimeline() {
+    return {
+      title: '把你的 AI 名片分享出去，让对的人来找你 · VibeCard',
+      query: '',
+    };
   },
 });

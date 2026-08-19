@@ -3,13 +3,27 @@
     "pages/card/card",
     "pages/requests/requests",
     "pages/vibe/vibe",
-    "pages/visitor-chat/visitor-chat",
-    "pages/threads/threads",
-    "pages/more/more",
-    "pages/discover/discover",
-    "pages/games/games",
-    "pages/thread-publish/thread-publish"
+    "pages/visitor-chat/visitor-chat"
   ],
+  "subPackages": [
+    {
+      "root": "pages/legacy",
+      "name": "legacy",
+      "pages": [
+        "threads/threads",
+        "more/more",
+        "discover/discover",
+        "games/games",
+        "thread-publish/thread-publish"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/card/card": {
+      "network": "all",
+      "packages": ["legacy"]
+    }
+  },
   "window": {
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#ffffff",
@@ -47,5 +61,9 @@
     ]
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "__usePrivacyCheck__": true,
+  "requiredPrivateInfos": [
+    "chooseAvatar"
+  ]
 }
