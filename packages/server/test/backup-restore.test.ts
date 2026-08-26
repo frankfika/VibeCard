@@ -11,7 +11,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -38,6 +38,7 @@ test('backup then restore preserves the complete Core fixture state', async () =
   const dirA = mkdtempSync(join(tmpdir(), 'vibecard-backup-a-'));
   const dirB = mkdtempSync(join(tmpdir(), 'vibecard-backup-b-'));
   try {
+    chmodSync(dirA, 0o755);
     // --- seed store A with the fixture archive ---
     const dbA = join(dirA, 'vibecard.db');
     const archive = fixturePrivateArchive();
@@ -57,6 +58,17 @@ test('backup then restore preserves the complete Core fixture state', async () =
       saveMeta(dbA, meta);
       repos.close();
     }
+    assert.equal(statSync(dbA).mode & 0o777, 0o600);
+    assert.equal(statSync(`${dbA}.owner.json`).mode & 0o777, 0o600);
+    assert.equal(statSync(dirA).mode & 0o777, 0o755, 'pre-existing parent permissions');
+
+    const cliBackup = join(dirA, 'cli-backup.vibe');
+    execFileSync(
+      process.execPath,
+      ['--import', 'tsx', 'src/cli.ts', 'backup', '--out', cliBackup, '--db', dbA],
+      { cwd: serverDir, stdio: 'pipe' },
+    );
+    assert.equal(statSync(cliBackup).mode & 0o777, 0o600);
 
     // --- backup: private archive export (the documented backup artifact) ---
     const backupJson = await (async () => {

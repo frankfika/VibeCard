@@ -12,7 +12,7 @@ import { ShareCardTemplate, type CardTheme, type CardLayout, type CardOrientatio
 const THEMES: { id: CardTheme; label: string }[] = [
   { id: 'dark', label: 'Dark Vibe · 暗黑' },
   { id: 'light', label: 'Pure Light · 纯净' },
-  { id: 'neon', label: 'Web3 Neon · 链上霓虹' },
+  { id: 'neon', label: 'Neon Glow · 霓虹' },
   { id: 'chill', label: 'Chill Breeze · 清新' },
   { id: 'retro', label: 'Retro Classic · 复古' },
 ];
@@ -40,7 +40,6 @@ export default function ShareDrawer({
   const [qrError, setQrError] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isEmbedCopied, setIsEmbedCopied] = useState(false);
-  const [isScriptEmbedCopied, setIsScriptEmbedCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
 
@@ -117,10 +116,7 @@ export default function ShareDrawer({
 
   const embedCode = `<iframe\n  src="${shareUrl}"\n  width="100%"\n  height="640"\n  style="border:0;border-radius:24px;max-width:420px;"\n  title="vibecard"\n></iframe>`;
 
-  const scriptEmbedCode = `<script\n  src="${window.location.origin}/widget.js"\n  data-address="${profile.verified?.wallet ?? ''}"\n  data-theme="light"\n></script>`;
-
   const copyEmbedCode = () => copyToClipboard(embedCode, setIsEmbedCopied);
-  const copyScriptEmbedCode = () => copyToClipboard(scriptEmbedCode, setIsScriptEmbedCopied);
 
   const nativeShare = async () => {
     try {
@@ -584,10 +580,6 @@ export default function ShareDrawer({
             <button onClick={copyEmbedCode} className="w-full flex items-center justify-center gap-2 py-3.5 bg-background border border-border rounded-xl font-semibold text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all">
               {isEmbedCopied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Code className="w-4 h-4" />}
               {isEmbedCopied ? '已复制' : '获取 iframe 代码'}
-            </button>
-            <button onClick={copyScriptEmbedCode} className="w-full flex items-center justify-center gap-2 py-3.5 bg-background border border-border rounded-xl font-semibold text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all">
-              {isScriptEmbedCopied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Code className="w-4 h-4" />}
-              {isScriptEmbedCopied ? '已复制' : '获取 JS Widget'}
             </button>
           </div>
         </div>

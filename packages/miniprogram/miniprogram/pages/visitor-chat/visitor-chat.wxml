@@ -1,6 +1,11 @@
 <view class="page">
   <navbar title="{{ownerName}}的 AI 分身" showBack dark background="rgba(14,14,18,0.9)" />
 
+  <view wx:if="{{stage === 'loading'}}" class="done-wrap">
+    <view class="done-title">正在连接他的分身…</view>
+    <view class="done-desc">我会先确认这张名片属于谁。</view>
+  </view>
+
   <!-- ========== 对话阶段 ========== -->
   <view wx:if="{{stage === 'chat' || stage === 'reason'}}" class="chat-stage">
     <scroll-view scroll-y class="chat" scroll-into-view="{{scrollIntoId}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
@@ -81,5 +86,6 @@
     <view class="done-icon">🌙</view>
     <view class="done-title">{{unavailableTitle}}</view>
     <view wx:if="{{unavailableDesc}}" class="done-desc">{{unavailableDesc}}</view>
+    <view wx:if="{{unavailableRetry}}" class="preview-btn preview-btn-primary" bindtap="onRetryInit">重新加载</view>
   </view>
 </view>

@@ -151,12 +151,25 @@ test('visitorMessage entry: query-stage visibility filtering and typed errors', 
     ]),
     requests: new Map(),
     conversations: new Map(),
+    visitor_activity: new Map(),
+    visitor_evidence: new Map(),
+    now_items: new Map(),
   };
   const fakeCloud = {
     DYNAMIC_CURRENT_ENV: 'test',
     init() {},
     database() {
-      return {
+      const db = {
+        runTransaction(handler) {
+          // Real CloudBase transactions expose deterministic doc operations,
+          // not collection queries such as where().
+          return handler({
+            collection(name) {
+              const regular = db.collection(name);
+              return { doc: regular.doc };
+            },
+          });
+        },
         collection(name) {
           const coll = store[name];
           return {
@@ -169,7 +182,19 @@ test('visitorMessage entry: query-stage visibility filtering and typed errors', 
                     .map(([_id, v]) => ({ _id, ...v }));
                   return { data };
                 },
+                async remove() {
+                  let removed = 0;
+                  for (const [id, value] of coll.entries()) {
+                    if (Object.entries(conds).every(([key, expected]) => value[key] === expected)) { coll.delete(id); removed += 1; }
+                  }
+                  return { stats: { removed } };
+                },
               };
+            },
+            async add({ data }) {
+              const id = `${name}-${coll.size + 1}`;
+              coll.set(id, data);
+              return { _id: id };
             },
             doc(id) {
               return {
@@ -177,11 +202,22 @@ test('visitorMessage entry: query-stage visibility filtering and typed errors', 
                   if (!coll.has(id)) throw new Error('Doc not found');
                   return { data: coll.get(id) };
                 },
+                async set({ data }) { coll.set(id, data); return { _id: id }; },
+                async update({ data }) {
+                  if (!coll.has(id)) throw new Error('Doc not found');
+                  coll.set(id, { ...coll.get(id), ...data });
+                  return { stats: { updated: 1 } };
+                },
               };
             },
           };
         },
       };
+      return db;
+    },
+    async callFunction({ name }) {
+      assert.equal(name, 'content-check');
+      return { result: { gate: { allowed: true } } };
     },
     getWXContext() { return { OPENID: currentOpenid }; },
   };
@@ -198,7 +234,7 @@ test('visitorMessage entry: query-stage visibility filtering and typed errors', 
   const res = await agentFunction.main({
     action: 'visitorMessage',
     ownerId: 'owner-1',
-    messages: [{ role: 'user', content: '他最近在做什么？' }],
+    message: '他最近在做什么？',
   });
   assert.equal(res.ok, true);
   assert.equal(validateVisitorAgentResult(res.result), null);
@@ -212,11 +248,11 @@ test('visitorMessage entry: query-stage visibility filtering and typed errors', 
   const missing = await agentFunction.main({
     action: 'visitorMessage',
     ownerId: 'nobody',
-    messages: [{ role: 'user', content: 'hi' }],
+    message: 'hi',
   });
   assert.equal(missing.ok, false);
   assert.equal(missing.error.code, 'not_found');
 
-  const noOwner = await agentFunction.main({ action: 'visitorMessage', messages: [] });
+  const noOwner = await agentFunction.main({ action: 'visitorMessage', message: 'hi' });
   assert.equal(noOwner.error.code, 'invalid_request');
 });

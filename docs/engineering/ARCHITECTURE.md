@@ -85,7 +85,7 @@ Keep in place but outside the current navigation:
 - Games
 - Discover
 - Vibe Points
-- Web3 identity and contracts
+- Legacy Web3 contracts in the isolated optional `packages/contracts` package; no Web client runtime dependency
 - Platform adapters
 
 Do not migrate relationship or private memory data on-chain.
@@ -103,14 +103,14 @@ WeChat Mini Program          Web / Public Card
                      |
        +-------------+-------------+
        |             |             |
-     user          agent       connection
+     user          agent        requests
        |             |             |
        +-------------+-------------+
                      |
               WeChat Cloud Database
                      |
        users / memories / cards / now_items /
-       conversations / connection_requests
+       conversations / requests / visitor_evidence / request_gates
 ```
 
 For the competition MVP, do not introduce:
@@ -128,10 +128,11 @@ interfaces. WeChat remains one client and one deployment adapter.
 
 ---
 
-# 4. Six Data Collections
+# 4. Seven Product Data Collections
 
 Existing legacy collections may remain. The Now-enhanced competition product
-centers on six logical collections.
+centers on seven logical collections. Operational rate-limit state additionally
+uses `visitor_activity` and `request_gates`; these are not canonical user data.
 
 ## `users`
 
@@ -190,7 +191,7 @@ Stores:
 
 Keep owner and visitor conversations distinguishable. Do not mix private owner chat into a visitor session.
 
-## `connection_requests`
+## `requests`
 
 Uses the `ConnectionRequest` contract from `AI_BEHAVIOR.md`.
 
@@ -205,6 +206,18 @@ Required indexes:
 
 - `ownerId + ownerAction + createdAt`
 - `visitorId + createdAt`
+
+## `visitor_evidence`
+
+Stores only short-lived, server-validated topic labels produced by a grounded
+visitor-agent turn. A random evidence ID is bound to one owner and one visitor,
+may be consumed once by `requests.createRequest`, and is then deleted. Raw
+visitor text is never stored here.
+
+Required lifecycle/index:
+
+- TTL on `expiresAt` (24 hours)
+- `ownerId + visitorId` for replacement of an older unconsumed token
 
 ---
 
@@ -223,7 +236,7 @@ Extend only when needed for:
 - Private contact method selection
 - Agent enabled state
 
-## New `agent`
+## Current `agent`
 
 Actions added milestone by milestone:
 
@@ -244,7 +257,7 @@ Responsibilities:
 - Validate structured output
 - Return typed results or typed errors
 
-## New `connection`
+## Current `requests`
 
 Actions:
 
@@ -285,7 +298,7 @@ The client never calls a model provider directly.
 interface AgentProvider {
   ownerMessage(input: OwnerMessageInput): Promise<OwnerAgentResult>;
   visitorMessage(input: VisitorMessageInput): Promise<VisitorAgentResult>;
-  generateCardDraft(input: CardDraftInput): Promise<VibeCard>;
+  generateCardDraft(input: CardDraftInput): Promise<CardDraft>;
   summarizeConnection(input: ConnectionInput): Promise<ConnectionSummary>;
 }
 ```
@@ -356,7 +369,7 @@ Owner sends message
 -> normal reply
 -> optional single memory proposal
 -> owner confirms, edits, or rejects
--> connection/user data layer persists decision
+-> memory data layer persists the owner's decision
 ```
 
 The chat reply must not fail only because memory extraction fails.
@@ -382,7 +395,7 @@ Visitor opens public Card
 -> create visitor conversation
 -> agent.visitorMessage with public evidence
 -> visitor confirms connection reason
--> connection.createRequest
+-> requests.createRequest
 ```
 
 Contact details are not loaded into the visitor conversation.
@@ -391,12 +404,26 @@ Contact details are not loaded into the visitor conversation.
 
 ```text
 Owner opens inbox
--> connection.getRequest
+-> requests.getRequest
 -> read concise summary and original reason
 -> choose connect / later / decline
 -> if connect, select one contact method
 -> show Vibe matched
 ```
+
+## Owner Decision Learning Flow
+
+```text
+Owner chooses connect / later / decline
+-> requests stores the interaction decision
+-> agent may propose at most one owner preference or boundary memory
+-> owner confirms, edits, or rejects the proposal
+-> memory data layer activates only a confirmed proposal
+```
+
+The decision remains valid if proposal extraction fails. A click never becomes
+durable memory automatically, and the system must not create a visitor profile
+inside the owner's memory.
 
 ---
 
@@ -445,9 +472,10 @@ Clients do not implement independent permission or connection-recommendation log
 
 ---
 
-# 11. Target Folder Additions
+# 11. Current Implementation Paths
 
-Add only when the matching development-plan task starts:
+The focused implementation uses these paths. Keep documentation and new work
+aligned with them instead of reviving superseded page or function names:
 
 ```text
 packages/shared/
@@ -457,17 +485,25 @@ packages/shared/
 
 packages/miniprogram/cloudfunctions/
 ├── agent/
-└── connection/
+├── card/
+├── memory/
+├── now/
+└── requests/
 
 packages/miniprogram/miniprogram/pages/
-├── agent-chat/
+├── card/
 ├── requests/
-└── request-detail/
+├── vibe/
+└── visitor-chat/
 
 packages/web/src/pages/
-├── AgentPage.tsx
+├── CardPage.tsx
+├── MyVibePage.tsx
+├── PublicCardPage.tsx
 ├── RequestsPage.tsx
-└── VisitorAgentPage.tsx
+
+packages/web/src/components/vibe/
+└── VisitorVibeChat.tsx
 ```
 
 Names may follow existing local conventions, but avoid creating duplicate owner and visitor domain models.
@@ -476,7 +512,7 @@ Names may follow existing local conventions, but avoid creating duplicate owner 
 
 # 12. Reliability
 
-Every AI action returns one of:
+Core AI actions use the following canonical result/error vocabulary:
 
 ```text
 success
@@ -487,7 +523,14 @@ permission_denied
 rate_limited
 blocked
 not_found
+unsupported_capability
+no_confirmed_memories
 ```
+
+Deployment adapters may receive legacy transport aliases such as
+`provider_unavailable`, `unauthorized`, `forbidden`, or `card_deleted`. They
+must map those aliases to a documented client state at the adapter boundary;
+clients must not infer behavior from an undocumented raw provider error.
 
 Clients must provide:
 

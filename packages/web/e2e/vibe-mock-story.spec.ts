@@ -11,10 +11,11 @@ import { test, expect } from '@playwright/test';
  */
 
 const demoProfile = {
+  demoFixtureId: 'vibecard-official-fixture-v1',
   name: '林舟',
-  handle: 'linzhou',
+  handle: '在做一张会越来越懂你的 AI 名片',
   avatar: '',
-  bio: '在做一张会越来越懂你的 AI 名片',
+  bio: '把「先理解，再认识」做成一个真正可用的产品，最近在打磨访客和分身的前六轮对话。',
   tags: [{ label: 'AI', icon: '' }],
   lookingFor: '真正做过 AI 社交产品的人',
   event: '',
@@ -32,6 +33,13 @@ function encodeProfile(profile: object): string {
 }
 
 test.describe('VibeCard mock story (task 0.4)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('vibecard_runtime_v1', JSON.stringify({ mode: 'local', endpoint: '', ownerToken: '' }));
+      localStorage.setItem('vibecard_demo_mode', '1');
+    });
+  });
+
   test('owner vibe conversation proposes a memory and remembers it', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('tab', { name: 'Vibe' }).click();
@@ -79,7 +87,7 @@ test.describe('VibeCard mock story (task 0.4)', () => {
   });
 
   test('visitor talks to the public vibe and submits a specific reason', async ({ page }) => {
-    await page.goto(`/?c=${encodeProfile(demoProfile)}`);
+    await page.goto(`/?c=${encodeProfile(demoProfile)}&demo=1`);
 
     // Contact details are never visible on the public card
     await expect(page.locator('text=secret-wechat-id')).toHaveCount(0);
@@ -123,22 +131,22 @@ test.describe('VibeCard mock story (task 0.4)', () => {
 
     // Declining the weak one leaves the strong one actionable
     await page.getByTestId('request-decline').click();
-    await page.getByText('返回').click();
+    await expect(page.getByTestId('request-detail')).toHaveCount(0);
     await expect(page.getByTestId('request-item-weak')).toHaveCount(0);
     await expect(page.getByTestId('request-item')).toBeVisible();
   });
 
   test('visitor free-form questions get honest uncertainty, not invention', async ({ page }) => {
-    await page.goto(`/?c=${encodeProfile(demoProfile)}`);
+    await page.goto(`/?c=${encodeProfile(demoProfile)}&demo=1`);
     await page.getByTestId('chat-with-vibe').click();
     await page.getByTestId('visitor-input').fill('他年收入多少？');
     await page.getByTestId('visitor-send').click();
     await expect(page.getByTestId('visitor-vibe-chat')).toContainText('我不想替他猜');
   });
 
-  test('public card with agent disabled offers no chat entry (task 3.4)', async ({ page }) => {
-    await page.goto(`/?c=${encodeProfile({ ...demoProfile, agentEnabled: false })}`);
-    await expect(page.getByTestId('vibe-disabled')).toContainText('他的分身暂时在休息');
+  test('public card with agent disabled offers a request-only path', async ({ page }) => {
+    await page.goto(`/?c=${encodeProfile({ ...demoProfile, agentEnabled: false })}&demo=1`);
+    await expect(page.getByTestId('vibe-disabled')).toContainText('仍可提交认识理由');
     await expect(page.getByTestId('chat-with-vibe')).toHaveCount(0);
   });
 

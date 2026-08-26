@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const E2E_APP_PORT = 4179;
+const E2E_CARD_API_PORT = 4180;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -8,7 +11,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${E2E_APP_PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     actionTimeout: 10000,
@@ -29,15 +32,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'node scripts/e2e-hardhat.js',
-      url: 'http://127.0.0.1:8545',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-    },
-    {
-      command: 'VITE_MOCK_IPFS=true npm run dev',
-      url: 'http://localhost:3000',
-      reuseExistingServer: !process.env.CI,
+      command: `NAMECARD_SERVER_PORT=${E2E_CARD_API_PORT} npm run dev -- --port ${E2E_APP_PORT}`,
+      url: `http://localhost:${E2E_APP_PORT}`,
+      reuseExistingServer: false,
       timeout: 120 * 1000,
     },
   ],

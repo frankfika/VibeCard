@@ -4,7 +4,7 @@
  * 验收点：
  * - getPublicCard 返回 card_deleted / not_found -> 终态 unavailable，不回退演示
  * - card.agentEnabled === false -> 分身休息终态
- * - 普通网络错误 -> 保持回退 fixture 演示（回归）
+ * - 普通网络错误 -> 可重试终态，不得回退到别人的 fixture 数据
  * - getPublicCard 正常 -> 云模式对话（回归，投影字段来自 result.card）
  *
  * 运行：cd packages/miniprogram && node --test tests/
@@ -56,6 +56,25 @@ function makePage() {
   return page;
 }
 
+test('缺 ownerId 且未显式 demo：链接不完整，不加载 fixture', () => {
+  const page = makePage();
+  page.onLoad({});
+  assert.strictEqual(page.demoMode, false);
+  assert.strictEqual(page.data.stage, 'unavailable');
+  assert.strictEqual(page.data.messages.length, 0);
+  assert.match(page.data.unavailableTitle, /链接不完整/);
+});
+
+test('真实分享初始化期间保持 loading，不暴露 fixture 主人', () => {
+  cloudImpl = async () => new Promise(() => {});
+  const page = makePage();
+  page.onLoad({ ownerId: 'owner-1' });
+  assert.strictEqual(page.demoMode, false);
+  assert.strictEqual(page.data.stage, 'loading');
+  assert.strictEqual(page.data.ownerName, '这位主人');
+  assert.strictEqual(page.data.messages.length, 0);
+});
+
 test('card_deleted：终态「这张名片已被主人收回」，不回退演示', async () => {
   toasts.length = 0;
   cloudImpl = async () => ({ ok: false, error: { code: 'card_deleted', message: 'gone' } });
@@ -94,7 +113,7 @@ test('agentEnabled === false：分身休息终态，无输入阶段', async () =
   assert.strictEqual(page.data.messages.length, 0, '分身休息时不产生对话');
 });
 
-test('普通网络错误：仍回退 fixture 演示（回归）', async () => {
+test('普通网络错误：显示可重试终态，不伪造 fixture 主人', async () => {
   cloudImpl = async () => {
     throw new Error('network down');
   };
@@ -102,10 +121,11 @@ test('普通网络错误：仍回退 fixture 演示（回归）', async () => {
   page.onLoad({ ownerId: 'owner-1' });
   await flushAll();
 
-  assert.strictEqual(page.demoMode, true, '网络失败回退 demo');
-  assert.strictEqual(page.data.stage, 'chat');
-  assert.strictEqual(page.data.messages.length, 1, 'fixture 开场白');
-  assert.match(page.data.messages[0].text, /AI 分身/);
+  assert.strictEqual(page.demoMode, false);
+  assert.strictEqual(page.data.stage, 'unavailable');
+  assert.strictEqual(page.data.unavailableRetry, true);
+  assert.strictEqual(page.data.messages.length, 0, '没有 fixture 开场白');
+  assert.doesNotMatch(page.data.unavailableTitle, /林舟|苏晴/);
 });
 
 test('getPublicCard 正常：云模式对话（回归，读取 result.card 投影）', async () => {
@@ -133,7 +153,7 @@ test('getPublicCard 正常：云模式对话（回归，读取 result.card 投�
   assert.strictEqual(page.data.chips.length, 3, '按公开字段生成预设问题');
 });
 
-test('getPublicCard unauthorized：toast 请先登录后再试，随后仍回退演示', async () => {
+test('getPublicCard unauthorized：提示登录且不回退演示', async () => {
   toasts.length = 0;
   cloudImpl = async () => ({ ok: false, error: { code: 'unauthorized', message: 'login required' } });
   const page = makePage();
@@ -141,5 +161,7 @@ test('getPublicCard unauthorized：toast 请先登录后再试，随后仍回退
   await flushAll();
 
   assert.ok(toasts.includes('请先登录后再试'));
-  assert.strictEqual(page.demoMode, true, '初始化阶段未登录仍按现有逻辑回退演示');
+  assert.strictEqual(page.demoMode, false);
+  assert.strictEqual(page.data.stage, 'unavailable');
+  assert.strictEqual(page.data.messages.length, 0);
 });

@@ -21,7 +21,7 @@
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, chmodSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
@@ -53,6 +53,15 @@ import {
   MemoryTransitionError,
   NOW_ITEM_TOPICS,
   applyOwnerAction,
+  connectionDecisionSignal,
+  thirdPartyFragments,
+  validateExplicitDecisionPreference,
+  evaluateDecisionLearning,
+  finalizeDecisionLearningProposal,
+  normalizeSafeDecisionTopic,
+  exportKnowledgeBundle,
+  importKnowledgeBundle,
+  retrieveKnowledgeChunks,
 } from '../../shared/index';
 import type {
   ArchiveConversation,
@@ -64,6 +73,14 @@ import type {
   NowItem,
   NowItemStatus,
   VibeCard,
+  ExplicitDecisionPreference,
+  DecisionLearningEvidence,
+  ArchiveKnowledgeSource,
+  KnowledgeChunk,
+  PortableKnowledgeBundle,
+  PortableKnowledgeSource,
+  ImportedKnowledgeBundle,
+  CanonicalKnowledgeSource,
 } from '../../shared/index';
 import { createLocalRepositories } from '../../platforms/local-store/index';
 import type { LocalRepositories } from '../../platforms/local-store/index';
@@ -84,6 +101,9 @@ import { safeErrorForLog } from './redact';
 
 const APP_INFO = { name: 'vibecard-server', version: '0.1.0' };
 const CONTACT_KINDS = ['wechat', 'email', 'phone', 'telegram', 'other'] as const;
+// Reference Pro permits 10 MB of canonical source text. Base64 plus metadata
+// fits this authenticated endpoint's bounded 32 MiB envelope.
+const KNOWLEDGE_IMPORT_MAX_BYTES = 32 * 1024 * 1024;
 
 /* ---------------------------------------------------------------------------
  * Owner-side metadata (blocked list, export/delete guard) — small JSON
@@ -97,6 +117,9 @@ export interface OwnerMeta {
   blockedUsers: string[];
   lastPrivateExportAt: number | null;
   lastWriteAt: number;
+  knowledgeRevision: number;
+  lastKnowledgeExportRevision: number | null;
+  lastKnowledgeExportDigest: string | null;
 }
 
 export function loadMeta(dbPath: string): OwnerMeta {
@@ -106,6 +129,9 @@ export function loadMeta(dbPath: string): OwnerMeta {
     blockedUsers: [],
     lastPrivateExportAt: null,
     lastWriteAt: 0,
+    knowledgeRevision: 0,
+    lastKnowledgeExportRevision: null,
+    lastKnowledgeExportDigest: null,
   };
   if (dbPath === ':memory:') return empty;
   const path = `${dbPath}.owner.json`;
@@ -120,18 +146,47 @@ export function loadMeta(dbPath: string): OwnerMeta {
         : [],
       lastPrivateExportAt: typeof raw.lastPrivateExportAt === 'number' ? raw.lastPrivateExportAt : null,
       lastWriteAt: typeof raw.lastWriteAt === 'number' ? raw.lastWriteAt : 0,
+      knowledgeRevision: typeof raw.knowledgeRevision === 'number' && Number.isSafeInteger(raw.knowledgeRevision) ? raw.knowledgeRevision : 0,
+      lastKnowledgeExportRevision: typeof raw.lastKnowledgeExportRevision === 'number' && Number.isSafeInteger(raw.lastKnowledgeExportRevision) ? raw.lastKnowledgeExportRevision : null,
+      lastKnowledgeExportDigest: typeof raw.lastKnowledgeExportDigest === 'string' ? raw.lastKnowledgeExportDigest : null,
     };
   } catch {
     return empty;
   }
 }
 
+function knowledgePath(dbPath: string): string {
+  return `${dbPath}.knowledge.json`;
+}
+
+function loadLocalKnowledge(dbPath: string): ImportedKnowledgeBundle | null {
+  if (dbPath === ':memory:' || !existsSync(knowledgePath(dbPath))) return null;
+  const parsed = JSON.parse(readFileSync(knowledgePath(dbPath), 'utf8')) as unknown;
+  const validated = importKnowledgeBundle(parsed);
+  if (validated.ok === false) throw new Error(`invalid local knowledge store: ${validated.error.code}`);
+  return validated.value;
+}
+
+function stageLocalKnowledge(dbPath: string, bundle: PortableKnowledgeBundle): { commit: () => void; abort: () => void } {
+  if (dbPath === ':memory:') return { commit() {}, abort() {} };
+  const path = knowledgePath(dbPath);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const tmp = `${path}.tmp-${randomUUID()}`;
+  writeFileSync(tmp, JSON.stringify(bundle, null, 2), { mode: 0o600 });
+  chmodSync(tmp, 0o600);
+  return {
+    commit() { renameSync(tmp, path); },
+    abort() { rmSync(tmp, { force: true }); },
+  };
+}
+
 export function saveMeta(dbPath: string, meta: OwnerMeta): void {
   if (dbPath === ':memory:') return;
   const path = `${dbPath}.owner.json`;
-  mkdirSync(dirname(path), { recursive: true });
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(meta, null, 2));
+  writeFileSync(tmp, JSON.stringify(meta, null, 2), { mode: 0o600 });
+  chmodSync(tmp, 0o600);
   renameSync(tmp, path);
 }
 
@@ -236,6 +291,8 @@ export interface AppOptions {
   moderate?: ModerationHook;
   now?: () => number;
   logger?: (line: string) => void;
+  /** Fault-injection seam for crash-consistency tests. */
+  knowledgeImportBarrier?: (stage: 'after_stage' | 'after_metadata' | 'after_commit') => Promise<void>;
 }
 
 export interface App {
@@ -251,21 +308,68 @@ export function createApp(options: AppOptions): App {
   const moderate = options.moderate ?? defaultModerationHook;
   const agent = createAgentModel(provider);
 
-  if (config.dbPath !== ':memory:') mkdirSync(dirname(config.dbPath), { recursive: true });
+  if (config.dbPath !== ':memory:') {
+    mkdirSync(dirname(config.dbPath), { recursive: true, mode: 0o700 });
+  }
   const repos = createLocalRepositories(config.dbPath);
   const meta = loadMeta(config.dbPath);
+  let localKnowledge = loadLocalKnowledge(config.dbPath);
+  let knowledgeRecovery: Promise<void> = Promise.resolve();
 
   const chatLimiter = createRateLimiter({ perHour: config.chatRatePerHour, now });
   const requestLimiter = createRateLimiter({ perHour: config.requestRatePerHour, now });
+  const keyedMutationTails = new Map<string, Promise<void>>();
+  let canonicalRevision = 0;
+
+  async function withMutationLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+    const previous = keyedMutationTails.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.then(() => current);
+    keyedMutationTails.set(key, tail);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (keyedMutationTails.get(key) === tail) keyedMutationTails.delete(key);
+    }
+  }
 
   function touch(): void {
+    canonicalRevision += 1;
     meta.lastWriteAt = now();
+    // A monotonic validity flag is safer than comparing wall-clock
+    // milliseconds: same-tick writes and clock rollback must invalidate the
+    // owner's previous private export.
+    meta.lastPrivateExportAt = null;
     saveMeta(config.dbPath, meta);
   }
 
   async function ownerCard(): Promise<VibeCard | null> {
     return meta.cardId ? repos.cards.get(meta.cardId) : null;
   }
+
+  function currentKnowledge(ownerId: string): { sources: CanonicalKnowledgeSource[]; chunks: KnowledgeChunk[] } {
+    if (!localKnowledge) return { sources: [], chunks: [] };
+    if (localKnowledge.bundle.ownerId !== ownerId) throw new Error('local knowledge owner does not match identity');
+    return { sources: localKnowledge.sources, chunks: localKnowledge.chunks };
+  }
+
+  async function synchronizeKnowledgeMetadata(bundle: ImportedKnowledgeBundle | null, ownerId: string): Promise<void> {
+    const existing = await repos.knowledgeSources.list({ ownerId });
+    const nextIds = new Set((bundle?.sources ?? []).map(source => source.id));
+    for (const source of existing) if (!nextIds.has(source.id)) await repos.knowledgeSources.remove(source.id);
+    for (const source of bundle?.sources ?? []) {
+      await repos.knowledgeSources.save({
+        id: source.id, schemaVersion: 1, ownerId: source.ownerId,
+        kind: source.kind, title: source.title, source: source.source,
+        status: source.status, createdAt: source.createdAt, updatedAt: source.updatedAt,
+      });
+    }
+  }
+
+  if (localKnowledge) knowledgeRecovery = synchronizeKnowledgeMetadata(localKnowledge, localKnowledge.bundle.ownerId);
 
   function requireOwner(req: IncomingMessage): void {
     const header = req.headers.authorization ?? '';
@@ -297,6 +401,75 @@ export function createApp(options: AppOptions): App {
 
   async function confirmedMemories(ownerId: string): Promise<Memory[]> {
     return repos.memories.list({ ownerId, status: 'confirmed' });
+  }
+
+  function sameStringSet(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
+    const a = [...new Set(left ?? [])].sort();
+    const b = [...new Set(right ?? [])].sort();
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+  }
+
+  /**
+   * Best-effort task 2.6 learning. The caller has already persisted the
+   * connection decision. Every error is contained here so model/storage
+   * availability can never roll back or mask that decision.
+   */
+  async function proposeDecisionLearning(
+    request: ConnectionRequest,
+    explicitPreference: ExplicitDecisionPreference | undefined,
+  ): Promise<{ learningStatus: 'proposed' | 'not_suggested' | 'already_handled' | 'unavailable'; learningProposalId?: string }> {
+    try {
+      const all = await repos.connections.listForOwner({ ownerId: request.ownerId });
+      const evidence: DecisionLearningEvidence = {
+        current: connectionDecisionSignal(request),
+        prior: all
+          .filter((candidate) => candidate.id !== request.id && candidate.ownerAction !== 'pending')
+          .map((candidate) => connectionDecisionSignal(candidate)),
+        ...(explicitPreference ? { explicitPreference } : {}),
+        forbiddenFragments: all.flatMap(thirdPartyFragments),
+      };
+      const eligibility = evaluateDecisionLearning(evidence);
+      if (!eligibility.eligible) return { learningStatus: 'not_suggested' };
+
+      const system = [
+        '你在执行连接决定学习。服务器已判断证据清晰；你只能返回至多一条主人的偏好或边界候选。',
+        '不得描述、识别或画像任何访客，不得包含姓名、账号、链接或访客原话。',
+        '这只是 proposed 私有候选，必须由主人另行确认才生效。',
+        `候选类型：${eligibility.kind}`,
+        `候选内容：${eligibility.suggestedContent}`,
+        '只输出 JSON：{"proposal":{"kind":"preference|boundary","content":string,"suggestedVisibility":"private|agent_only"}|null}',
+      ].join('\n');
+      const outcome = await agent.extractDecisionLearning({
+        system,
+        messages: [{ role: 'user', content: '请在不增加第三方信息的前提下返回这条候选。' }],
+      });
+      if (outcome.ok === false || !outcome.value.proposal) return { learningStatus: 'unavailable' };
+      const proposal = finalizeDecisionLearningProposal(outcome.value.proposal, evidence, request.ownerId);
+      if (!proposal) return { learningStatus: 'not_suggested' };
+
+      const existing = (await repos.memories.list({ ownerId: request.ownerId }))
+        .find((memory) => memory.sourceConversationId === proposal.idempotencyKey);
+      if (existing) return { learningStatus: 'already_handled', learningProposalId: existing.id };
+
+      const memory = buildProposedMemory(
+        {
+          ownerId: request.ownerId,
+          kind: proposal.kind,
+          content: proposal.content,
+          visibility: proposal.suggestedVisibility,
+          sourceConversationId: proposal.idempotencyKey,
+          sourceMessageIds: proposal.sourceRequestIds,
+        },
+        now(),
+        `mem-decision-${proposal.idempotencyKey.slice(proposal.idempotencyKey.lastIndexOf(':') + 1)}`,
+      );
+      await repos.memories.save(memory);
+      touch();
+      return { learningStatus: 'proposed', learningProposalId: memory.id };
+    } catch (error) {
+      log(`[decision-learning] unavailable: ${safeErrorForLog(error)}`);
+      return { learningStatus: 'unavailable' };
+    }
   }
 
   async function exportPrivate(includeConversations: boolean) {
@@ -365,6 +538,7 @@ export function createApp(options: AppOptions): App {
         }
         const card = await requireIdentity();
         const ownerId = meta.ownerId!;
+        const revisionAtStart = canonicalRevision;
         if (meta.blockedUsers.includes(visitorId)) {
           throw new ApiError(403, 'blocked', 'this visitor is blocked');
         }
@@ -470,9 +644,48 @@ export function createApp(options: AppOptions): App {
           createdAt: now(),
         };
         conversation.messages = [...conversation.messages, visitorMsg, agentMsg];
+        conversation.verifiedSharedContext = [...new Set([
+          ...(conversation.verifiedSharedContext ?? []),
+          ...((result.sharedContext ?? []) as string[])
+            .map((value) => normalizeSafeDecisionTopic(value))
+            .filter((value): value is string => !!value),
+        ])].slice(0, 5);
         conversation.updatedAt = now();
-        await repos.conversations.save(conversation);
-        return { status: 200, data: { conversationId: conversation.id, ...result } };
+        return withMutationLock('canonical-state', async () => {
+          if (meta.ownerId !== ownerId || !meta.cardId || canonicalRevision !== revisionAtStart) {
+            throw new ApiError(409, 'concurrent_update', 'owner data changed during the conversation; retry');
+          }
+          await repos.conversations.save(conversation);
+          touch();
+          return { status: 200, data: { conversationId: conversation.id, ...result } };
+        });
+      }
+
+      if (method === 'POST' && rest[1] === 'knowledge' && rest[2] === 'search' && rest.length === 3) {
+        const visitorId = data.visitorId;
+        const query = data.query;
+        if (!isNonEmptyString(visitorId) || visitorId.length > 100) {
+          throw new ApiError(400, 'invalid_request', 'visitorId is required');
+        }
+        if (!isNonEmptyString(query) || query.length > 1000) {
+          throw new ApiError(400, 'invalid_request', 'query is required (max 1000 chars)');
+        }
+        const card = await requireIdentity();
+        if (card.agentEnabled === false) throw new ApiError(403, 'agent_disabled', 'the owner has disabled the visitor agent');
+        checkRate(chatLimiter, visitorKey(req, `knowledge:${visitorId}`));
+        await moderateOrThrow(moderate, query.trim());
+        const knowledge = currentKnowledge(meta.ownerId!);
+        return {
+          status: 200,
+          data: {
+            provider: 'structured',
+            results: retrieveKnowledgeChunks({
+              ownerId: meta.ownerId!, audience: 'visitor', chunks: knowledge.chunks,
+              queryText: query.trim(), limit: typeof data.limit === 'number' ? Math.max(1, Math.min(20, Math.floor(data.limit))) : 8,
+              now: now(),
+            }),
+          },
+        };
       }
 
       if (method === 'POST' && rest[1] === 'requests' && rest.length === 2) {
@@ -482,47 +695,79 @@ export function createApp(options: AppOptions): App {
         }
         await requireIdentity();
         const ownerId = meta.ownerId!;
+        const revisionAtStart = canonicalRevision;
         if (meta.blockedUsers.includes(visitorId)) {
           throw new ApiError(403, 'blocked', 'this visitor is blocked');
         }
         checkRate(requestLimiter, visitorKey(req, visitorId));
         if (isNonEmptyString(data.reason)) await moderateOrThrow(moderate, data.reason.trim());
         if (isNonEmptyString(data.visitorSummary)) await moderateOrThrow(moderate, data.visitorSummary.trim());
+        let visitorWorkUrl: string | null = null;
+        if (data.visitorWorkUrl !== undefined && data.visitorWorkUrl !== null && data.visitorWorkUrl !== '') {
+          if (!isNonEmptyString(data.visitorWorkUrl) || data.visitorWorkUrl.length > 500) {
+            throw new ApiError(400, 'invalid_work_url', 'visitorWorkUrl must be an HTTPS URL');
+          }
+          try {
+            const parsed = new URL(data.visitorWorkUrl);
+            if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('unsafe URL');
+            visitorWorkUrl = parsed.toString();
+          } catch {
+            throw new ApiError(400, 'invalid_work_url', 'visitorWorkUrl must be an HTTPS URL');
+          }
+          await moderateOrThrow(moderate, visitorWorkUrl);
+        }
 
+        let verifiedSharedContext: string[] = [];
+        if (isNonEmptyString(data.conversationId)) {
+          const conversation = await repos.conversations.get(data.conversationId);
+          if (conversation && conversation.ownerId === ownerId && conversation.visitorId === visitorId && conversation.kind === 'visitor') {
+            verifiedSharedContext = (conversation.verifiedSharedContext ?? [])
+              .map((value) => normalizeSafeDecisionTopic(value))
+              .filter((value): value is string => !!value)
+              .slice(0, 5);
+          }
+        }
         const payloadError = validateConnectionRequestPayload({
           ownerId,
           reason: typeof data.reason === 'string' ? data.reason : '',
           visitorSummary: (data.visitorSummary as string | undefined) ?? null,
-          possibleSharedContext: (data.possibleSharedContext as string[] | undefined) ?? null,
-          visitorWorkUrl: (data.visitorWorkUrl as string | undefined) ?? null,
+          // Client-supplied overlap is never trusted as owner-facing evidence.
+          possibleSharedContext: verifiedSharedContext,
+          visitorWorkUrl,
         });
         if (payloadError) {
           throw new ApiError(400, payloadError, payloadError === 'weak_reason'
             ? '请写下一个具体的理由（至少 10 个字）：为什么想认识，想聊什么。'
             : `invalid request: ${payloadError}`);
         }
-        const pair = await repos.connections.listByPair(ownerId, visitorId);
-        const gate = checkConnectionCreateAllowed({ requests: pair, ownerId, visitorId, now: now() });
-        if (gate) {
-          throw new ApiError(429, gate, gate === 'declined_cooldown'
-            ? 'the owner declined recently; please wait before asking again'
-            : 'you already sent a request recently');
-        }
-        const request = buildConnectionRequest(
-          {
-            ownerId,
-            visitorId,
-            reason: data.reason as string,
-            visitorSummary: (data.visitorSummary as string | undefined) ?? null,
-            possibleSharedContext: (data.possibleSharedContext as string[] | undefined) ?? null,
-            visitorWorkUrl: (data.visitorWorkUrl as string | undefined) ?? null,
-          },
-          now(),
-          `req-${randomUUID()}`,
-        );
-        await repos.connections.save(request);
-        touch();
-        return { status: 201, data: { id: request.id, ownerAction: request.ownerAction } };
+        return withMutationLock(`request-pair:${ownerId}:${visitorId}`, () => withMutationLock('canonical-state', async () => {
+          if (meta.ownerId !== ownerId || !meta.cardId || canonicalRevision !== revisionAtStart) {
+            throw new ApiError(409, 'concurrent_update', 'owner data changed while submitting; retry');
+          }
+          if (meta.blockedUsers.includes(visitorId)) throw new ApiError(403, 'blocked', 'this visitor is blocked');
+          const pair = await repos.connections.listByPair(ownerId, visitorId);
+          const gate = checkConnectionCreateAllowed({ requests: pair, ownerId, visitorId, now: now() });
+          if (gate) {
+            throw new ApiError(429, gate, gate === 'declined_cooldown'
+              ? 'the owner declined recently; please wait before asking again'
+              : 'you already sent a request recently');
+          }
+          const request = buildConnectionRequest(
+            {
+              ownerId,
+              visitorId,
+              reason: data.reason as string,
+              visitorSummary: (data.visitorSummary as string | undefined) ?? null,
+              possibleSharedContext: verifiedSharedContext,
+              visitorWorkUrl,
+            },
+            now(),
+            `req-${randomUUID()}`,
+          );
+          await repos.connections.save(request);
+          touch();
+          return { status: 201, data: { id: request.id, ownerAction: request.ownerAction } };
+        }));
       }
 
       if (method === 'GET' && rest[1] === 'requests' && rest.length === 3) {
@@ -585,6 +830,28 @@ export function createApp(options: AppOptions): App {
         throw new ApiError(400, imported.error.code, imported.error.message);
       }
       const state = imported.value;
+      // `force` is an authoritative replacement, not an upsert. Remove every
+      // record reachable from the old identity before switching metadata so
+      // private rows cannot become orphaned and survive a later delete-all.
+      if (await ownerCard()) {
+        const previousArchive = await exportPrivate(true);
+        const previousPlan = buildDeletionPlan(previousArchive);
+        if (previousPlan.ok === false) throw new ApiError(400, previousPlan.error.code, previousPlan.error.message);
+        for (const id of previousPlan.value.cardIds) await repos.cards.remove(id);
+        for (const id of previousPlan.value.nowItemIds) await repos.now.remove(id);
+        for (const id of previousPlan.value.memoryIds) await repos.memories.remove(id);
+        for (const id of previousPlan.value.contactMethodIds) await repos.contactMethods.remove(id);
+        for (const id of previousPlan.value.connectionRequestIds) await repos.connections.remove(id);
+        for (const id of previousPlan.value.conversationIds) await repos.conversations.remove(id);
+        for (const id of previousPlan.value.knowledgeSourceIds) await repos.knowledgeSources.remove(id);
+      }
+      if (localKnowledge && localKnowledge.bundle.ownerId !== state.card.ownerId) {
+        localKnowledge = null;
+        if (config.dbPath !== ':memory:') rmSync(knowledgePath(config.dbPath), { force: true });
+        meta.knowledgeRevision += 1;
+        meta.lastKnowledgeExportRevision = null;
+        meta.lastKnowledgeExportDigest = null;
+      }
       await repos.cards.save(state.card);
       if (state.kind === 'private') {
         for (const item of state.nowItems as NowItem[]) await repos.now.save(item);
@@ -594,6 +861,9 @@ export function createApp(options: AppOptions): App {
       for (const request of state.connectionRequests) await repos.connections.save(request);
       for (const contact of state.contactMethods) await repos.contactMethods.save(contact);
       for (const source of state.knowledgeSources) await repos.knowledgeSources.save(source);
+      if (localKnowledge?.bundle.ownerId === state.card.ownerId) {
+        await synchronizeKnowledgeMetadata(localKnowledge, state.card.ownerId);
+      }
       meta.ownerId = state.card.ownerId;
       meta.cardId = state.card.id;
       touch();
@@ -601,6 +871,61 @@ export function createApp(options: AppOptions): App {
         status: 200,
         data: { ok: true, kind: state.kind, ownerId: state.card.ownerId, cardId: state.card.id },
       };
+    }
+
+    if (rest[1] === 'knowledge') {
+      if (method === 'POST' && rest[2] === 'import' && rest.length === 3) {
+        await requireIdentity();
+        const imported = importKnowledgeBundle(data.bundle, meta.ownerId!);
+        if (imported.ok === false) throw new ApiError(400, imported.error.code, imported.error.message);
+        const previous = localKnowledge;
+        const nextBundle = exportKnowledgeBundle({
+          ownerId: meta.ownerId!, sources: imported.value.sources,
+          app: APP_INFO, createdAt: now(),
+        });
+        const next: ImportedKnowledgeBundle = { bundle: nextBundle, sources: imported.value.sources, chunks: imported.value.chunks };
+        const staged = stageLocalKnowledge(config.dbPath, nextBundle);
+        try {
+          await options.knowledgeImportBarrier?.('after_stage');
+          await synchronizeKnowledgeMetadata(next, meta.ownerId!);
+          await options.knowledgeImportBarrier?.('after_metadata');
+          staged.commit();
+          localKnowledge = next;
+          meta.knowledgeRevision += 1;
+          meta.lastKnowledgeExportRevision = null;
+          meta.lastKnowledgeExportDigest = null;
+          touch();
+          await options.knowledgeImportBarrier?.('after_commit');
+        } catch (error) {
+          staged.abort();
+          localKnowledge = loadLocalKnowledge(config.dbPath) ?? (config.dbPath === ':memory:' ? previous : null);
+          await synchronizeKnowledgeMetadata(localKnowledge, meta.ownerId!);
+          throw error;
+        }
+        return { status: 200, data: { ok: true, sources: next.sources.length, chunks: next.chunks.length } };
+      }
+      if (method === 'GET' && rest[2] === 'export' && rest.length === 3) {
+        await requireIdentity();
+        const knowledge = currentKnowledge(meta.ownerId!);
+        const bundle = exportKnowledgeBundle({ ownerId: meta.ownerId!, sources: knowledge.sources, app: APP_INFO, createdAt: now() });
+        meta.lastKnowledgeExportRevision = meta.knowledgeRevision;
+        meta.lastKnowledgeExportDigest = bundle.integrity.digest;
+        saveMeta(config.dbPath, meta);
+        return { status: 200, data: bundle };
+      }
+      if (method === 'POST' && rest[2] === 'search' && rest.length === 3) {
+        await requireIdentity();
+        if (!isNonEmptyString(data.query) || data.query.length > 1000) throw new ApiError(400, 'invalid_request', 'query is required (max 1000 chars)');
+        const knowledge = currentKnowledge(meta.ownerId!);
+        return { status: 200, data: {
+          provider: 'structured',
+          results: retrieveKnowledgeChunks({
+            ownerId: meta.ownerId!, audience: 'owner', chunks: knowledge.chunks,
+            queryText: data.query.trim(), limit: typeof data.limit === 'number' ? Math.max(1, Math.min(20, Math.floor(data.limit))) : 8,
+            now: now(),
+          }),
+        } };
+      }
     }
 
     if (method === 'GET' && rest[1] === 'card' && rest.length === 2) {
@@ -636,9 +961,17 @@ export function createApp(options: AppOptions): App {
             .map((h, i) => ({
               id: `highlight-${i + 1}`,
               title: h.title.trim().slice(0, 80),
-              ...(typeof h.url === 'string' && h.url.trim() ? { url: h.url.trim().slice(0, 300) } : {}),
+              ...(() => {
+                if (typeof h.url !== 'string' || !h.url.trim()) return {};
+                try {
+                  const url = new URL(h.url.trim());
+                  return url.protocol === 'https:' && !url.username && !url.password
+                    ? { url: url.toString().slice(0, 300) }
+                    : {};
+                } catch { return {}; }
+              })(),
             }))
-            .slice(0, 3);
+            .slice(0, 6);
       if (data.highlights !== undefined && !highlights) {
         throw new ApiError(400, 'invalid_request', 'highlights must be an array');
       }
@@ -665,9 +998,22 @@ export function createApp(options: AppOptions): App {
 
     if (method === 'POST' && rest[1] === 'card' && rest[2] === 'draft' && rest.length === 3) {
       const card = await requireIdentity();
-      const confirmed = await confirmedMemories(meta.ownerId!);
+      let scopedIds: Set<string> | null = null;
+      if (data.memoryIds !== undefined) {
+        if (!Array.isArray(data.memoryIds) || data.memoryIds.length > 20 || !data.memoryIds.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 200)) {
+          throw new ApiError(400, 'invalid_request', 'memoryIds must be a string array with at most 20 ids');
+        }
+        scopedIds = new Set(data.memoryIds as string[]);
+      }
+      // A Card draft is a public-facing suggestion. Even in owner mode, raw
+      // private/connected/agent-only or boundary memories must not enter its
+      // model context. A first-run allow-list narrows this again to memories
+      // explicitly confirmed during that onboarding session.
+      const confirmed = (await confirmedMemories(meta.ownerId!)).filter((memory) =>
+        memory.visibility === 'public' && memory.kind !== 'boundary' && (!scopedIds || scopedIds.has(memory.id)),
+      );
       if (confirmed.length === 0) {
-        throw new ApiError(400, 'no_confirmed_memories', '还没有已确认的记忆，先和 Vibe 聊几句吧');
+        throw new ApiError(400, 'no_confirmed_memories', '还没有可用于公开 Card 的已确认记忆');
       }
       const system = buildCardDraftSystem(confirmed, card);
       const outcome = await agent.generateCardDraft({
@@ -686,7 +1032,37 @@ export function createApp(options: AppOptions): App {
       if (!isNonEmptyString(message) || message.length > 2000) {
         throw new ApiError(400, 'invalid_request', 'message is required (max 2000 chars)');
       }
+      const clientMessageId = data.clientMessageId;
+      if (clientMessageId !== undefined && (typeof clientMessageId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(clientMessageId))) {
+        throw new ApiError(400, 'invalid_request', 'clientMessageId must be 8-100 URL-safe characters');
+      }
       const existing = await repos.conversations.list({ ownerId, kind: 'owner_vibe' });
+      const stableOwnerMessageId = typeof clientMessageId === 'string' ? `msg-client-${clientMessageId}` : null;
+      const stableProposalId = typeof clientMessageId === 'string' ? `mem-client-${clientMessageId}` : null;
+      if (stableOwnerMessageId) {
+        for (const priorConversation of existing) {
+          const messageIndex = priorConversation.messages.findIndex((item) => item.id === stableOwnerMessageId);
+          if (messageIndex < 0) continue;
+          const priorOwnerMessage = priorConversation.messages[messageIndex]!;
+          if (priorOwnerMessage.text !== message.trim()) {
+            throw new ApiError(409, 'idempotency_conflict', 'clientMessageId was already used for a different message');
+          }
+          const priorReply = priorConversation.messages.slice(messageIndex + 1).find((item) => item.role === 'vibe');
+          const priorProposal = stableProposalId
+            ? await repos.memories.get(stableProposalId)
+            : (await repos.memories.list({ ownerId })).find((item) => item.sourceMessageIds.includes(stableOwnerMessageId));
+          return {
+            status: 200,
+            data: {
+              conversationId: priorConversation.id,
+              reply: priorReply?.text ?? '',
+              cardUpdateSuggested: false,
+              ...(priorProposal ? { memoryProposalId: priorProposal.id } : {}),
+              agentNotice: '我是你的 AI 分身，不是本人。',
+            },
+          };
+        }
+      }
       let conversation = existing[0] ?? null;
       if (!conversation) {
         const t = now();
@@ -721,7 +1097,7 @@ export function createApp(options: AppOptions): App {
       const result = outcome.value;
 
       const ownerMsg: ArchiveMessage = {
-        id: `msg-${randomUUID()}`,
+        id: stableOwnerMessageId ?? `msg-${randomUUID()}`,
         schemaVersion: 1,
         conversationId: conversation.id,
         role: 'owner',
@@ -752,7 +1128,7 @@ export function createApp(options: AppOptions): App {
             sourceMessageIds: result.memoryProposal.sourceMessageIds ?? [ownerMsg.id],
           },
           now(),
-          `mem-${randomUUID()}`,
+          stableProposalId ?? `mem-${randomUUID()}`,
         );
         await repos.memories.save(proposal);
         memoryProposalId = proposal.id;
@@ -837,6 +1213,7 @@ export function createApp(options: AppOptions): App {
           return { status: 200, data: updated };
         }
         if (method === 'POST' && action === 'pause') {
+          if (memory.status === 'paused') return { status: 200, data: memory };
           const updated = pauseMemory(memory, now());
           await repos.memories.save(updated);
           touch();
@@ -1028,6 +1405,9 @@ export function createApp(options: AppOptions): App {
       if (meta.lastPrivateExportAt === null || meta.lastPrivateExportAt < meta.lastWriteAt) {
         throw new ApiError(409, 'export_required', 'export a private archive before deleting all data');
       }
+      if (localKnowledge && localKnowledge.sources.length > 0 && meta.lastKnowledgeExportDigest !== localKnowledge.bundle.integrity.digest) {
+        throw new ApiError(409, 'knowledge_export_required', 'export the portable knowledge bundle before deleting all data');
+      }
       const archive = await exportPrivate(true); // refresh the export timestamp guard
       const plan = buildDeletionPlan(archive);
       if (plan.ok === false) throw new ApiError(400, plan.error.code, plan.error.message);
@@ -1038,10 +1418,15 @@ export function createApp(options: AppOptions): App {
       for (const id of plan.value.connectionRequestIds) await repos.connections.remove(id);
       for (const id of plan.value.conversationIds) await repos.conversations.remove(id);
       for (const id of plan.value.knowledgeSourceIds) await repos.knowledgeSources.remove(id);
+      localKnowledge = null;
+      if (config.dbPath !== ':memory:') rmSync(knowledgePath(config.dbPath), { force: true });
       meta.ownerId = null;
       meta.cardId = null;
       meta.lastPrivateExportAt = null;
       meta.lastWriteAt = now();
+      meta.knowledgeRevision = 0;
+      meta.lastKnowledgeExportRevision = null;
+      meta.lastKnowledgeExportDigest = null;
       saveMeta(config.dbPath, meta);
       return { status: 200, data: { ok: true, deleted: {
         cards: plan.value.cardIds.length,
@@ -1084,36 +1469,57 @@ export function createApp(options: AppOptions): App {
 
     if (method === 'POST' && rest[1] === 'requests' && rest.length === 4 && rest[3] === 'action') {
       await requireIdentity();
-      const request = await repos.connections.get(rest[2]!);
-      if (!request || request.ownerId !== meta.ownerId) throw new ApiError(404, 'not_found', 'request not found');
-      const action = data.action;
-      if (action !== 'connect' && action !== 'later' && action !== 'decline') {
-        throw new ApiError(400, 'invalid_action', 'action must be connect, later, or decline');
-      }
-      let sharedIds: string[] | undefined;
-      if (action === 'connect') {
-        if (!Array.isArray(data.sharedContactMethodIds)) {
-          throw new ApiError(400, 'invalid_contact_selection', 'connect requires sharedContactMethodIds');
+      const requestId = rest[2]!;
+      return withMutationLock(`request-action:${requestId}`, async () => {
+        const request = await repos.connections.get(requestId);
+        if (!request || request.ownerId !== meta.ownerId) throw new ApiError(404, 'not_found', 'request not found');
+        const action = data.action;
+        if (action !== 'connect' && action !== 'later' && action !== 'decline') {
+          throw new ApiError(400, 'invalid_action', 'action must be connect, later, or decline');
         }
-        const owned = new Set((await repos.contactMethods.listByOwner(meta.ownerId!)).map((c) => c.id));
-        sharedIds = (data.sharedContactMethodIds as unknown[]).filter((v): v is string => typeof v === 'string');
-        if (sharedIds.some((id) => !owned.has(id))) {
-          throw new ApiError(400, 'invalid_contact_selection', 'contact methods must belong to the owner');
+        let sharedIds: string[] | undefined;
+        if (action === 'connect') {
+          if (!Array.isArray(data.sharedContactMethodIds)) {
+            throw new ApiError(400, 'invalid_contact_selection', 'connect requires sharedContactMethodIds');
+          }
+          const owned = new Set((await repos.contactMethods.listByOwner(meta.ownerId!)).map((c) => c.id));
+          sharedIds = (data.sharedContactMethodIds as unknown[]).filter((v): v is string => typeof v === 'string');
+          if (sharedIds.some((id) => !owned.has(id))) {
+            throw new ApiError(400, 'invalid_contact_selection', 'contact methods must belong to the owner');
+          }
         }
-      }
-      try {
-        const updated = applyOwnerAction(request, action, sharedIds, now());
-        await repos.connections.save(updated);
-        touch();
-        const contactMethods = await repos.contactMethods.listByOwner(meta.ownerId!);
-        const sharedContacts = resolveSharedContacts(updated, { contactMethods });
-        return { status: 200, data: { ...updated, ...(sharedContacts ? { sharedContacts } : {}) } };
-      } catch (error) {
-        if (error instanceof ConnectionTransitionError) {
-          throw new ApiError(409, error.code, error.message);
+        const explicitPreference = validateExplicitDecisionPreference(data.learningPreference) === null
+          ? data.learningPreference as unknown as ExplicitDecisionPreference
+          : undefined;
+        try {
+          const exactRetry = request.ownerAction === action && (
+            action !== 'connect' || sameStringSet(request.sharedContactMethodIds, sharedIds)
+          );
+          if (!exactRetry && request.ownerAction !== 'pending' && data.expectedUpdatedAt !== request.updatedAt) {
+            throw new ApiError(409, 'concurrent_update', 'the request changed; reload it before choosing again');
+          }
+          const repeated = request.ownerAction === action && (
+            action !== 'connect' || sameStringSet(request.sharedContactMethodIds, sharedIds)
+          );
+          const updated = repeated ? request : applyOwnerAction(request, action, sharedIds, now());
+          if (!repeated) {
+            await repos.connections.save(updated);
+            touch();
+          }
+          const learning = await proposeDecisionLearning(updated, explicitPreference);
+          const contactMethods = await repos.contactMethods.listByOwner(meta.ownerId!);
+          const sharedContacts = resolveSharedContacts(updated, { contactMethods });
+          return {
+            status: 200,
+            data: { ...updated, ...learning, ...(sharedContacts ? { sharedContacts } : {}) },
+          };
+        } catch (error) {
+          if (error instanceof ConnectionTransitionError) {
+            throw new ApiError(409, error.code, error.message);
+          }
+          throw error;
         }
-        throw error;
-      }
+      });
     }
 
     throw new ApiError(404, 'not_found', 'unknown endpoint');
@@ -1134,8 +1540,29 @@ export function createApp(options: AppOptions): App {
       }
       const url = new URL(req.url ?? '/', 'http://localhost');
       const path = url.pathname.replace(/\/+$/, '') || '/';
-      const body = req.method === 'GET' || req.method === 'HEAD' ? {} : await readBody(req, config.maxBodyBytes);
-      const { status, data } = await route(req.method ?? 'GET', path, req, body);
+      const method = req.method ?? 'GET';
+      const isKnowledgeImport = method === 'POST' && path === '/api/v1/owner/knowledge/import';
+      if (isKnowledgeImport) requireOwner(req);
+      const body = method === 'GET' || method === 'HEAD' ? {} : await readBody(req, isKnowledgeImport ? Math.max(config.maxBodyBytes, KNOWLEDGE_IMPORT_MAX_BYTES) : config.maxBodyBytes);
+      const isPublicChat = method === 'POST' && path === '/api/v1/public/chat';
+      const isPublicRequest = method === 'POST' && path === '/api/v1/public/requests';
+      const isPublicKnowledgeSearch = method === 'POST' && path === '/api/v1/public/knowledge/search';
+      const mutatesCanonicalState = method !== 'GET' && method !== 'HEAD' && !isPublicChat && !isPublicRequest && !isPublicKnowledgeSearch;
+      const isPrivateExport = method === 'GET' && path === '/api/v1/owner/export';
+      const isKnowledgeExport = method === 'GET' && path === '/api/v1/owner/knowledge/export';
+      const operation = async () => {
+        await knowledgeRecovery;
+        return route(method, path, req, body);
+      };
+      // The reference Server is single-owner. Serialize every canonical write
+      // with private export/delete so a slow model/moderator response cannot
+      // create a torn backup or resurrect data after delete-all.
+      const publicData = asRecord(body);
+      const { status, data } = await (mutatesCanonicalState || isPrivateExport || isKnowledgeExport
+        ? withMutationLock('canonical-state', operation)
+        : isPublicChat
+          ? withMutationLock(`visitor-chat:${String(publicData.ownerId ?? '')}:${String(publicData.visitorId ?? '')}`, operation)
+          : operation());
       sendJson(res, status, data, cors);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -1175,4 +1602,3 @@ export function listen(app: App, host: string, port: number) {
     server.listen(port, host, () => resolve(server));
   });
 }
-

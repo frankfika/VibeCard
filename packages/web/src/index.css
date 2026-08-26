@@ -143,6 +143,10 @@
     input, textarea, select { font-size: inherit; }
   }
   button { -webkit-tap-highlight-color: transparent; }
+  :focus-visible {
+    outline: 3px solid color-mix(in oklab, currentColor 72%, transparent);
+    outline-offset: 3px;
+  }
   /* Respect users who prefer reduced motion */
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
@@ -153,6 +157,20 @@
     }
   }
 }
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 0.75rem;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+}
+.skip-link:focus { transform: translateY(0); }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {

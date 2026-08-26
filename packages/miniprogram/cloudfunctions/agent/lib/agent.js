@@ -7,7 +7,7 @@
  * never reach the client.
  */
 
-const { validateOwnerAgentResult, validateVisitorAgentResult, validateConnectionSummary, validateCardDraft, typedError, ok } = require('./schema');
+const { validateOwnerAgentResult, validateVisitorAgentResult, validateConnectionSummary, validateDecisionLearningAgentResult, validateCardDraft, typedError, ok } = require('./schema');
 const { isProviderError } = require('./providers');
 
 const OWNER_SYSTEM_PROMPT = [
@@ -275,8 +275,9 @@ const CONNECTION_SUMMARY_SYSTEM_PROMPT = [
 
 /**
  * Summarize a connection request for the owner. Evidence is assembled by the
- * caller (request fields + optional visitor conversation excerpt); the model
- * only sees labeled lines with citable ids.
+ * caller (server-verified request evidence + optional visitor conversation
+ * excerpt); the model only sees labeled lines with citable ids. Visitor-owned
+ * fields remain explicitly labeled as unverified self-report.
  */
 async function runConnectionSummary({ provider, request, conversationExcerpt }) {
   if (!request || typeof request !== 'object') {
@@ -292,7 +293,7 @@ async function runConnectionSummary({ provider, request, conversationExcerpt }) 
     `- [req:shared_context] 可能的共同点：${sharedContext || '（无）'}`,
   ];
   if (typeof request.visitorWorkUrl === 'string' && request.visitorWorkUrl.trim()) {
-    evidenceLines.push(`- [req:work_url] 作品链接：${request.visitorWorkUrl}`);
+    evidenceLines.push(`- [req:work_url] 访客自述作品链接（未验证）：${request.visitorWorkUrl}`);
   }
   if (typeof conversationExcerpt === 'string' && conversationExcerpt.trim()) {
     evidenceLines.push(`- [conv:excerpt] 访客对话摘录：${conversationExcerpt.trim().slice(0, 1500)}`);
@@ -313,12 +314,40 @@ async function runConnectionSummary({ provider, request, conversationExcerpt }) 
   return ok({ summary: attempt.value });
 }
 
+/**
+ * Model refinement for a server-established, privacy-minimized learning
+ * candidate. Eligibility and third-party filtering remain server-owned.
+ */
+async function runDecisionLearning({ provider, kind, suggestedContent }) {
+  if (!['preference', 'boundary'].includes(kind) || typeof suggestedContent !== 'string' || !suggestedContent.trim()) {
+    return typedError('invalid_request', 'eligible learning candidate is required');
+  }
+  const system = [
+    '你在执行连接决定学习。服务器已判断证据清晰；你只能返回至多一条主人的偏好或边界候选。',
+    '不得描述、识别或画像任何访客，不得包含姓名、账号、链接或访客原话。',
+    '这只是 proposed 私有候选，必须由主人另行确认才生效。',
+    `候选类型：${kind}`,
+    `候选内容：${suggestedContent.slice(0, 500)}`,
+    '只输出 JSON：{"proposal":{"kind":"preference|boundary","content":string,"suggestedVisibility":"private|agent_only"}|null}',
+  ].join('\n');
+  const messages = [{ role: 'user', content: '请在不增加第三方信息的前提下返回这条候选。' }];
+  let attempt = await callAndValidate(provider, system, messages, validateDecisionLearningAgentResult);
+  if (attempt.providerError) return attempt.providerError;
+  if (attempt.error) {
+    attempt = await callAndValidate(provider, system, messages, validateDecisionLearningAgentResult);
+    if (attempt.providerError) return attempt.providerError;
+    if (attempt.error) return typedError('invalid_model_output', 'model output failed schema validation');
+  }
+  return ok(attempt.value);
+}
+
 module.exports = {
   runOwnerAgent,
   extractMemoryProposal,
   runCardDraft,
   runVisitorAgent,
   runConnectionSummary,
+  runDecisionLearning,
   OWNER_SYSTEM_PROMPT,
   VISITOR_SYSTEM_PROMPT,
   CONNECTION_SUMMARY_SYSTEM_PROMPT,

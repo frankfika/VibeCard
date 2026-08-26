@@ -18,6 +18,9 @@ const BLOCKED = 'blocked-openid';
 let currentOpenid = VISITOR;
 // Controls the fake content-check gate: 'allow' | 'blocked' | 'unavailable' | 'down'
 let moderationBehavior = 'allow';
+let learningBehavior = 'ok';
+const learningMemories = new Map();
+let activeStore = null;
 
 function createFakeCloud() {
   const store = {
@@ -33,45 +36,67 @@ function createFakeCloud() {
       }],
     ]),
     requests: new Map(),
+    request_gates: new Map(),
+    visitor_evidence: new Map(),
+    conversations: new Map(),
   };
+  activeStore = store;
   let seq = 0;
+  let transactionQueue = Promise.resolve();
 
-  const db = {
-    collection(name) {
-      const coll = store[name];
-      return {
-        where(conds) {
-          return {
-            orderBy() { return this; },
-            async get() {
-              const data = [...coll.entries()]
-                .filter(([, v]) => Object.entries(conds).every(([k, val]) => v[k] === val))
-                .map(([_id, v]) => ({ _id, ...v }));
-              return { data };
-            },
-          };
+  function collection(name, allowQuery) {
+    const coll = store[name];
+    const api = {
+      doc(_id) {
+        return {
+          async get() {
+            if (!coll.has(_id)) throw new Error('Doc not found');
+            return { data: coll.get(_id) };
+          },
+          async set({ data }) {
+            coll.set(_id, data);
+            return { _id };
+          },
+          async update({ data }) {
+            if (!coll.has(_id)) throw new Error('Doc not found');
+            coll.set(_id, { ...coll.get(_id), ...data });
+            return { stats: { updated: 1 } };
+          },
+          async remove() {
+            coll.delete(_id);
+            return { stats: { removed: 1 } };
+          },
+        };
+      },
+    };
+    if (allowQuery) {
+      api.where = conds => ({
+        orderBy() { return this; },
+        async get() {
+          const data = [...coll.entries()]
+            .filter(([, v]) => Object.entries(conds).every(([k, val]) => v[k] === val))
+            .map(([_id, v]) => ({ _id, ...v }));
+          return { data };
         },
-        async add({ data }) {
-          seq += 1;
-          const _id = `${name}-${seq}`;
-          coll.set(_id, data);
-          return { _id };
-        },
-        doc(_id) {
-          return {
-            async get() {
-              if (!coll.has(_id)) throw new Error('Doc not found');
-              return { data: coll.get(_id) };
-            },
-            async update({ data }) {
-              if (!coll.has(_id)) throw new Error('Doc not found');
-              coll.set(_id, { ...coll.get(_id), ...data });
-              return { stats: { updated: 1 } };
-            },
-          };
-        },
+      });
+      api.add = async ({ data }) => {
+        seq += 1;
+        const _id = `${name}-${seq}`;
+        coll.set(_id, data);
+        return { _id };
       };
+    }
+    return api;
+  }
+
+  const transactionDb = { collection(name) { return collection(name, false); } };
+  const db = {
+    runTransaction(handler) {
+      const run = transactionQueue.then(() => handler(transactionDb));
+      transactionQueue = run.catch(() => {});
+      return run;
     },
+    collection(name) { return collection(name, true); },
   };
 
   return {
@@ -80,6 +105,22 @@ function createFakeCloud() {
     database() { return db; },
     getWXContext() { return { OPENID: currentOpenid }; },
     async callFunction({ name, data }) {
+      if (name === 'agent') {
+        if (learningBehavior === 'down') throw new Error('agent unavailable');
+        return { result: { ok: true, result: { proposal: {
+          kind: data.kind,
+          content: data.suggestedContent,
+          suggestedVisibility: data.kind === 'boundary' ? 'agent_only' : 'private',
+        } } } };
+      }
+      if (name === 'memory') {
+        if (learningBehavior === 'down') throw new Error('memory unavailable');
+        const existing = learningMemories.get(data.idempotencyKey);
+        if (existing) return { result: { memory: existing, deduplicated: true } };
+        const memory = { _id: `learning-${learningMemories.size + 1}`, status: 'proposed', ...data };
+        learningMemories.set(data.idempotencyKey, memory);
+        return { result: { memory, deduplicated: false } };
+      }
       if (name !== 'content-check') throw new Error('unexpected function: ' + name);
       if (moderationBehavior === 'down') throw new Error('function not found');
       const gates = {
@@ -139,11 +180,80 @@ test('createRequest creates a pending request and rate-limits duplicates', async
   assert.equal(first.result.request.ownerAction, 'pending');
   assert.equal(first.result.request.visitorId, VISITOR);
   assert.deepEqual(first.result.request.sharedContactMethodIds, []);
+  assert.deepEqual(first.result.request.possibleSharedContext, [], '客户端自报共同点不作为主人证据落库');
   assert.equal(JSON.stringify(first).includes('secret-wechat-id'), false);
 
   const second = await createPending();
   assert.equal(second.ok, false);
   assert.equal(second.error.code, 'rate_limited');
+});
+
+test('concurrent duplicate requests create exactly one record', async () => {
+  const previous = currentOpenid;
+  currentOpenid = 'visitor-concurrent';
+  const event = {
+    action: 'createRequest', ownerId: OWNER, visitorSummary: '并发访客',
+    reason: GOOD_REASON, possibleSharedContext: ['客户端伪造共同点'],
+  };
+  const results = await Promise.all([call(event), call(event)]);
+  currentOpenid = previous;
+  assert.equal(results.filter(result => result.ok).length, 1);
+  assert.equal(results.filter(result => !result.ok && result.error.code === 'rate_limited').length, 1);
+});
+
+test('conversation evidence requires exact token + owner + visitor + authoritative conversation binding', async () => {
+  const validVisitor = 'visitor-evidence-valid';
+  const validConversationId = 'visitor-conv-valid';
+  activeStore.conversations.set(validConversationId, {
+    mode: 'visitor', ownerId: OWNER, visitorId: validVisitor,
+    roundCount: 1, messages: [{ role: 'user', content: '我也在做微信小程序' }],
+  });
+  activeStore.visitor_evidence.set('evidence-valid', {
+    ownerId: OWNER, visitorId: validVisitor, conversationId: validConversationId,
+    contexts: ['微信小程序'], expiresAt: Date.now() + 60_000,
+  });
+  currentOpenid = validVisitor;
+  const valid = await call({
+    action: 'createRequest', ownerId: OWNER, reason: GOOD_REASON,
+    conversationId: validConversationId, evidenceId: 'evidence-valid',
+    possibleSharedContext: ['客户端伪造共同点'],
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.result.request.conversationId, validConversationId);
+  assert.deepEqual(valid.result.request.possibleSharedContext, ['微信小程序']);
+  assert.equal(activeStore.visitor_evidence.has('evidence-valid'), false, '成功请求后令牌单次消费');
+
+  const invalidCases = [
+    { visitor: 'visitor-no-token', conversationId: validConversationId },
+    { visitor: 'visitor-cross-owner', conversationId: 'cross-conv', evidenceId: 'cross-evidence' },
+    { visitor: 'visitor-mismatch', conversationId: 'mismatch-conv', evidenceId: 'mismatch-evidence' },
+  ];
+  activeStore.conversations.set('cross-conv', {
+    mode: 'visitor', ownerId: 'other-owner', visitorId: 'visitor-cross-owner', messages: [], roundCount: 1,
+  });
+  activeStore.visitor_evidence.set('cross-evidence', {
+    ownerId: OWNER, visitorId: 'visitor-cross-owner', conversationId: 'cross-conv',
+    contexts: ['微信小程序'], expiresAt: Date.now() + 60_000,
+  });
+  activeStore.conversations.set('mismatch-conv', {
+    mode: 'visitor', ownerId: OWNER, visitorId: 'visitor-mismatch', messages: [], roundCount: 1,
+  });
+  activeStore.visitor_evidence.set('mismatch-evidence', {
+    ownerId: OWNER, visitorId: 'visitor-mismatch', conversationId: 'different-conv',
+    contexts: ['微信小程序'], expiresAt: Date.now() + 60_000,
+  });
+  for (const item of invalidCases) {
+    currentOpenid = item.visitor;
+    const result = await call({
+      action: 'createRequest', ownerId: OWNER, reason: GOOD_REASON,
+      conversationId: item.conversationId, evidenceId: item.evidenceId,
+      possibleSharedContext: ['客户端伪造共同点'],
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.request.conversationId, undefined);
+    assert.deepEqual(result.result.request.possibleSharedContext, []);
+  }
+  currentOpenid = VISITOR;
 });
 
 test('blocked visitors cannot create requests', async () => {
@@ -232,6 +342,45 @@ test('later keeps the request actionable and shares nothing', async () => {
   assert.deepEqual(connected.result.sharedContacts, [
     { id: 'cm-2', kind: 'email', label: '邮箱', value: 'secret@example.com' },
   ]);
+});
+
+test('clear owner preference proposes once; retry with rewording reuses the same proposal', async () => {
+  const created = await createPending('visitor-learning');
+  const requestId = created.result.request._id;
+  currentOpenid = OWNER;
+  const first = await call({
+    action: 'actOnRequest',
+    requestId,
+    decision: 'later',
+    learningPreference: { kind: 'preference', content: '我喜欢带着具体产品问题来交流的人。' },
+  });
+  assert.equal(first.ok, true);
+  assert.equal(first.result.learningStatus, 'proposed');
+  const retry = await call({
+    action: 'actOnRequest',
+    requestId,
+    decision: 'later',
+    learningPreference: { kind: 'boundary', content: '我希望邀请先说明一个具体问题。' },
+  });
+  assert.equal(retry.ok, true);
+  assert.equal(retry.result.learningStatus, 'already_handled');
+  assert.equal(retry.result.learningProposalId, first.result.learningProposalId);
+});
+
+test('learning outage never changes a stored owner decision', async () => {
+  const created = await createPending('visitor-learning-down');
+  currentOpenid = OWNER;
+  learningBehavior = 'down';
+  const acted = await call({
+    action: 'actOnRequest',
+    requestId: created.result.request._id,
+    decision: 'decline',
+    learningPreference: { kind: 'boundary', content: '我希望邀请先说明一个具体问题。' },
+  });
+  learningBehavior = 'ok';
+  assert.equal(acted.ok, true);
+  assert.equal(acted.result.request.ownerAction, 'decline');
+  assert.equal(acted.result.learningStatus, 'unavailable');
 });
 
 test('decline cools the visitor down for 24h', async () => {

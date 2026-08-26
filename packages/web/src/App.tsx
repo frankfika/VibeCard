@@ -2,17 +2,14 @@ import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Inbox, Sparkles, ChevronLeft } from 'lucide-react';
 import CardPage from './pages/CardPage';
-import EmbedCardPage from './pages/EmbedCardPage';
 import PublicCardPage from './pages/PublicCardPage';
-import IMBrowserNotice from './components/IMBrowserNotice';
 import { useProfile } from './store';
+import RuntimeSetup from './components/RuntimeSetup';
+import { flushOwnerMutations, loadRuntimeConfig, saveRuntimeConfig } from './lib/runtime';
+import { runLocalMigrations } from './lib/local-migrations';
 
 const RequestsPage = lazy(() => import('./pages/RequestsPage'));
 const MyVibePage = lazy(() => import('./pages/MyVibePage'));
-
-const E2EChainSyncPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/E2EChainSyncPage'))
-  : null;
 
 type Tab = 'card' | 'requests' | 'vibe';
 
@@ -71,41 +68,64 @@ function MobileHeader({ activeTab, onBack, hidden, onboarding }: { activeTab: st
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>(readStoredTab);
-  const { isSetup } = useProfile();
-
+  runLocalMigrations();
   const searchParams = new URLSearchParams(window.location.search);
+  const forceRuntimeSetup = searchParams.has('runtime-setup');
+  const [runtimeSetupForced, setRuntimeSetupForced] = useState(forceRuntimeSetup);
+  const [activeTab, setActiveTab] = useState<Tab>(readStoredTab);
+  const [runtimeReady, setRuntimeReady] = useState(() => {
+    if (loadRuntimeConfig()) return true;
+    // Creation must be zero-config. Start locally and let the owner choose a
+    // self-hosted or managed home after they have a Card worth publishing.
+    saveRuntimeConfig({ mode: 'local', endpoint: '', ownerToken: '' });
+    return true;
+  });
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const { isSetup } = useProfile();
+  const explicitDemoMode = localStorage.getItem('vibecard_demo_mode') === '1';
+  const ownerReady = isSetup || onboardingComplete || explicitDemoMode;
+  const visibleTab: Tab = ownerReady ? activeTab : 'card';
+
   const isSharedView = searchParams.has('c') || searchParams.has('id');
-  const isEmbedView = searchParams.has('address') || searchParams.has('cid');
-  const isE2EChainSync = window.location.pathname === '/e2e/chain-sync';
 
   useEffect(() => {
-    if (!isSharedView && !isEmbedView && !isE2EChainSync) {
-      localStorage.setItem('vibecard_tab', activeTab);
+    if (!isSharedView) {
+      localStorage.setItem('vibecard_tab', visibleTab);
     }
-  }, [activeTab, isSharedView, isEmbedView, isE2EChainSync]);
+  }, [visibleTab, isSharedView]);
 
-  if (isE2EChainSync && E2EChainSyncPage) {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-background" />}>
-        <E2EChainSyncPage />
-      </Suspense>
-    );
-  }
+  useEffect(() => {
+    const flush = () => { void flushOwnerMutations(); };
+    window.addEventListener('online', flush);
+    flush();
+    return () => window.removeEventListener('online', flush);
+  }, []);
+
+  useEffect(() => {
+    const complete = () => setOnboardingComplete(true);
+    window.addEventListener('vibecard-onboarding-complete', complete);
+    return () => window.removeEventListener('vibecard-onboarding-complete', complete);
+  }, []);
 
   if (isSharedView) {
     return <PublicCardPage />;
   }
 
-  if (isEmbedView) {
-    return <EmbedCardPage />;
+  if (!runtimeReady || runtimeSetupForced) {
+    return <RuntimeSetup onReady={() => {
+      if (runtimeSetupForced) {
+        window.history.replaceState(null, '', window.location.pathname);
+        setRuntimeSetupForced(false);
+      }
+      setRuntimeReady(true);
+    }} />;
   }
 
   return (
     <>
-      <IMBrowserNotice />
+      <a className="skip-link" href="#main-content">跳到主要内容</a>
       <div className="min-h-dvh bg-background text-foreground flex md:flex-row flex-col">
-        <MobileHeader activeTab={activeTab} hidden={isSharedView} onboarding={!isSetup} />
+        <MobileHeader activeTab={visibleTab} hidden={isSharedView} onboarding={!ownerReady} />
 
         {/* Desktop Sidebar */}
         {!isSharedView && (
@@ -124,12 +144,16 @@ export default function App() {
                 <button
                   key={tab.id}
                   role="tab"
-                  aria-selected={activeTab === tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  aria-selected={visibleTab === tab.id}
+                  aria-disabled={!ownerReady && tab.id !== 'card'}
+                  disabled={!ownerReady && tab.id !== 'card'}
+                  onClick={() => { if (ownerReady || tab.id === 'card') setActiveTab(tab.id); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                    activeTab === tab.id
+                    visibleTab === tab.id
                       ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                      : !ownerReady
+                        ? 'text-muted-foreground/45 cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
                   {tab.icon}
@@ -141,7 +165,7 @@ export default function App() {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col h-dvh md:h-auto relative overflow-hidden">
+        <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col h-dvh md:h-auto relative overflow-hidden">
           <div
             className="flex-1 flex flex-col overflow-hidden relative"
             style={{
@@ -151,20 +175,20 @@ export default function App() {
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={activeTab}
+                key={visibleTab}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
                 className="flex-1 flex flex-col overflow-hidden"
               >
-                {activeTab === 'card' && <CardPage />}
-                {activeTab === 'requests' && (
+                {visibleTab === 'card' && <CardPage />}
+                {visibleTab === 'requests' && (
                   <Suspense fallback={<PageSkeleton />}>
                     <RequestsPage />
                   </Suspense>
                 )}
-                {activeTab === 'vibe' && (
+                {visibleTab === 'vibe' && (
                   <Suspense fallback={<PageSkeleton />}>
                     <MyVibePage />
                   </Suspense>
@@ -190,8 +214,9 @@ export default function App() {
                       <TabBtn
                         icon={tab.icon}
                         label={tab.label}
-                        active={activeTab === tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        active={visibleTab === tab.id}
+                        disabled={!ownerReady && tab.id !== 'card'}
+                        onClick={() => { if (ownerReady || tab.id === 'card') setActiveTab(tab.id); }}
                       />
                     </div>
                   ))}
@@ -213,14 +238,16 @@ function PageSkeleton() {
   );
 }
 
-function TabBtn({ icon, label, active, onClick }: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
+function TabBtn({ icon, label, active, disabled, onClick }: { icon: ReactNode; label: string; active: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       role="tab"
       aria-selected={active}
+      aria-disabled={disabled}
+      disabled={disabled}
       aria-label={label}
-      className="tap-target relative flex flex-col items-center justify-center gap-1 px-4 py-1.5 rounded-2xl transition-all duration-300 ease-out group"
+      className="tap-target relative flex flex-col items-center justify-center gap-1 px-4 py-1.5 rounded-2xl transition-all duration-300 ease-out group disabled:opacity-35 disabled:cursor-not-allowed"
     >
       {/* Background Highlight */}
       <div

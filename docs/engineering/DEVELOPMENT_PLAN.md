@@ -15,6 +15,12 @@ This is the execution checklist for humans and coding agents.
 
 Only mark `[x]` after the listed acceptance criteria pass.
 
+Historical implementation note: some downstream tasks were built and verified
+against a stable mock or interface before an upstream release gate closed. Their
+`[x]` records describe their own acceptance evidence only; they do not close an
+unfinished dependency or parent milestone. New work must still follow the
+declared dependencies in order.
+
 ---
 
 # Milestone 0: Focus The Existing Product
@@ -239,7 +245,7 @@ Dependencies: 0.1
 
 ## 1.2 Add AI Provider Boundary
 
-Status: `[x]`
+Status: `[~]`
 
 Completion:
 
@@ -248,7 +254,13 @@ Completion:
 - Model output is JSON-parsed and schema-validated (`OwnerAgentResult`: reply / optional single memoryProposal / cardUpdateSuggested); one retry on invalid output, then typed error (`invalid_model_output`); provider/network failures return `provider_unavailable`; raw model text never reaches clients
 - Confirmed memories are injected into the owner-mode system prompt (only status=confirmed)
 - Validation: 10 node:test cases pass, covering mock determinism, no-proposal-for-greetings, invalid JSON retry, bad-kind rejection, memory context injection, provider selection, entry-level typed errors
-- Notes: the suite is provider-injectable, so the identical cases run against a configured real provider (needs owner's credentials, not available here). Known legacy issue: `packages/web/src/lib/genai.ts` still bundles a Gemini key client-side for avatar generation (pre-existing); flagged for Milestone 3/4 cleanup, out of 1.2 scope
+- Notes: the suite is provider-injectable, so the identical cases run against a configured real provider (needs owner's credentials, not available here). The browser-side Gemini credential path noted in the original completion record was later removed in 4.1.
+
+Remaining acceptance evidence:
+
+- Run the provider conformance suite against one configured real provider. The
+  implementation and mock-provider coverage are complete, but this listed
+  acceptance criterion has not yet passed in the recorded environment.
 
 Owner: Lane C
 
@@ -276,17 +288,23 @@ Dependencies: 1.1
 
 ## 1.3 Implement Owner Conversation
 
-Status: `[x]`
+Status: `[~]`
 
 Completion:
 
 - 2026-07-19, on `main`. Mini Program `pages/vibe` now wires the real chain: send → `agent.ownerMessage` (schema-validated reply + at most one proposal) → `memory.appendMessage` persistence → proposal card → `memory.createMemoryProposal` / `confirmMemory` / `deleteMemory`; 「已记住」list comes from `listMemories` (confirmed only)
 - Failure behavior per AI_BEHAVIOR.md: agent/provider failure → "我现在有点连不上，刚才的话不会丢。可以稍后再试。" and the chat stays usable; persistence failures never block the chat; confirm failure keeps the proposal pending with a retry toast
 - Rejected proposals are soft-deleted and are never retrievable (retrieval = confirmed only, enforced in 1.1)
-- Cloud unavailable (undeployed env / logged out) → automatic fallback to the 0.4 fixture demo path, so the competition demo never breaks
+- Historical competition behavior: cloud unavailable (undeployed env / logged out) automatically entered the 0.4 fixture path. This was superseded by the current safety hardening: production/cloud mode shows an explicit unavailable or authentication state, while fixtures require an explicit development/demo mode.
 - Validation: `node --check` ✅; node stub smoke tests covering demo fallback, full real path (send → proposal → confirm → list refresh), and agent-failure path — all pass
-- Intentional deviation: Web `MyVibePage` stays on fixtures — the first backend is WeChat Cloud Development and the web has no cloud session; a shared HTTP API is needed before web can use the real chain (noted for post-MVP / platform adapter work)
+- Historical deviation at competition-MVP time: Web `MyVibePage` stayed on fixtures because the Web client had no WeChat cloud session. Milestones 5-6 later added the portable HTTP API and open-client path.
 - Not verifiable here: deployment + invocation inside WeChat DevTools (owner's cloud env)
+
+Remaining acceptance evidence:
+
+- Re-run the owner conversation against deployed cloud functions in DevTools;
+  the pure logic and page-stub paths pass, but the current Mini Program cloud
+  invocation is part of the blocked 4.2 gate.
 
 Owners: Lane A and Lane D
 
@@ -310,15 +328,22 @@ Dependencies: 1.1 and 1.2
 
 ## 1.4 Generate Or Update Card From Memory
 
-Status: `[x]`
+Status: `[~]`
 
 Completion:
 
 - 2026-07-19, on `main`. New agent action `generateCardDraft`: uses only status=confirmed memories (zero confirmed → typed `no_confirmed_memories`); output schema-validated with empty sections stripped; draft never carries name/avatar/contact fields; provider failure → typed error
 - Mini Program vibe page: "✨ 让 Vibe 更新我的 Card" → draft preview panel with per-field old→new diff (此刻的我 / 想遇见谁 / 话题标签 / 代表内容) → 采用 writes mapped fields into the v1 profile via `store.setProfile` (name/avatar/contacts untouched, backward compatible); 放弃 discards and the published Card stays unchanged; empty-diff drafts show a toast instead of a blank panel
-- Demo mode (cloud down) generates the fixture draft so the flow is always demoable
+- Explicit development/demo mode generates a deterministic fixture draft. A
+  cloud or provider failure in production remains an error/retry state and
+  never substitutes fixture identity or memory.
 - Validation: agent suite 16/16 pass (incl. draft validity, empty-section stripping, contact-field rejection, typed errors); node stub smoke tests pass for demo-accept, real-reject-unchanged, and no-diff paths
 - Not verifiable here: real-model draft quality + DevTools run (owner's env). Web integration deferred with the same HTTP-API constraint as 1.3
+
+Remaining acceptance evidence:
+
+- Complete a timed first-run conversation with a configured real provider and
+  verify that the resulting Card draft is useful before marking this task done.
 
 Owner: Lane C, integrated by Lanes A and D
 
@@ -341,7 +366,67 @@ Acceptance:
 
 Dependencies: 1.3
 
-Milestone 1 complete when one confirmed memory changes a later response and can update a Card draft.
+## 1.5 Build Conversational First-Run Onboarding
+
+Status: `[x]`
+
+Completion (2026-08-23):
+
+- Replaced the Web and Mini Program first-run forms with the five-question
+  conversational flow from `PRODUCT.md`, including answer/skip/correct,
+  per-response memory review, editable Card preview, and explicit publish.
+- Resume state is versioned. Web owner messages carry a stable
+  `clientMessageId`; the Server replays the authoritative result for the same
+  owner/message and rejects a conflicting reuse. Lost message and Card-publish
+  responses recover without duplicate chat, memory, or publication.
+- First-run Card generation is scoped to this run's confirmed public memory
+  ids. Both clients and the Server exclude private, `agent_only`, and boundary
+  memories before model invocation; an exact concurrent-private-proposal
+  regression proves the client never guesses a proposal by timestamp.
+- Boundary answers remain private and outside the public Card. Skipped answers
+  do not create memories or Card fields; proposed content remains inactive
+  until the owner confirms it.
+- Validation: root `release:check` passes; Shared 145/145, Server 34/34,
+  Agent 81/81, Mini Program pages 77/77, Card 14/14, and Memory 18/18. The Web first-run
+  suite passes on desktop and the Pixel 5 mobile profile. The full Web suite
+  is recorded under task 4.4.
+
+Owner: Lanes A and D, using Lane C agent contracts
+
+Experience:
+
+```text
+New owner starts without a completed Card
+-> Vibe asks the five PRODUCT.md first-run questions conversationally
+-> owner may answer, skip, or correct each answer
+-> Vibe proposes at most one memory per response
+-> owner confirms the memories they want to keep
+-> Vibe generates a Card draft
+-> owner previews, edits, and explicitly publishes it
+```
+
+Requirements:
+
+- Do not turn the flow into a five-field form or a separate training center
+- Resume safely after interruption without duplicating confirmed memories
+- Keep the privacy-boundary answer private unless the owner explicitly changes visibility
+- Preserve the existing structured editor as the precision-editing path
+- Provide loading, empty, error, retry, and permission-denied states
+
+Acceptance:
+
+- A new owner can complete the five-question flow and publish a Card in about three minutes
+- Skipping a question does not invent a Card field or memory
+- No proposed memory or generated Card field becomes active before confirmation
+- Refreshing or retrying resumes the flow without duplicate memory or publication
+- Desktop-browser and Pixel 5 mobile-profile coverage passes; Mini Program
+  page tests cover the same state transitions
+
+Dependencies: 1.3 and the Card-draft implementation in 1.4
+
+Milestone 1 complete when tasks 1.1-1.5 pass, one confirmed memory changes a
+later response, and the conversational first-run flow can publish an
+owner-approved Card draft.
 
 ---
 
@@ -363,6 +448,17 @@ Completion:
 - 10 node:test cases pass, including a where-clause assertion proving query-stage filtering
 - Web short links (`?c=` / `?id=`) already resolve to the PublicCardPage, which since 0.4 renders no contact details and offers the Vibe chat entry; Mini Program share view resolves to the same owner card
 
+Owner: Lane B
+
+Acceptance:
+
+- Public projection contains no contact field or non-public memory content
+- Memory visibility is filtered before records enter the projection
+- Missing and deleted Cards return typed states
+- Existing Web and Mini Program shared links resolve the intended owner
+
+Dependencies: 0.1 and 1.1
+
 ## 2.2 Implement Visitor Conversation
 
 Status: `[x]`
@@ -374,6 +470,18 @@ Completion:
 - Output schema `VisitorAgentResult` { reply, evidenceRefs, nextAction: continue|invite_connection_reason|offer_request_review|end, boundaryCode? }; invalid model output rejected with one retry then typed error
 - Boundary behavior: contact requests → `contact_request` refusal with a legitimate path; prompt injection (ignore-instructions / impersonating owner / system-prompt extraction) → `prompt_injection` refusal; tested with fixtures
 - 11 node:test cases pass, including entry-level assertions that only public and agent_only memories are ever queried
+
+Owner: Lane C
+
+Acceptance:
+
+- Every factual owner claim carries a valid public evidence reference
+- `agent_only` memory may affect a boundary decision but is never quoted or revealed
+- Unknown questions produce uncertainty instead of invention
+- Contact extraction and prompt-injection attempts are refused
+- The six-round cap and one-question-per-turn rules are enforced server-side
+
+Dependencies: 1.2 and 2.1
 
 ## 2.3 Create Connection Request
 
@@ -387,6 +495,18 @@ Completion:
 - Contact values resolve only after `connect` (unknown ids silently dropped); pending/later/decline requests never carry contact values
 - 16 node:test cases pass covering all of the above plus visitor-cannot-act and inbox scoping
 
+Owner: Lane B
+
+Acceptance:
+
+- The visitor confirms a specific reason before submission
+- Weak, duplicate, blocked, and decline-cooldown requests return typed states
+- Only the owner can act on a request
+- No contact value is returned before `connect`
+- `connect` releases only owner-selected contact methods
+
+Dependencies: 2.1
+
 ## 2.4 Summarize Why This Connection Matters
 
 Status: `[x]`
@@ -398,21 +518,106 @@ Completion:
 - Weak evidence (short reason, no shared context) → `need_more_context` with explicit uncertainty; `why` must be non-empty with evidence
 - 5 node:test cases pass (strong/weak evidence fixtures, structure, no-score)
 
+Owner: Lane C
+
+Acceptance:
+
+- The result is structured, evidence-backed, and contains explicit uncertainty
+- Weak evidence produces `need_more_context`
+- No score, pass/fail label, or unsupported owner claim is returned
+- Only the request owner can obtain the private summary
+
+Dependencies: 1.2 and 2.3
+
 ## 2.5 Complete The Connection Moment
 
-Status: `[x]`
+Status: `[~]`
 
 Completion:
 
-- 2026-07-19, on `main`. Mini Program `pages/requests` and `pages/visitor-chat` upgraded to dual-mode (real cloud chain first, fixture demo fallback — same pattern as vibe page)
+- Historical 2026-07-19 implementation: Mini Program `pages/requests` and `pages/visitor-chat` used a real-cloud-first dual mode with automatic fixture fallback. Current safety hardening supersedes the automatic transition: production/cloud failures stay visible and fixture data is available only in an explicit development/demo mode.
 - Requests page: real `listInbox` inbox → detail with `summarizeConnection` Vibe take (recommendation→warm-copy mapping, summary failure falls back to fixture take, page never breaks) → `actOnRequest` with `decision` field → connect picks owner contact methods (from `user.getProfile` contactMethods) → matched view shows shared values only after connect; `later`/`decline` equally accessible with their own states; empty inbox uses the 0.4 empty state; demo reset only in demo mode
 - Visitor chat: `card.getPublicCard` bootstrap (owner name, public-field-driven suggestion chips) → `agent.visitorMessage` with nextAction flow → preview → `requests.createRequest`; `weak_reason` triggers the Vibe's follow-up question with the draft preserved; `blocked`/`rate_limited`/`declined_cooldown` get gentle terminal copy; model failure never invents and keeps the flow alive; never touches contact APIs
 - Validation: `node --check` ✅; 42 node-stub smoke assertions pass across fallback, cloud inbox→detail→connect→matched (contact values asserted absent before connect), later/decline, and visitor-chat cloud flows (grounded answer → invite → submit; weak-reason follow-up; blocked copy)
-- Intentional deviation (same as 1.3/1.4): web `RequestsPage`/`VisitorVibeChat` stay on fixtures until a shared HTTP API exists; request state consistency across Mini Program and Web therefore holds through the shared cloud backend once deployed
+- Historical deviation at competition-MVP time: Web `RequestsPage`/`VisitorVibeChat` stayed on fixtures until the shared HTTP API arrived in Milestones 5-6. Mini Program cloud-mode verification remains part of 4.2.
 - Not verifiable here: WeChat DevTools compile, real OPENID login chain, physical-device share → visitor-chat deep link
 
+Owner: Lanes A and D
 
-Milestone 2 complete when the full real-data connection loop passes.
+Acceptance:
+
+- A visitor can open the correct shared Card, talk to its AI representation, review a specific reason, and submit it
+- The owner can open the real inbox, see the evidence-based summary, and choose connect, later, or decline
+- Contact values remain absent until connect and contain only the owner's selected methods afterward
+- The connected path ends in `Vibe matched`; weak and blocked paths remain recoverable or terminate safely
+- The full cloud-data loop passes with real OPENID sessions in DevTools and on a physical-device deep link
+
+Dependencies: 2.1, 2.2, 2.3, and 2.4
+
+Remaining acceptance evidence:
+
+- Real OPENID, deployed cloud functions, and physical-device share/deep-link verification are part of task 4.2 and remain open.
+
+## 2.6 Propose Learning From Owner Connection Decisions
+
+Status: `[x]`
+
+Completion (2026-08-23):
+
+- Added the shared structured decision-learning contract and matching Server
+  and WeChat request handlers. A decision is stored first; learning is
+  best-effort, proposes at most one private/`agent_only` memory, and reuses a
+  stable idempotency key across retries.
+- One ambiguous click produces no proposal. Repeated/explicit owner evidence
+  may propose a preference or boundary. Shared-context evidence is accepted
+  only from a short-lived, owner/visitor-bound server record produced by the
+  visitor conversation; arbitrary client context is ignored, and successful
+  request creation consumes the evidence record. Visitor-controlled names,
+  handles, email, phone, free-form reason, and unsafe URLs/context are removed
+  or rejected before persistence.
+- Web and Mini Program request pages consume `learningStatus` and
+  `learningProposalId`, then offer Remember / Edit / Do not remember through
+  the normal memory lifecycle. Lookup/confirm/reject failures never roll back
+  connect/later/decline; Web persists and recovers a pending proposal by exact
+  id after retry or reload.
+- Validation: Shared 145/145, Server 34/34, WeChat request function 32/32,
+  Agent function 81/81, Card function 14/14, memory function 18/18, Mini Program pages 77/77, plus
+  desktop/mobile Web confirmation, editing, rejection, lookup-failure, and
+  reload recovery.
+
+Owner: Lanes B and C, integrated by Lanes A and D
+
+Experience:
+
+```text
+Owner chooses connect / later / decline
+-> the decision is stored as interaction data
+-> when evidence is clear, Vibe may propose one preference or boundary memory
+-> owner chooses Remember / Edit / Do not remember
+-> only a confirmed proposal affects later retrieval
+```
+
+Requirements:
+
+- Never convert a click directly into durable memory
+- Do not create durable memory about the identifiable visitor
+- Avoid proposing a stable preference from one ambiguous decision
+- Preserve the original connection decision even if proposal extraction fails
+- Keep the proposal private to the owner and apply the normal memory lifecycle
+
+Acceptance:
+
+- Connect, later, and decline decisions remain usable when learning is unavailable
+- A clear repeated or explicit preference can produce at most one proposal
+- Rejecting the proposal leaves later retrieval unchanged
+- Confirming it makes the preference available only to roles allowed by its visibility
+- Tests cover ambiguous one-click input, third-party information, rejection, confirmation, and retry without duplication
+
+Dependencies: 1.1, 1.2, and 2.3
+
+
+Milestone 2 complete when tasks 2.1-2.6 pass, the full real-data connection
+loop passes, and owner decisions can inform only owner-confirmed learning.
 
 ---
 
@@ -434,6 +639,11 @@ Completion:
 - UI retry preserved: Mini Program `visitor-chat` maps `moderation_blocked` back to the reason editor and `moderation_unavailable` to a retry toast; the typed reason stays in `reasonValue` either way, so retry never loses typed content
 - New committed smoke tests `packages/miniprogram/tests/visitor-chat.moderation.test.js` (node stub harness) assert both moderation branches preserve the draft, plus a weak_reason regression
 - Validation: `npm test` in content-check 7/7 pass; requests 18/18 pass incl. both new moderation paths; page smoke 3/3 pass
+- 2026-08-23 hardening: `agent.visitorMessage` now accepts only the newest
+  visitor message and an optional authoritative conversation id. Stranger text
+  passes the fail-closed `content-check` gate before any conversation write or
+  model invocation; unsafe or unavailable moderation produces zero provider
+  calls and stores no visitor text. Agent 81/81 and Mini pages 77/77 pass.
 
 Owner: Lane B
 
@@ -462,12 +672,18 @@ Status: `[x]`
 Completion:
 
 - 2026-07-19, on `main`. Server-side enforcement added in front of the model:
-  - New `agent/lib/limits.js` pure logic (`VISITOR_MESSAGES_PER_DAY=60`, `VISITOR_NEW_CONVERSATIONS_PER_DAY=10`, `checkVisitorActivity`, `activityDocId`, `todayStr`, `isBlocked`); `agent.visitorMessage` now gates blocked visitors (`blocked`) and over-limit visitors (`rate_limited`, distinct copy for message cap vs new-conversation cap) **before any provider call** — tests assert the stub provider is never invoked in those paths. Limits persist in a new `visitor_activity` collection (`_id = visitorId:ownerId:YYYY-MM-DD`, East-8 date); limiter read/upsert failures degrade to allow-with-warn so DB jitter never kills a normal conversation
+  - New `agent/lib/limits.js` pure logic (`VISITOR_MESSAGES_PER_DAY=60`, `VISITOR_NEW_CONVERSATIONS_PER_DAY=10`, `checkVisitorActivity`, `activityDocId`, `todayStr`, `isBlocked`); `agent.visitorMessage` now gates blocked visitors (`blocked`) and over-limit visitors (`rate_limited`, distinct copy for message cap vs new-conversation cap) **before any provider call** — tests assert the stub provider is never invoked in those paths. Limits persist in `visitor_activity` using deterministic pair and daily aggregate document ids (East-8 date); the current transaction path fails closed if quota cannot be reserved.
   - `requests.blockVisitor({ requestId })` (owner-only, else `forbidden`): addToSet the visitor into `users.blockedUsers` (same field/write style as the legacy `report` function, so existing block tooling stays compatible); pending/later requests become `decline` via `core.applyBlock`; other states untouched (connect-shared contacts are not clawed back)
   - Existing 2.3 guards already covered connection-request rate (1/24h per pair) and repeated requests after decline (24h cooldown); blocked check now also runs ahead of the agent
-- Mini Program: requests detail gained a de-emphasized 「不再接收 TA 的消息」 entry (pending/later only) → `wx.showModal` confirm → `blockVisitor` → detail refreshes to decline; demo mode simulates locally without cloud. visitor-chat maps `blocked` / `rate_limited` to a gentle agent sign-off (`ended: true`, composer hides); other failures keep the existing fallback
+- Mini Program: requests detail gained a de-emphasized 「不再接收 TA 的消息」 entry (pending/later only) → `wx.showModal` confirm → `blockVisitor` → detail refreshes to decline; explicit demo mode simulates locally without cloud. visitor-chat maps `blocked` / `rate_limited` to a gentle agent sign-off (`ended: true`, composer hides). The original generic-error fixture fallback was later removed by safety hardening.
 - Validation: agent 40/40 pass (incl. new limits.test.js), requests 24/24 pass (incl. new block.test.js), page smoke `node --test tests/*.test.js` 12/12 pass (block flow incl. modal/confirm/demo/cancel, visitor gates incl. fallback regression)
 - Not verifiable here: WeChat DevTools compile; first deploy should ensure the `visitor_activity` collection exists (or auto-create on first write)
+- 2026-08-23 concurrency closure: visitor history and round count are
+  server-owned. A doc-only CloudBase transaction atomically reserves each turn
+  and caps a conversation at six even under `Promise.all`; forged client
+  history/round counts are ignored. Daily activity and request-pair gates also
+  use deterministic document ids because CloudBase transactions do not support
+  `where` or `add`. Agent 81/81, Requests 32/32, and Mini pages 77/77 pass.
 
 Owner: Lane B
 
@@ -534,7 +750,7 @@ Completion:
   - **Agent disabled**: visitor-chat cloud init checks `card.agentEnabled === false` (field absent → enabled, backward compatible) and shows a terminal「他的分身暂时在休息」with no composer; Web `PublicCardPage` gained optional `agentEnabled` on SharedProfile and swaps both chat buttons for a quiet `vibe-disabled` note. Cloud projection already carries the field.
   - **Model unavailable**: pre-existing AI_BEHAVIOR §11 copy on both pages (chat continues, nothing lost) — verified by existing tests.
   - **Moderation unavailable**: task 3.1 behavior (retry toast, draft preserved) — verified.
-  - **Network timeout / generic cloud failure**: dual-mode pages keep the deliberate fixture-demo fallback so a judge's demo never breaks; `card_deleted` / `not_found` were carved **out** of that fallback (see below).
+  - **Network timeout / generic cloud failure**: the original dual-mode implementation automatically substituted fixture data. Current safety hardening replaces that behavior with an explicit unavailable/retry state in production/cloud mode; deterministic fixtures require explicit development/demo mode. `card_deleted` / `not_found` remain distinct terminal states.
   - **Permission denied**: `unauthorized` from any cloud call now maps to「请先登录后再试」with page state and drafts kept (vibe ownerMessage / card draft, requests inbox + actions, visitor-chat init + send + submit). Requests inbox deliberately does **not** fall back to demo data on `unauthorized` — an unlogged owner must never see fixture requests.
   - **Deleted Card**: visitor-chat init now distinguishes `card_deleted` (「这张名片已被主人收回」) and `not_found` (「这张名片找不到了」) as terminal states with「可以请对方重新分享一次」, no composer, no demo fallback; Web public page already had its recovery actions.
 - Retry-without-duplication: verified guards already in place — vibe `this.sending` lock + persist-before-reply ordering (owner message persisted exactly once; a failed reply never re-appends), visitor-chat `sending` lock on submit, requests `acting` lock on decisions.
@@ -574,6 +790,8 @@ Status: `[x]`
 
 Completion:
 
+- 2026-08-14 release hardening: removed the browser-side Gemini credential path and its runtime SDK; onboarding avatar shuffle is now local-only, while all model credentials remain server-side. Moved the build-only `shadcn` package to dev dependencies, upgraded Vite to 6.4.3, refreshed both lockfiles, and reduced the main Web chunk from 627.75 kB / 158.95 kB gzip to 336.34 kB / 101.39 kB gzip. Official-registry production dependency audits are 0 vulnerabilities for both the root workspace and standalone Web package. Validation: `npm run lint` ✅, `npm run build` ✅, Playwright **70/70** ✅.
+- 2026-08-08 cleanup: Web3 was retired from the Web runtime by owner instruction. Wagmi, Viem, RainbowKit, Pinata/IPFS, wallet verification, chain sync, wallet-only embed/widget paths, and their obsolete E2E cases were removed. The remaining focused product suite is **52/52 pass** across Chromium and mobile Chrome, including a regression proving wallet-bearing v1 profiles still load without restoring Web3 UI. The isolated legacy `packages/contracts` package remains optional and is not bundled into Web.
 - 2026-07-19, on `main`. Baseline was 30/38; the suite is now **50/50 pass, 0 fail, 0 skip** (both chromium and mobile-chrome).
 - `chain-test.spec.ts` rewritten: the stale "verified accounts section" assertion (expecting removed `Verified`/`Wallet` labels) is re-pointed at the still-supported advanced area — seeded owner profile with a wallet address → `card-advanced` details opens → theme toggle + `verify-wallet-button` visible; a second case asserts the shortened wallet badge. The two permanently skipped cases (More-page wallet surface, On-Chain Identity/DappRep/Badges) targeted product paths removed in 0.2 and are deleted, not restored.
 - `chain-sync.spec.ts` root-caused instead of skipped — two real defects fixed:
@@ -601,7 +819,7 @@ Replace legacy navigation assertions with:
 - Request handling
 - Mobile layout
 
-Keep Web3 tests only for the still-supported advanced feature surface.
+Web3 tests were removed with the Web runtime dependencies on 2026-08-08; do not restore them to the current product suite.
 
 Acceptance:
 
@@ -613,23 +831,33 @@ Dependencies: Milestone 3
 
 ## 4.2 WeChat DevTools And Device Verification
 
-Status: `[~]`
+Status: `[!]`
 
 Progress (2026-07-20, on `main`):
 
 - Owner logged into DevTools; automated simulator verification ran via `miniprogram-automator` against the real IDE (AppID `wxa79d41c8255ff90d`, base library 3.13.1): **18 behavior checks pass** — cold compile, v1 profile migration, three tabs render+switch, share payload privacy, deep link to the correct owner, shared-card visibility, visitor role isolation, visitor chat (AI identity + grounded answers), requests list/detail, block entry, owner-controlled contact unlock, vibe memories.
 - Bugs found by the verification and fixed in this task: (1) share URL embedded the full profile including `verified.wechat` — payload now strips `verified`; (2) shared Card rendered invisible (`cardVisible` never set in the shared branch) — fixed, visitor view confirmed by screenshot; (3) `custom-tab-bar/` misplaced at project root since `22440db` — moved to `miniprogram/custom-tab-bar/`, which also fixed a DevTools cold-compile crash (`_getPackageFiles` path.join undefined) and made the tab bar render for the first time (screenshot-verified); (4) four visitor/owner-facing Web3 legacy strings replaced with current product copy.
 - Note: the IDE's automation server degrades after the first connect/disconnect cycle per launch — each verification script must run as the first session on a freshly launched IDE.
-- Remaining: physical-device pass. Preview QR generated (`cli preview`, package ~251.5 KB); waiting for the owner to scan and walk the checklist below. On device the pages fall back to fixture demo mode until cloud functions are deployed to the owner's env.
+- Remaining: the previously generated preview proved packaging at that time but
+  is not current release evidence. A new preview must be generated after login,
+  cloud deployment, index creation, and a fresh compile. On device the pages
+  otherwise show the current explicit unavailable state; deterministic fixtures
+  require an explicit development/demo mode.
 - AI message retry: covered by cloudfunction unit tests and page smoke tests; no live AI call exists in demo mode to exercise it in the simulator.
 
-Blocked (recorded 2026-07-19, on `main`):
+Current external blocker (reconfirmed 2026-08-23):
 
-- Blocker: WeChat DevTools on this machine is **not logged in** (`cli islogin` → `{"login":false}`). Opening any project fails with `Login is required (code 10)`, and login requires scanning a QR code with the owner's WeChat — not something an agent can do autonomously. The automation port also refuses connections (`target project window is opened with automation enabled` fails) for the same reason.
+- Blocker: WeChat DevTools on this machine is **not currently logged in** (`cli islogin` → `{"login":false}`). A previous authenticated session completed the 18 simulator checks above, but generating a current preview, deploying cloud functions, and completing the physical-device checklist require the owner to authenticate again.
 - Attempted: `cli islogin` (found running IDE, connected on its actual port, confirmed logged-out); `cli open --project` → code 10; installed `miniprogram-automator@0.12.1` in isolated `/tmp/mp-auto` and tried `automator.connect` → refused.
-- Verified instead (static compile-equivalent, all pass): every JSON under `miniprogram/` parses; all 9 declared pages have their `.js/.wxml/.json` files; every `usingComponents` reference resolves; `node --check` passes for all 84 page/util JS files and every cloudfunction `index.js`; plus the 31 committed page-logic smoke tests and the cloudfunction unit tests.
-- Current code state: Mini Program side is feature-complete through Milestone 3 (navigation, vibe/requests/visitor-chat dual-mode, recognition moments, failure states) but has **never been compiled in DevTools**.
-- Next step (needs the user): log into WeChat DevTools, open `packages/miniprogram`, confirm compile, then run the checklist below. Also covers the still-open 0.3 acceptance (tab bar compile check).
+- Verified instead (static compile-equivalent, all pass): every JSON under `miniprogram/` parses; all 9 declared pages have their `.js/.wxml/.json` files; every `usingComponents` reference resolves; `node --check` passes for all page/util JS files and every cloudfunction `index.js`; plus the current 72 page-logic tests and all cloudfunction suites in `release:check`.
+- Current code state: Mini Program side is feature-complete through Milestone 3 and has passed the recorded DevTools simulator run, but has no current cloud deployment or physical-device release evidence.
+- Current read-only check: DevTools is running, but CLI `islogin` still returns
+  `{"login":false}`.
+- Next step (needs the user): scan the DevTools login QR, open
+  `packages/miniprogram`, deploy the cloud functions, create the documented
+  `now_items` and `visitor_activity` indexes, confirm a clean compile, generate
+  one current preview, and run the checklist below. This also revalidates the
+  0.3 tab-bar acceptance against the current code.
 
 Owner: Lane A
 
@@ -654,7 +882,7 @@ Dependencies: Milestone 3
 
 ## 4.3 Prepare Demo Data
 
-Status: `[x]`
+Status: `[~]`
 
 Completion:
 
@@ -663,9 +891,15 @@ Completion:
   - **Visitor with a strong shared reason**: 苏晴, independent dev building a WeChat AI bookkeeping app, stuck on the exact private-memory/public-identity boundary the owner is working on (existing).
   - **One weak request to demonstrate boundaries**: new `fixtureWeakVisitor` 王拓 + `fixtureWeakConnectionRequest` (「想认识一下，多个朋友多条路。」— the AI_BEHAVIOR §7 anti-pattern, no shared context) added to `packages/shared/fixtures/vibe.ts` and mirrored in `miniprogram/data/vibe-fixtures.js`. Both demo inboxes now show strong + weak side by side: Mini Program `requests.loadFixtureDemo` picks a per-request Vibe take (weak → 「我还判断不好，信息不太够。」 with reasons grounded in what's missing); Web `RequestsPage` was refactored from a single request to a requests array with per-request visitor/take mapping (`request-item-weak` testid; strong keeps `request-item` so older assertions still hold). Empty shared-context sections render nothing — no invented common ground.
   - **One confirmed memory used later**: `fixture-memory-public-focus` (confirmed) is the memory the Vibe calls back to in the task-3.3 recognition moment on both clients.
-- Real-AI vs fixtures: cloud mode uses only live data (fixtures never leak into cloud paths — dual-mode pages fall back to fixtures only when the cloud is unreachable, by design); deterministic fixture demo works fully offline.
+- Real-AI vs fixtures: cloud mode uses only live data and never substitutes fixture records on failure. Deterministic fixture demo works fully offline only when explicit development/demo mode is selected.
 - Reset under one minute: Web RequestsPage「重置演示状态」restores both requests instantly; My Vibe state resets on page reload; Mini Program demo exposes「重置演示状态」in demo mode. Full reset procedure is scripted in the 4.4 walkthrough.
 - Validation: Mini Program page tests 34/34 pass (3 new weak-request cases); `npm run lint` clean; `npm run build` ok; `vibe-mock-story.spec.ts` 16/16 pass (new weak-request boundary case).
+
+Remaining acceptance evidence:
+
+- Deterministic fixture mode is complete. The listed real-AI demo acceptance
+  remains open until 4.2 deploys the cloud functions and verifies a configured
+  provider on the current Mini Program build.
 
 Owner: coordinating agent
 
@@ -681,7 +915,7 @@ Never use real private contact details in committed fixtures.
 Acceptance:
 
 - Demo can run with real AI
-- Demo can fall back to deterministic fixtures
+- Demo can be switched explicitly to deterministic fixtures
 - Reset procedure takes under one minute
 
 Dependencies: 4.1 and 4.2
@@ -696,9 +930,23 @@ Completion:
 - Demo beats: owner opens My Vibe → confirms the pending proposal → "我记住了…"; visitor opens the shared Card (`?c=`) → asks the public Vibe "他为什么做这个？" → gets a grounded answer from `fixtureOwnerCard.currentFocus`; visitor states a specific reason → shared-context discovery appears → confirms submission; owner opens Requests → sees the evidence-based take → selects WeChat contact → "Vibe matched."
 - VisitorVibeChat suggestion copy was updated from "他最近在做什么？" to "他为什么做这个？" to match the product script; the invite-reason transition is now synchronous so the demo stays reliable and fast.
 - Runtime observed: ~6 seconds on both chromium and mobile-chrome, well under the 90-second limit.
-- Validation: `npm run lint` ✅, `npm run build` ✅, full Playwright suite 54/54 pass (4.1 baseline 50 + 4.4 demo 4 across two projects).
+- The current script also previews and adopts the Card draft, then verifies the
+  published `wantsToMeet` projection before continuing to the visitor flow.
+- Validation (2026-08-23): root `release:check` passes and the full Playwright
+  suite passes 124/124 on desktop and mobile; both demo runs complete in about
+  six seconds, well inside the 90-second budget.
 
 Owner: Lane D
+
+Acceptance:
+
+- The deterministic Web walkthrough completes in under 90 seconds on desktop and mobile
+- The owner explicitly confirms the proposed memory
+- The owner previews and accepts the Card update, and the published “想遇见谁” value reflects it
+- The visitor answer is grounded, the request reason is visitor-confirmed, and contact details remain gated until connect
+- The final connected state displays `Vibe matched`
+
+Dependencies: 4.1 and the deterministic fixture path in 4.3
 
 ---
 
@@ -754,11 +1002,57 @@ Dependencies: 1.4 and 2.1
 
 ---
 
+## 4.6 Add WeChat Private Archive And Delete-All Controls
+
+Status: `[ ]`
+
+Audit finding (2026-08-23):
+
+- The portable `.vibe` format and deletion plan exist in Core, H5, self-hosted,
+  and managed modes, but the WeChat client/cloud-functions do not yet expose a
+  private export, validated import, or complete owner deletion workflow. A
+  physical-device pass in 4.2 cannot substitute for this product capability.
+
+Owner: Lanes A and B using the shared archive contract
+
+Implement:
+
+- Export the owner's canonical WeChat records as a validated private `.vibe`
+  archive, with raw conversations included only after an explicit choice
+- Import only after schema, checksum, ownership, and future-version validation
+- Require a successful fresh private export and explicit destructive
+  confirmation before delete-all
+- Delete or tombstone every owner-scoped canonical record, public Card/Now
+  projection, request/contact state, short-lived evidence, and operational
+  gate that can still reveal or retrieve owner data
+- Provide progress, permission-denied, failure, retry, and partial-cleanup
+  reconciliation states; never report success while public data remains
+
+Acceptance:
+
+- A real owner exports, deletes all WeChat cloud data, and the public Card and
+  visitor agent can no longer retrieve it
+- Import into a fresh owner restores the same portable identity without
+  restoring credentials, provider metadata, or deleted records
+- Public export never authorizes deletion and private export never leaks into
+  logs or another OPENID
+- Automated owner-isolation and response-loss tests pass, followed by two-
+  OPENID DevTools and physical-device verification
+
+Dependencies: 4.2, 4.5, and 5.3
+
+---
+
 # Post-Competition Roadmap
 
 Do not start post-competition work until the competition branch is stable.
 Execute one numbered task at a time. A later client may start only after the
 portable Core and export format it depends on are verified.
+
+Historical note: tasks in Milestones 5-7 and 9 were implemented before the
+physical-device release gate in 4.2 closed. Their completion records describe
+code and automated evidence; they do not imply that Milestone 4 or the WeChat
+competition release is complete.
 
 The target is:
 
@@ -1045,14 +1339,42 @@ Status: `[x]`
 
 Completion:
 
-- 2026-07-21, on branch `feature/task-5.7-self-hosted-stack`. Milestone 5 is complete: a technical user can run the full core product without the official service and move data in/out without vendor lock-in.
+- 2026-07-21, on branch `feature/task-5.7-self-hosted-stack`. The self-hosted implementation and application-level smoke path landed; current-machine runtime evidence and the remaining clean-machine caveat are recorded below.
 - New `packages/server/` (zero runtime deps, Node 24 built-ins): open server composing Core + local-store (node:sqlite, migrations at startup) + config-driven model providers (mock default; OpenAI-compatible/BYOK/local via env — no VibeCard Cloud key required). H5-ready JSON API under `/api/v1` (CORS-enabled): owner identity create/import `.vibe`, My Vibe chat with memory/Now proposals, memory confirm/edit/reject/pause/resume/delete, Card draft+publish, full Now lifecycle, contacts CRUD, requests inbox/summary/action (connect requires owner-owned contact ids), private/public export, delete-all guarded by `export_required`; public endpoints: Card projection (≤3 active Now, no contacts by construction), visitor chat (visitor_quote/visitor_boundary retrieval only, 6-round cap, `forbiddenForVisitor` second net), request submission (Core 24h gate + weak-reason rejection), contact unlock only after owner connect.
 - Security defaults: single-owner bearer token (constant-time compare; ephemeral + warning when unset; all owner families 401-tested), localhost bind default, in-memory token-bucket rate limits per visitor+IP on top of the Core pair gate, pluggable `moderate(text)` hook that **fails closed** (hook throw → 503 `moderation_unavailable`, negative verdict → 403, nothing stored), provider-style log redaction, no stack traces in responses.
 - Backup/restore: backup = private `.vibe` export (HTTP or `npm run backup --prefix packages/server`) + optional sqlite copy; restore CLI rejects public archives and non-forced overwrites; delete-all refuses until a private export is newer than the last write. Backup/restore round-trip test proves Core fixture state preserved deep-equal.
 - Deploy assets: `deploy/docker-compose.yml` (node:24, `/data` volume, localhost-mapped port, validated with `docker compose config`), `deploy/.env.example` (all vars documented, no secrets), `packages/server/Dockerfile` with healthcheck, `docs/engineering/SELF_HOSTING.md` (quickstart, config, API map, security, moderation hook API, backup/upgrade, "no VibeCard Cloud account or key required").
+- The checked-in `.env.example` keeps the documented loopback-only quickstart
+  runnable with `REQUIRE_MODERATION=0`. Any public exposure must instead set
+  `REQUIRE_MODERATION=1` and configure a real fail-closed moderation service;
+  this documentation/configuration reconciliation is not recorded as a new
+  Compose runtime run.
 - Automated smoke test spawns the real server on an ephemeral port: health → import fixture archive → publish Card+Now → visitor open/chat (mock provider) → request → inbox+summary → connect with contact → visitor sees unlock (stranger 404) → backup → restore into fresh server → fixture state preserved → delete-all.
-- Validation: server tests **13/13**; shared **132/132**; local-store **48/48**; miniprogram page tests 50/50; cloud functions memory 17/17, agent 71/71, card 13/13, now 16/16, requests 24/24, content-check 7/7; web e2e **70/70**; `npm run lint` ✅, `npm run build` ✅, `git diff --check` ✅; sanity boot `/healthz` OK, nothing left running.
+- 2026-08-14 production closure: Compose now starts both the private Core API and a dedicated H5/PWA container. The H5 entrypoint serves immutable built assets plus SPA fallbacks, keeps `/api/v1` same-origin through a fixed internal proxy, adds readiness and security headers, and defaults a deployed client's Server address to its current HTTPS origin. Public sharing now defaults to an embedded local projection or the canonical remote Card, so it creates no extra server copy. The optional operator snapshot service is disabled by default; when explicitly enabled it requires fail-closed moderation and issues independent random, capability-revocable, time-limited URLs while legacy non-revocable records fail closed. Container builds exclude local secrets and user-owned artifacts; both services run read-only without Linux capabilities, and Core runs as the non-root Node user. Production startup rejects ephemeral/placeholder owner tokens and, when `REQUIRE_MODERATION=1`, refuses public stranger traffic without a configured fail-closed HTTP moderation service. Added production-entry and moderation integration tests plus the release runbook; `docker compose config` passes with explicit release configuration.
+- Validation: server tests **15/15**; shared **132/132**; local-store **48/48**; miniprogram page tests 50/50; cloud functions memory 17/17, agent 71/71, card 13/13, now 16/16, requests 24/24, content-check 7/7; web e2e **72/72**; `npm run release:check` ✅, `git diff --check` ✅; production Web boot/health/static/proxy/privacy tests **2/2** ✅.
 - Recorded deviations: blocked-users list lives in a JSON sidecar (repositories have no profile/blocked store — documented); default moderation hook is a passthrough with the fail-closed contract enforced around it; `packages/server` is intentionally not a root workspace (scripts via `npm --prefix packages/server`).
+- 2026-08-22 clean runtime closure: both Node 24 images built successfully from
+  the documented Compose file. A real `up -d --no-build` smoke run exposed and
+  fixed the Web runtime image's missing ESM package metadata; after rebuilding,
+  both containers reported healthy, `GET /healthz` returned
+  `{\"ok\":true,\"web\":true,\"api\":true}`, and the PWA root returned HTTP
+  200. The validation containers and network were stopped without deleting the
+  persistent volumes.
+- 2026-08-23 clean-runtime closure: `docker compose build --no-cache` completed
+  both Node 24 images from fresh dependency layers over a reliable registry
+  connection. An isolated Compose project with fresh named volumes then
+  started both services healthy. The H5 same-origin endpoint completed identity
+  creation, owner message → confirmed memory, published Now, public Card,
+  visitor chat, request submission, evidence review, selected-contact connect,
+  and private archive export. The disposable validation containers, network,
+  and volumes were removed afterward.
+- Validation (2026-08-23 final): root `release:check` passes; Server 34/34,
+  Shared 145/145, local-store 49/49, production Web server 3/3, and full Web
+  Playwright 124/124 pass. A second isolated no-cache Compose build using the
+  checked-in `.env.example` with only the owner token replaced started both
+  services healthy and completed Card publish, visitor chat, request, owner
+  connect, contact unlock, and private export before its containers, network,
+  and fresh volumes were removed.
 
 Owner: Infrastructure
 
@@ -1077,8 +1399,9 @@ Acceptance:
 
 Dependencies: 5.3, 5.4, 5.5, and 5.6
 
-Milestone 5 is complete when a technical user can run the complete core product
-without the official service and move data in and out without vendor lock-in.
+Milestone 5 is complete when task 5.7's clean-machine deployment evidence passes
+and a technical user can run the complete core product without the official
+service and move data in and out without vendor lock-in.
 
 ---
 
@@ -1086,7 +1409,16 @@ without the official service and move data in and out without vendor lock-in.
 
 ## 6.1 Build Local-First Owner Onboarding
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-08):
+
+- 2026-08-14: added a real production Web entrypoint, Docker image, same-origin Core API proxy, readiness endpoint, immutable asset caching, security headers, and a production integration test. Removed stale Web3/social metadata and an unrelated `vibecard.io` ownership claim. Visual inspection of the built production onboarding page passed with no browser warnings/errors. Full E2E is now 72/72, including deployed-origin runtime resolution.
+- Added first-run runtime choice for local, self-hosted, and managed-compatible endpoints; local mode requires no account, while remote endpoint/token settings remain changeable at runtime and the token is never rendered or logged.
+- Wired owner conversation and memory confirmation to the open server in remote modes; local mode persists only owner-created memories (fixture memory is now opt-in demo state).
+- Added portable private `.vibe` import/export and export-before-delete controls; public archives are rejected for owner restore and remote deletion uses the server's explicit `DELETE` confirmation contract.
+- Profile edits queue an idempotent remote Card update while remaining immediately available locally.
+- Validation: `npm run lint`, `npm run build`, and the complete Web E2E suite pass on desktop and mobile (70/70).
 
 Owner: Web
 
@@ -1110,7 +1442,15 @@ Dependencies: Milestone 5
 
 ## 6.2 Build Public Sharing And Visitor Flow
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-08):
+
+- Public URLs carry an offline-readable public snapshot and may point to either a self-hosted or managed-compatible public API using the same Core contract.
+- Existing QR and iframe embed sharing now use that projection; remote visitor chat and connection-request submission use `/api/v1/public/*`.
+- Agent-disabled cards expose a request-only path instead of a dead end. Contact unlock remains governed by the existing server request state and owner-selected contact contract.
+- Fixed a privacy bug: legacy Web sharing previously sent `contacts` to `/api/cards` and embedded them in fallback URLs even though the UI hid them. Both client and server now allow-list public fields; wallet proof, contacts, memories, and legacy feed content never enter the public payload.
+- Validation: public-boundary and offline-snapshot E2E cases pass in both desktop and mobile projects as part of the 70/70 suite.
 
 Owner: Web
 
@@ -1135,7 +1475,15 @@ Dependencies: 6.1 and 5.7
 
 ## 6.3 Make H5 Installable And Resilient
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-08):
+
+- PWA manifest/install assets remain active; service-worker navigation is now network-first with an offline shell fallback, preventing an upgraded deployment from serving stale HTML that references removed bundles.
+- Local owner edits remain readable offline. Idempotent remote Card edits are queued, coalesced by resource, and flushed on reconnect without duplication.
+- Added versioned, idempotent browser-state migrations. Failed or future-version migrations preserve all canonical raw keys in a recoverable snapshot instead of deleting source data.
+- Added a keyboard skip link, global visible focus treatment, existing reduced-motion behavior, and desktop/mobile resilience tests.
+- Validation: offline edit/reload/reconnect, queue coalescing, migration recovery, keyboard path, responsive layout, lint, build, production entrypoint, and full E2E all pass (72/72).
 
 Owner: Web
 
@@ -1166,7 +1514,27 @@ closed dependency.
 
 ## 7.1 Add Account, Sync, And Public-Agent Hosting
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-23):
+
+- Added `packages/cloud` as an optional managed gateway composing the existing open Server/Core per account.
+- Accounts have stable public slugs, bearer credentials, device registration, region/retention metadata, always-on public agents, connection notifications, and restart-safe account stores.
+- The gateway proxies the unchanged owner/public API and preserves export/import portability; cloud metadata never enters `.vibe` archives.
+- Added delta synchronization with per-device cursors, conflict handling,
+  tombstones, visibility-preserving deletion propagation, and explicit opt-in
+  for raw data. Region migration/isolation, retention enforcement, encrypted
+  backup/restore, stable public agents, notifications, and portable export are
+  exercised through the reference gateway.
+- Delete-all now clears managed knowledge and both vector namespaces, backups,
+  sync snapshots/deltas/device bindings, notifications, usage, and BYOK state
+  before reporting success; a restart-safe pending marker completes interrupted
+  adjunct cleanup without erasing it when Core rejects deletion.
+- A corrupt account with pending cleanup is isolated from health and other
+  tenants; cleanup resumes only when that account is accessed.
+- Validation: cloud typecheck and 20/20 cloud integration tests pass. Real
+  multi-region infrastructure and object-storage durability/DR remain
+  deployment-operator gates, not missing reference-code acceptance.
 
 Owner: Cloud
 
@@ -1190,7 +1558,39 @@ Dependencies: Milestone 6
 
 ## 7.2 Add Managed AI And Knowledge Plans
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-23):
+
+- Added server-side free/pro quota policy for model calls and knowledge bytes with visible usage and estimated cost.
+- Added managed/BYOK mode switching; BYOK provider keys are encrypted with the gateway master secret and never returned by the plan API.
+- Delinquent billing blocks managed model calls only. Owner access, export, deletion, and permission semantics remain available.
+- Added managed knowledge accounting and quotas, source synchronization and
+  deletion, retrieval/vector namespace isolation, managed/BYOK routing, and
+  encrypted provider credentials. Provider URLs are bounded against SSRF and
+  DNS rebinding; body, account, and retrieval limits plus fail-closed public
+  moderation are enforced at the gateway boundary.
+- Knowledge writes, edits, deletes, and restores invalidate the last portable
+  knowledge-export marker. Delete-all returns `knowledge_export_required`
+  until a new knowledge export succeeds, including under a fixed or rewound
+  wall clock; a Core-only `.vibe` export cannot silently authorize knowledge
+  loss.
+- Added a versioned portable knowledge bundle containing canonical source bytes
+  and visibility but no provider, vector, billing, or managed-account fields.
+  The open Server validates and atomically imports it, deterministically
+  rebuilds chunks, and exposes owner/public retrieval with the same
+  visibility-first semantics. CRLF, whitespace, multi-chunk content, 10 MB
+  plan boundaries, crash recovery, stale export receipts, index recovery, and
+  managed-to-self-host byte/retrieval parity are covered by tests.
+- The reference quotas are intentionally bounded to a safely portable Free
+  1 MB / Pro 10 MB. Authenticated large-body limits cover worst-case JSON
+  escaping, metadata is bounded, concurrent exports apply backpressure, and
+  managed routing blocks direct Core knowledge APIs that could bypass quota
+  accounting.
+- Validation: Shared 145/145, Server 34/34, and Cloud 20/20 pass with Server
+  and Cloud typechecks. Real
+  provider SLA, production monitoring, and support staffing remain explicit
+  deployment/operator commitments rather than reference-code acceptance.
 
 Owner: Cloud and AI
 
@@ -1221,7 +1621,37 @@ Dependencies: 7.1
 
 ## 7.3 Publish Cloud Deployment And Portability Guarantees
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-23):
+
+- Documented the reference managed gateway, API namespace, region/retention controls, notification boundary, plan behavior, secret handling, and self-host migration in [`MANAGED_CLOUD.md`](MANAGED_CLOUD.md).
+- The open Server remains the migration target and source of canonical data; cloud-specific account metadata is deliberately excluded from portable archives.
+- Production deployment still requires operator-owned TLS, secret rotation, billing webhooks, monitoring, and incident response; these are documented as operational prerequisites rather than hidden assumptions.
+- 2026-08-22 portability verification: a real managed fixture account publishes
+  a Now item, exports its private archive, imports it into a fresh self-hosted
+  Server, and remains usable through the public Card with the same published
+  state. The test recursively checks that account token, slug, region, billing,
+  notification, and redirect metadata do not enter the archive.
+- Added the managed-link exit strategy: an authenticated owner can configure an
+  HTTPS-only public base URL; the stable managed namespace then responds with
+  HTTP 308 while preserving method, remaining path, and query. Embedded URL
+  credentials and insecure HTTP targets are rejected. The operator retention
+  responsibility is explicit in [`MANAGED_CLOUD.md`](MANAGED_CLOUD.md).
+- Published concrete Reference, Standard (99.5%, RPO/RTO 24h/24h), and Pro
+  (99.9%, RPO/RTO 4h/8h) service-level options, with explicit operator/owner
+  responsibilities and a rule that any undeclared deployment is best effort.
+
+- Reference acceptance now includes enforced region/retention behavior,
+  deletion propagation, backup/restore, knowledge isolation, and the managed
+  fixture migration path. A managed knowledge export now imports into a fresh
+  open Server and reproduces owner/public retrieval while keeping private
+  chunks private. The cloud integration suite passes 20/20.
+- Production TLS, real multi-region/object-storage operations, secret
+  rotation, provider SLA, billing webhooks, monitoring, incident response,
+  and published support coverage remain deployment-operator gates documented
+  in [`MANAGED_CLOUD.md`](MANAGED_CLOUD.md), not claims that local tests can
+  satisfy.
 
 Owner: coordinating agent
 
@@ -1248,7 +1678,19 @@ Dependencies: 7.1 and 7.2
 
 ## 8.1 Build The Lightweight Desktop Shell
 
-Status: `[ ]`
+Status: `[!]`
+
+Progress (2026-08-08):
+
+- Added `packages/desktop` SwiftUI `WindowGroup` + `MenuBarExtra` shell with local archive persistence, text capture, memory confirmation, Now capture, and request-inbox placeholder; it uses the same HTTP/Core archive boundary rather than a second memory model.
+- Added the project-local `script/build_and_run.sh` and Codex Run action as required by the macOS SwiftPM skills.
+- Blocker: this machine's `/Library/Developer/CommandLineTools` compiler and macOS SDK are mismatched (`SDK ... effective-5.10 ... compiler ... effective-5.10` with different patch builds), and even a generated vanilla SwiftPM package fails manifest linking. Re-run `swift build --package-path packages/desktop` after selecting a matching Xcode/CommandLineTools toolchain.
+- 2026-08-23 direct compiler recheck: no `Xcode.app` exists and
+  `xcode-select` still points to CommandLineTools. A narrow `swiftc -typecheck`
+  of every desktop source fails before application code with duplicate
+  `SwiftBridging` module maps and an unbuildable Foundation/CoreServices
+  module. This confirms a toolchain/SDK blocker rather than a SwiftUI source
+  diagnostic; installing/selecting a matching full Xcode remains required.
 
 Owner: Desktop
 
@@ -1272,7 +1714,14 @@ Dependencies: Milestone 5
 
 ## 8.2 Add Local Knowledge And Model Options
 
-Status: `[ ]`
+Status: `[!]`
+
+Progress:
+
+- The desktop shell already has a provider-independent `VibeService` seam and local deterministic provider. File/folder/clipboard ingestion and an OpenAI-compatible local endpoint remain queued behind the toolchain unblock so they can be tested in the real app.
+- Blocker: task 8.1 is blocked and is an explicit dependency. Do not continue
+  ingestion or provider implementation until a matching Xcode/SDK toolchain can
+  build and run the shell, then revalidate 8.1 first.
 
 Owner: Desktop and AI
 
@@ -1299,7 +1748,38 @@ Dependencies: 8.1 and 5.6
 
 ## 9.1 Define The Client SDK
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-08):
+
+- Added `packages/sdk` with canonical Card, visitor session, owner session, memory confirmation, request, and private export methods.
+- SDK targets `/api/v1` and works with self-hosted and managed namespaces; it exposes no provider/database records and carries the AGPL-3.0-only license.
+- 2026-08-23 progress: added the complete owner-confirmed Now lifecycle
+  (`list/create draft/publish/archive/hide/delete`), an async authentication
+  adapter resolved immediately before every owner request, and explicit
+  self-hosted/managed namespaces. Public methods never resolve or attach owner
+  credentials. Runnable owner and visitor examples execute unchanged against
+  real in-process self-hosted Server and managed Gateway instances. The live
+  examples now cover Card, Now, visitor chat, request submission, owner inbox,
+  evidence summary, contact creation/selection, connect, and private export.
+- Successful responses are runtime-validated and projected onto canonical
+  allowlists. Injected provider, ORM `_id`, contacts, or other server fields are
+  stripped from public/Card/domain results; private exports must validate as a
+  portable archive and reject implementation keys. Typed errors preserve HTTP
+  status, stable code, and retry metadata. Static and adapter auth cannot be
+  configured together, eliminating silent credential fallback.
+- Request inputs and successful responses are projected through runtime
+  canonical allowlists; visitor action/evidence enums fail closed rather than
+  accepting or silently dropping malformed server fields. The live examples
+  now include owner message → memory proposal → owner confirmation.
+- The SDK now has a real build and package surface: JavaScript bundles,
+  declaration output, explicit `main`/`module`/`types`/`exports`, packaged
+  AGPL-3.0-only `LICENSE`, and a constrained published-file allowlist.
+- Validation: SDK typecheck passes; 8/8 SDK tests pass, including complete live
+  flows for both namespaces, rotating-auth assertions, response-injection
+  regressions, typed errors, public credential isolation, and archive checks.
+  Package smoke builds and packs the SDK, installs it in a temporary consumer,
+  imports it from Node, and typechecks a TypeScript consumer successfully.
 
 Owner: Core
 
@@ -1324,6 +1804,14 @@ Dependencies: Milestones 5 and 6
 
 Status: `[ ]`
 
+Deferred decision:
+
+- This is intentionally not started, not technically blocked. The current
+  product already has a first-class H5/PWA and WeChat client; native clients
+  remain deferred until push, voice, share-sheet, camera/NFC, or local-model
+  requirements are selected. Building a second client before that product
+  decision would create a divergent data path.
+
 Owner: Mobile
 
 Build iOS and Android when the product needs:
@@ -1345,7 +1833,38 @@ Dependencies: 9.1
 
 ## 9.3 Add Third-Party Adapters Without Becoming A Community
 
-Status: `[ ]`
+Status: `[x]`
+
+Completion (2026-08-08):
+
+- Added `packages/platforms/adapter-contract.ts` with capability/permission manifests and credential-removal semantics.
+- Added conformance tests and [`ADAPTERS.md`](ADAPTERS.md); adapter failures cannot bypass Core privacy rules and the ecosystem has no central social feed.
+- 2026-08-23 progress: added `AdapterRuntime`, which validates manifests on
+  registration and denies undeclared capabilities or permissions before
+  adapter code executes. `read_public_card` input is projected through a strict
+  allowlist before delivery, so injected contacts/private/database fields are
+  removed. Credentials are lazy and limited to adapters declaring
+  `store_credentials`; implementation failures become `adapter_failed` and
+  never activate a broader fallback.
+- Disable and remove abort in-flight calls, withhold late results, invalidate
+  the active runtime generation, and delete credentials. The
+  reference public-Card JSON exporter is exercised by the same contribution
+  conformance suite.
+- Capabilities now bind to their required data permission; an adapter cannot
+  choose a broader declared permission to bypass public projection. Replacing
+  a registration aborts and invalidates old in-flight work and credentials,
+  including class-based adapter implementations.
+- Untrusted adapters run in an OS/process-isolated host with bounded IPC,
+  explicit environment/filesystem/network/subprocess permissions, credential
+  isolation, and fail-closed sandbox requirements (macOS Seatbelt or Linux
+  Bubblewrap plus Node permissions). Abort, replace, disable, and remove also
+  terminate or invalidate isolated work.
+- The public-Card exporter and a reference knowledge adapter both run through
+  the same contribution/conformance contract.
+- Validation: platform typecheck passes and adapter tests pass 18/18, covering
+  manifest validation, pre-execution enforcement, process-host isolation,
+  failure isolation, malicious public-input fields, credential revocation,
+  in-flight/cached-state invalidation, and both reference adapters.
 
 Owner: Ecosystem
 

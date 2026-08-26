@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  MapPin, Zap, Sparkles, Check, Wallet,
-  ArrowRight, User, MessageCircle,
+  MapPin, Sparkles,
+  ArrowRight, User, MessageCircle, ExternalLink,
 } from 'lucide-react';
-import { useAccount } from 'wagmi';
 
 import VisitorVibeChat from '../components/vibe/VisitorVibeChat';
 import type { NowItem } from '@shared';
 import { vibeFixtures } from '@shared';
 import { NOW_TOPIC_LABELS, latestActiveNow, loadNowItems } from '../lib/now';
+import { normalizePublicSourceEndpoint } from '../lib/runtime';
 
 interface SharedProfile {
+  demoFixtureId?: string;
   name: string;
   handle: string;
   avatar: string;
@@ -21,6 +22,7 @@ interface SharedProfile {
   age?: string;
   location?: string;
   tags: { label: string; icon: string }[];
+  canHelpWith?: string[];
   lookingFor: string;
   event: string;
   /** Task 3.4: absent means enabled (backward compatible with old share links). */
@@ -35,15 +37,13 @@ interface SharedProfile {
   currentFocus?: string;
   highlights: { id: number; title: string; type: string; icon: string; link: string }[];
   threads: { id: string; content: string; images?: string[]; tags: string[]; timestamp: number }[];
-  contacts?: { id?: string; platform: string; value: string; url: string }[];
-  verified: {
-    wallet: string;
-    walletProof?: { address: string; message: string; signature: string; signedAt: number };
-    twitter: string;
-    discord: string;
-    wechat: string;
-    telegram: string;
-  };
+}
+
+function safePublicHref(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : undefined;
+  } catch { return undefined; }
 }
 
 function decodeSharedProfile(param: string): SharedProfile | null {
@@ -58,28 +58,14 @@ function decodeSharedProfile(param: string): SharedProfile | null {
   }
 }
 
-function shortAddress(addr: string) {
-  return addr.slice(0, 6) + '…' + addr.slice(-4);
-}
-
-function formatTime(ts: number) {
-  const diff = Date.now() - ts;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes} 分钟前`;
-  if (hours < 24) return `${hours} 小时前`;
-  if (days < 7) return `${days} 天前`;
-  return new Date(ts).toLocaleDateString('zh-CN');
-}
-
 function useSharedProfile() {
   const [profile, setProfile] = useState<SharedProfile | null>(null);
   const [id, setId] = useState<string | null>(null);
   const [raw, setRaw] = useState<string | null>(null);
   const [isFull, setIsFull] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [publicEndpoint, setPublicEndpoint] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -87,10 +73,54 @@ function useSharedProfile() {
     setIsFull(isFullParam);
     const idParam = params.get('id');
     const cParam = params.get('c');
+    const sourceParam = params.get('source');
+    const embeddedProfile = cParam ? decodeSharedProfile(cParam) : null;
+    setLoadError(null);
+    setRaw(cParam);
+    setId(idParam);
+    setProfile(embeddedProfile);
+    setLoading(Boolean(idParam || (sourceParam && !embeddedProfile)));
+
+    if (sourceParam) {
+      try {
+        const source = new URL(sourceParam);
+        if (source.protocol === 'http:' || source.protocol === 'https:') {
+          const endpoint = normalizePublicSourceEndpoint(source.toString());
+          setPublicEndpoint(endpoint);
+          fetch(`${endpoint}/card`)
+            .then(response => {
+              if (!response.ok) throw new Error(`http_${response.status}`);
+              return response.json();
+            })
+            .then(data => setProfile({
+              name: data.name || '',
+              handle: data.headline || '',
+              avatar: data.avatarUrl || '',
+              bio: data.currentFocus || '',
+              currentFocus: data.currentFocus || '',
+              tags: Array.isArray(data.topics) ? data.topics.map((label: string) => ({ label, icon: '' })) : [],
+              canHelpWith: Array.isArray(data.canHelpWith) ? data.canHelpWith : [],
+              lookingFor: Array.isArray(data.wantsToMeet) ? data.wantsToMeet.join('、') : '',
+              event: '',
+              agentEnabled: data.agentEnabled !== false,
+              nowItems: Array.isArray(data.now) ? data.now : [],
+              highlights: Array.isArray(data.highlights) ? data.highlights.map((item: { id: string; title: string; url?: string }) => ({ ...item, id: Number(item.id) || 0, type: 'project', icon: '✨', link: item.url || '' })) : [],
+              threads: [],
+            }))
+            .catch(() => {
+              // Keep the embedded static snapshot readable while the owner
+              // agent is offline.
+              if (!embeddedProfile) setLoadError('offline');
+            })
+            .finally(() => setLoading(false));
+        }
+      } catch {
+        if (!embeddedProfile) setLoadError('invalid_source');
+        setLoading(false);
+      }
+    }
     if (idParam) {
-      setId(idParam);
-      setLoadError(null);
-      fetch(`/api/cards/${encodeURIComponent(idParam)}`)
+      fetch(`/api/cards/${encodeURIComponent(idParam)}`, { cache: 'no-store' })
         .then((r) => {
           if (r.status === 404) throw new Error('not_found');
           if (!r.ok) throw new Error(`http_${r.status}`);
@@ -100,10 +130,13 @@ function useSharedProfile() {
           if (data && data.profile) setProfile(data.profile);
           else setLoadError('invalid_payload');
         })
-        .catch((e) => setLoadError(String(e?.message || e)));
-    } else if (cParam) {
-      setRaw(cParam);
-      setProfile(decodeSharedProfile(cParam));
+        .catch((e) => setLoadError(String(e?.message || e)))
+        .finally(() => setLoading(false));
+    } else if (cParam && !embeddedProfile) {
+      setLoadError('invalid_payload');
+      setLoading(false);
+    } else if (!sourceParam) {
+      setLoading(false);
     }
   }, []);
 
@@ -122,13 +155,36 @@ function useSharedProfile() {
     return url.pathname + url.search;
   };
 
-  return { profile, id, raw, isFull, buildUrl, loadError };
+  return {
+    profile,
+    id,
+    raw,
+    isFull,
+    buildUrl,
+    loadError,
+    publicEndpoint,
+    loading,
+    retry: () => window.location.reload(),
+  };
 }
 
 export default function PublicCardPage() {
-  const { profile, raw, isFull, buildUrl, loadError } = useSharedProfile();
-  const { address } = useAccount();
+  const { profile, isFull, buildUrl, loadError, publicEndpoint, loading, retry } = useSharedProfile();
   const [showVibeChat, setShowVibeChat] = useState(false);
+
+  if (loading && !profile) {
+    return (
+      <div className="min-h-dvh bg-[#050505] text-white flex flex-col items-center justify-center px-6" role="status" aria-label="正在加载名片">
+        <div className="w-full max-w-sm rounded-[32px] border border-white/10 bg-white/[0.05] p-6 animate-pulse">
+          <div className="w-24 h-24 rounded-[28px] bg-white/10 mx-auto mb-5" />
+          <div className="h-6 w-32 rounded-lg bg-white/10 mx-auto mb-3" />
+          <div className="h-4 w-52 rounded-lg bg-white/[0.07] mx-auto mb-8" />
+          <div className="h-12 rounded-2xl bg-white/10" />
+        </div>
+        <p className="mt-5 text-[13px] font-medium text-white/45">正在打开这张 VibeCard…</p>
+      </div>
+    );
+  }
 
   if (!profile) {
     return (
@@ -139,13 +195,20 @@ export default function PublicCardPage() {
         <h1 className="text-[20px] font-black text-white mb-2">这张名片找不到了</h1>
         <p className="text-[14px] font-medium text-white/55 max-w-[300px] leading-relaxed mb-8">
           {loadError === 'not_found'
-            ? '该名片可能已被删除, 或者链接地址写错了。'
-            : '链接格式有误, 名片内容无法解析。你可以问问分享者重新发一次。'}
+            ? '该名片可能已被删除，或者链接地址写错了。'
+            : loadError === 'offline'
+              ? '暂时没有连上名片服务。检查网络后可以再试一次。'
+              : '链接格式有误，名片内容无法解析。你可以问问分享者重新发一次。'}
         </p>
         <div className="flex flex-col gap-3 w-full max-w-[280px]">
+          {loadError !== 'invalid_payload' && (
+            <button type="button" onClick={retry} className="inline-flex items-center justify-center px-7 py-3.5 bg-white text-black rounded-2xl font-bold text-[15px] hover:opacity-90 transition-opacity">
+              重新加载
+            </button>
+          )}
           <a
             href="/"
-            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-black rounded-2xl font-bold text-[15px] hover:opacity-90 transition-opacity"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white/10 text-white rounded-2xl font-bold text-[15px] hover:bg-white/15 transition-colors"
           >
             <Sparkles className="w-5 h-5" />
             创建我的名片
@@ -166,22 +229,28 @@ export default function PublicCardPage() {
     );
   }
 
-  const isOwner =
-    !!address &&
-    !!profile.verified?.wallet &&
-    address.toLowerCase() === profile.verified.wallet.toLowerCase();
-
   const agentEnabled = profile.agentEnabled !== false;
 
   // Task 4.5: the public Now snapshot — newest 3 published, non-expired.
   // Embedded share snapshots win; the fixture demo falls back to the local
   // demo store so owner and visitor surfaces show the same published state.
-  const nowSource = Array.isArray(profile.nowItems) ? profile.nowItems : loadNowItems();
+  const explicitFixtureDemo = !publicEndpoint
+    && new URLSearchParams(window.location.search).get('demo') === '1'
+    && profile.demoFixtureId === 'vibecard-official-fixture-v1'
+    && profile.name === vibeFixtures.fixtureOwnerCard.name
+    && profile.handle === vibeFixtures.fixtureOwnerCard.headline
+    && profile.bio === vibeFixtures.fixtureOwnerCard.currentFocus
+    && profile.lookingFor === vibeFixtures.fixtureOwnerCard.wantsToMeet[0];
+  const nowSource = Array.isArray(profile.nowItems)
+    ? profile.nowItems
+    : explicitFixtureDemo ? loadNowItems() : [];
   const activeNow = latestActiveNow(nowSource, Date.now(), 3);
   const currentFocus =
     typeof profile.currentFocus === 'string'
       ? profile.currentFocus
-      : vibeFixtures.fixtureOwnerCard.currentFocus;
+      : explicitFixtureDemo
+        ? vibeFixtures.fixtureOwnerCard.currentFocus
+        : '';
 
   const avatarUrl =
     profile.avatar ||
@@ -189,6 +258,7 @@ export default function PublicCardPage() {
 
   return (
     <div className="min-h-dvh bg-[#050505] text-white flex flex-col relative overflow-hidden">
+      <a className="skip-link" href="#public-card-content">跳到名片内容</a>
       {/* Ambient background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-[20%] left-1/2 -translate-x-1/2 w-[120%] aspect-square rounded-full bg-white/[0.04] blur-[120px]" />
@@ -204,22 +274,17 @@ export default function PublicCardPage() {
         </a>
         <a
           href="/"
-          className={`text-[13px] font-bold px-4 py-2 rounded-full transition-all ${
-            isOwner
-              ? 'text-white bg-white/10 hover:bg-white hover:text-black'
-              : 'text-black bg-white hover:opacity-90'
-          }`}
+          className="text-[13px] font-bold px-4 py-2 rounded-full transition-all text-black bg-white hover:opacity-90"
         >
-          {isOwner ? '管理我的名片' : '创建我的'}
+          创建我的
         </a>
       </header>
 
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 sm:px-6 py-6">
+      <main id="public-card-content" tabIndex={-1} className="relative z-10 flex-1 flex flex-col items-center justify-center px-5 sm:px-6 py-6">
         {isFull ? (
           <FullCardView
             profile={profile}
             avatarUrl={avatarUrl}
-            isOwner={isOwner}
             agentEnabled={agentEnabled}
             nowItems={activeNow}
             simpleHref={buildUrl(false)}
@@ -229,7 +294,6 @@ export default function PublicCardPage() {
           <SimpleCardView
             profile={profile}
             avatarUrl={avatarUrl}
-            isOwner={isOwner}
             agentEnabled={agentEnabled}
             nowItems={activeNow}
             fullHref={buildUrl(true)}
@@ -244,6 +308,10 @@ export default function PublicCardPage() {
             ownerName={profile.name || '他'}
             nowItems={activeNow}
             currentFocus={currentFocus}
+            lookingFor={profile.lookingFor ? [profile.lookingFor] : []}
+            publicEndpoint={publicEndpoint}
+            agentEnabled={agentEnabled}
+            demoMode={explicitFixtureDemo}
             onClose={() => setShowVibeChat(false)}
           />
         )}
@@ -255,7 +323,7 @@ export default function PublicCardPage() {
           className="tap-target w-full py-4 bg-white rounded-2xl font-bold text-[15px] text-black active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-white/10"
         >
           <Sparkles className="w-5 h-5 text-black" />
-          {isOwner ? '管理我的 Web3 社交名片' : '一键创建我的 Web3 社交名片'}
+          创建我的 VibeCard
         </a>
       </footer>
     </div>
@@ -290,7 +358,6 @@ function PublicNowList({ items }: { items: NowItem[] }) {
 function SimpleCardView({
   profile,
   avatarUrl,
-  isOwner,
   agentEnabled,
   nowItems,
   fullHref,
@@ -298,7 +365,6 @@ function SimpleCardView({
 }: {
   profile: SharedProfile;
   avatarUrl: string;
-  isOwner: boolean;
   agentEnabled: boolean;
   nowItems: NowItem[];
   fullHref: string;
@@ -336,14 +402,6 @@ function SimpleCardView({
             <div className="text-[14px] font-semibold text-white/55">@{profile.handle}</div>
           )}
 
-          {profile.verified?.wallet && profile.verified.walletProof && (
-            <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-[11px] font-bold text-emerald-400 border border-emerald-500/25" title="该钱包已通过签名验证">
-              <Check className="w-3 h-3" />
-              <Wallet className="w-3 h-3" />
-              {shortAddress(profile.verified.wallet)}
-            </div>
-          )}
-
           {/* Task 0.4 privacy: contact details are never shown on the public
               card. They unlock only after the owner accepts a connection
               (the server-side public projection lands in task 2.1). */}
@@ -367,6 +425,13 @@ function SimpleCardView({
             </p>
           )}
 
+          {profile.canHelpWith && profile.canHelpWith.length > 0 && (
+            <div className="mt-5 text-left">
+              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-2">我能帮什么</h3>
+              <p className="rounded-[14px] border border-white/10 bg-white/[0.05] px-3 py-2.5 text-[13px] font-medium leading-relaxed text-white/85">{profile.canHelpWith.join('、')}</p>
+            </div>
+          )}
+
           <PublicNowList items={nowItems} />
         </div>
 
@@ -382,12 +447,14 @@ function SimpleCardView({
               先和我的分身聊聊
             </button>
           ) : (
-            <div
+            <button
+              type="button"
+              onClick={onChat}
               data-testid="vibe-disabled"
-              className="w-full py-4 rounded-2xl border border-white/10 bg-white/[0.04] text-center text-[13px] font-semibold text-white/45"
+              className="w-full py-4 rounded-2xl border border-white/10 bg-white/[0.04] text-center text-[13px] font-semibold text-white/70"
             >
-              他的分身暂时在休息，改天再来吧。
-            </div>
+              分身暂时离线，仍可提交认识理由
+            </button>
           )}
           <a
             href={fullHref}
@@ -407,7 +474,6 @@ function SimpleCardView({
 function FullCardView({
   profile,
   avatarUrl,
-  isOwner,
   agentEnabled,
   nowItems,
   simpleHref,
@@ -415,7 +481,6 @@ function FullCardView({
 }: {
   profile: SharedProfile;
   avatarUrl: string;
-  isOwner: boolean;
   agentEnabled: boolean;
   nowItems: NowItem[];
   simpleHref: string;
@@ -449,14 +514,6 @@ function FullCardView({
             <div className="text-[13px] font-semibold text-white/55 mt-1">@{profile.handle}</div>
           )}
 
-          {profile.verified?.wallet && profile.verified.walletProof && (
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 text-[11px] font-bold text-emerald-400 border border-emerald-500/25" title="该钱包已通过签名验证">
-              <Check className="w-3 h-3" />
-              <Wallet className="w-3 h-3" />
-              {shortAddress(profile.verified.wallet)}
-            </div>
-          )}
-
           {profile.event && (
             <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/8 text-[12px] font-semibold text-white/80">
               <MapPin className="w-3.5 h-3.5" />
@@ -481,6 +538,15 @@ function FullCardView({
                   {tag.label}
                 </span>
               ))}
+            </div>
+          )}
+
+          {profile.canHelpWith && profile.canHelpWith.length > 0 && (
+            <div className="mt-5 text-left">
+              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-2">我能帮什么</h3>
+              <ul className="space-y-2">
+                {profile.canHelpWith.map(item => <li key={item} className="rounded-[14px] border border-white/10 bg-white/[0.05] px-3 py-2.5 text-[13px] font-medium leading-relaxed text-white/85">{item}</li>)}
+              </ul>
             </div>
           )}
 
@@ -515,65 +581,29 @@ function FullCardView({
               <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-2">Highlights</h3>
               <div className="space-y-2">
                 {profile.highlights.filter(h => h.title).map(item => (
-                  <div
+                  <a
                     key={item.id}
-                    className="bg-white/[0.05] rounded-[14px] p-3 flex items-center gap-3 border border-white/10"
+                    href={safePublicHref(item.link)}
+                    target={safePublicHref(item.link) ? '_blank' : undefined}
+                    rel={safePublicHref(item.link) ? 'noopener noreferrer' : undefined}
+                    onClick={event => { if (!safePublicHref(item.link)) event.preventDefault(); }}
+                    className="bg-white/[0.05] rounded-[14px] p-3 flex items-center gap-3 border border-white/10 transition-colors hover:bg-white/10"
                   >
                     <div className="w-9 h-9 rounded-[10px] bg-white/10 flex items-center justify-center text-[16px]">
                       {item.icon}
                     </div>
-                    <div className="text-[13px] font-semibold text-white">{item.title}</div>
-                  </div>
+                    <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white">{item.title}</div>
+                    {safePublicHref(item.link) && <ExternalLink className="h-3.5 w-3.5 shrink-0 text-white/40" />}
+                  </a>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Task 4.5: owner-confirmed recent updates, before legacy threads. */}
+          {/* Task 4.5: owner-confirmed recent updates are the only public
+              time-based projection. Legacy v1 threads remain importable but
+              are intentionally absent from the current public Card. */}
           <PublicNowList items={nowItems} />
-
-          {/* Threads Box */}
-          {profile.threads?.length > 0 && (
-            <div className="md:col-span-2 bg-white/[0.04] backdrop-blur-2xl border border-white/10 shadow-sm rounded-[24px] p-5 sm:p-6">
-              <h3 className="text-[11px] sm:text-[12px] font-bold uppercase tracking-widest text-white/50 mb-5">个人动态</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {profile.threads.slice(0, 2).map(thread => (
-                  <div key={thread.id} className="bg-white/[0.04] rounded-[18px] p-5 border border-white/10 relative group hover:bg-white/[0.06] transition-colors">
-                    <div className="flex items-center gap-2 mb-3">
-                    <img 
-                      src={profile.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${profile.name || 'default'}&backgroundColor=transparent`} 
-                      alt={profile.name} 
-                      className="w-6 h-6 rounded-full bg-white/10 border border-white/10" 
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] font-bold text-white/90">{profile.name || 'Anonymous'}</span>
-                      <span className="text-[10px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded-md">{formatTime(thread.timestamp)}</span>
-                    </div>
-                  </div>
-                    <p className="text-[14px] font-medium text-white/90 leading-relaxed line-clamp-3 mb-4 whitespace-pre-wrap">
-                      {thread.content}
-                    </p>
-                    {thread.images && thread.images.length > 0 && (
-                      <div className={`grid gap-2 mb-4 ${thread.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                        {thread.images.slice(0, 2).map((img, idx) => (
-                          <div key={idx} className={`rounded-[14px] overflow-hidden bg-white/5 border border-white/5 ${thread.images!.length === 1 ? 'aspect-video' : 'aspect-square'}`}>
-                            <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 mt-auto">
-                      {thread.tags?.map(tag => (
-                        <span key={tag} className="text-[10px] font-bold text-white/60 bg-white/10 px-2 py-1 rounded-md">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="px-5 pb-6 space-y-2.5">
@@ -588,12 +618,14 @@ function FullCardView({
               先和我的分身聊聊
             </button>
           ) : (
-            <div
+            <button
+              type="button"
+              onClick={onChat}
               data-testid="vibe-disabled"
-              className="w-full py-4 rounded-2xl border border-white/10 bg-white/[0.04] text-center text-[13px] font-semibold text-white/45"
+              className="w-full py-4 rounded-2xl border border-white/10 bg-white/[0.04] text-center text-[13px] font-semibold text-white/70"
             >
-              他的分身暂时在休息，改天再来吧。
-            </div>
+              分身暂时离线，仍可提交认识理由
+            </button>
           )}
           <a
             href={simpleHref}

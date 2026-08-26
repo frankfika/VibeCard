@@ -40,6 +40,31 @@ export const defaultModerationHook: ModerationHook = async (text) => {
   return { ok: true };
 };
 
+export function createHttpModerationHook(options: {
+  url: string;
+  apiKey?: string | null;
+  timeoutMs?: number;
+}): ModerationHook {
+  return async (text) => {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (options.apiKey) headers.authorization = `Bearer ${options.apiKey}`;
+    const response = await fetch(options.url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(options.timeoutMs ?? 5000),
+    });
+    if (!response.ok) throw new Error(`moderation HTTP ${response.status}`);
+    const verdict = await response.json() as unknown;
+    if (!verdict || typeof verdict !== 'object' || typeof (verdict as { ok?: unknown }).ok !== 'boolean') {
+      throw new Error('invalid moderation verdict');
+    }
+    if ((verdict as { ok: boolean }).ok) return { ok: true };
+    const reason = (verdict as { reason?: unknown }).reason;
+    return { ok: false, reason: typeof reason === 'string' ? reason : 'rejected' };
+  };
+}
+
 /**
  * Run moderation with the fail-closed contract. Any hook failure becomes
  * `moderation_unavailable`; a negative verdict becomes `moderation_rejected`.

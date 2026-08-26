@@ -1,34 +1,32 @@
-import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import {
-  Share, MapPin, Twitter, MessageCircle, Wallet,
-  Check, Zap, Coins, QrCode, ShieldCheck, Loader2,
-  Sun, Moon, ChevronRight,
+  Share, MapPin, Sun, Moon, ChevronRight, ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../store';
-import { useAccount, useSignMessage, useDisconnect } from 'wagmi';
-import QRCode from 'qrcode';
 import { getSocialIcon, getSocialLabel } from '../lib/social';
 import OnboardingFlow from '../components/card/OnboardingFlow';
 import NowSection from '../components/card/NowSection';
 import { useNamecardUrl } from '../hooks/useNamecardUrl';
-import { buildSiweMessage, makeNonce } from '../lib/siwe';
-import { useToast } from '../components/ui/ToastProvider';
 import { useTheme } from '../components/ThemeProvider';
+import DataControls from '../components/card/DataControls';
+import { loadRuntimeConfig, profileToCard, queueOwnerMutation } from '../lib/runtime';
 
 const EditProfile = lazy(() => import('../components/card/EditProfile'));
 const ShareDrawer = lazy(() => import('../components/card/ShareDrawer'));
 
+function safePublicHref(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : undefined;
+  } catch { return undefined; }
+}
+
 export default function CardPage() {
   const { profile: myProfile, updateProfile, isSetup } = useProfile();
-  const { address } = useAccount();
-  const { signMessageAsync, isPending: isSigning } = useSignMessage();
-  const { disconnect } = useDisconnect();
   const { theme, resolved, toggle } = useTheme();
-  const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showShareDiv, setShowShareDiv] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   // Stable short share URL backed by /api/cards; falls back to legacy base64.
   const { url: shareUrl } = useNamecardUrl(myProfile);
@@ -38,58 +36,8 @@ export default function CardPage() {
     return `${shareUrl}${sep}view=full`;
   }, [shareUrl]);
 
-  const [qrDataUrl, setQrDataUrl] = useState('');
-  useEffect(() => {
-    QRCode.toDataURL(shareUrlFull, { width: 200, margin: 1, color: { dark: '#0a0a0a', light: '#ffffff' } })
-      .then((url: string) => setQrDataUrl(url))
-      .catch(() => setQrDataUrl(''));
-  }, [shareUrlFull]);
-
-  const syncedAddressRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (address && address !== syncedAddressRef.current) {
-      syncedAddressRef.current = address;
-      // Only record the address itself; the verified-with-signature badge
-      // is only granted after the user explicitly signs a SIWE message
-      // (see handleVerifyWallet below). This prevents a casual wallet
-      // connection from showing the green checkmark.
-      updateProfile({ verified: { ...myProfile.verified, wallet: address } });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address]);
-
-  const handleVerifyWallet = async () => {
-    if (!address || isVerifying) return;
-    setIsVerifying(true);
-    try {
-      const message = buildSiweMessage({ address, nonce: makeNonce() });
-      const signature = await signMessageAsync({ account: address as `0x${string}`, message });
-      updateProfile({
-        verified: {
-          ...myProfile.verified,
-          wallet: address,
-          walletProof: { address, message, signature, signedAt: Date.now() },
-        },
-      });
-      toast.show({ type: 'success', message: '钱包已签名验证 ✓', duration: 2200 });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message.slice(0, 80) : '用户取消';
-      toast.show({ type: 'error', title: '签名失败', message: reason, duration: 3000 });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleClearVerification = () => {
-    const { walletProof: _drop, ...rest } = myProfile.verified;
-    void _drop;
-    updateProfile({ verified: rest });
-    toast.show({ type: 'info', message: '已清除验证签名', duration: 1800 });
-  };
-
-
   if (!isSetup) {
-    return <OnboardingFlow onComplete={(data) => updateProfile(data)} />;
+    return <OnboardingFlow onComplete={updateProfile} />;
   }
 
   const profile = myProfile;
@@ -108,11 +56,6 @@ export default function CardPage() {
           <div className="flex flex-col items-center mb-8 pt-2">
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }} className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-[32px] mb-5 relative shadow-xl">
               <img src={avatarUrl} loading="lazy" decoding="async" className="w-full h-full rounded-[32px] object-cover bg-gradient-to-br from-secondary to-muted border border-white/10" alt="avatar" />
-              {profile.verified?.walletProof && profile.verified.walletProof.address.toLowerCase() === (profile.verified.wallet || '').toLowerCase() && (
-                <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-emerald-500 rounded-full border-[3px] border-background flex items-center justify-center shadow-md" title="已签名验证">
-                  <ShieldCheck className="w-3.5 h-3.5 text-white stroke-[2.5]" />
-                </div>
-              )}
             </motion.div>
             <motion.h1 initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-[24px] sm:text-[28px] md:text-[32px] font-black tracking-tight text-foreground mb-1">{profile.name}</motion.h1>
             {profile.handle && <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }} className="text-[15px] font-bold text-muted-foreground">{profile.handle}</motion.div>}
@@ -156,6 +99,15 @@ export default function CardPage() {
 
           <NowSection />
 
+          {profile.canHelpWith && profile.canHelpWith.length > 0 && (
+            <motion.section initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-sm rounded-[24px] p-6 mb-5">
+              <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground mb-3">我能帮什么</h3>
+              <ul className="space-y-2">
+                {profile.canHelpWith.map(item => <li key={item} className="text-[14px] font-semibold leading-relaxed text-foreground/80">{item}</li>)}
+              </ul>
+            </motion.section>
+          )}
+
           {(profile.mbti || profile.zodiac || profile.age || profile.location) && (
             <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.35 }} className="flex flex-wrap justify-center gap-2 mb-6">
               {profile.mbti && (
@@ -184,15 +136,7 @@ export default function CardPage() {
 
           {(
             <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-card/40 backdrop-blur-xl border border-white/10 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] rounded-[24px] p-6 mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">联系方式</h3>
-                {profile.verified?.wallet && (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                    <Wallet className="w-3 h-3" />
-                    {profile.verified.wallet.slice(0, 6)}…{profile.verified.wallet.slice(-4)}
-                  </span>
-                )}
-              </div>
+              <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground mb-4">联系方式</h3>
               <div className="flex flex-wrap gap-4">
                 {profile.contacts && profile.contacts.map(contact => {
                   const Icon = getSocialIcon(contact.platform);
@@ -227,18 +171,18 @@ export default function CardPage() {
               <h3 className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Highlights</h3>
               <div className="space-y-2">
                 {profile.highlights.filter(h => h.title).map((item) => (
-                  <div key={item.id} className="w-full bg-card/40 backdrop-blur-xl border border-white/10 shadow-sm rounded-[16px] p-3 flex items-center justify-between">
+                  <a key={item.id} href={safePublicHref(item.link)} target={safePublicHref(item.link) ? '_blank' : undefined} rel={safePublicHref(item.link) ? 'noopener noreferrer' : undefined} onClick={event => { if (!safePublicHref(item.link)) event.preventDefault(); }} className="w-full bg-card/40 backdrop-blur-xl border border-white/10 shadow-sm rounded-[16px] p-3 flex items-center justify-between transition-colors hover:bg-secondary/50">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-[12px] bg-secondary flex items-center justify-center text-[18px]">{item.icon}</div>
                       <div className="text-[14px] font-semibold text-foreground leading-tight">{item.title}</div>
                     </div>
-                  </div>
+                    {safePublicHref(item.link) && <ExternalLink className="h-4 w-4 text-muted-foreground" />}
+                  </a>
                 ))}
               </div>
             </motion.div>
           )}
-          {/* Advanced area (task 0.2): theme switching and legacy Web3 wallet
-              verification live here, collapsed, outside the MVP path. */}
+          {/* Theme stays out of the primary Card flow. */}
           <details data-testid="card-advanced" className="group w-full mb-8 rounded-[20px] border border-border/50 bg-card/60 backdrop-blur-md overflow-hidden">
             <summary className="list-none cursor-pointer px-5 py-3.5 flex items-center justify-between active:bg-secondary/40 transition-colors">
               <span className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground">高级选项</span>
@@ -258,33 +202,7 @@ export default function CardPage() {
                 </span>
                 <span className="text-[11px] font-medium text-muted-foreground">点击切换主题：系统 / 浅色 / 深色</span>
               </button>
-
-              {profile.verified?.wallet && !profile.verified.walletProof && (
-                <button
-                  type="button"
-                  onClick={handleVerifyWallet}
-                  disabled={isVerifying || isSigning}
-                  data-testid="verify-wallet-button"
-                  className="tap-target inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1.5 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors"
-                >
-                  {isVerifying || isSigning ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                  )}
-                  {isVerifying || isSigning ? '签名中…' : '签名验证我的钱包'}
-                </button>
-              )}
-              {profile.verified?.walletProof && (
-                <button
-                  type="button"
-                  onClick={handleClearVerification}
-                  data-testid="clear-wallet-proof"
-                  className="tap-target text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  清除验证签名
-                </button>
-              )}
+              <DataControls profile={profile} />
             </div>
           </details>
 
@@ -320,7 +238,28 @@ export default function CardPage() {
       </div>
 
       <AnimatePresence>{showShareDiv && <Suspense fallback={null}><ShareDrawer onClose={() => setShowShareDiv(false)} shareUrl={shareUrl} detailUrl={shareUrlFull} profile={profile} /></Suspense>}</AnimatePresence>
-      <AnimatePresence>{isEditing && <Suspense fallback={null}><EditProfile profile={profile} onSave={(p) => { updateProfile(p); setIsEditing(false); }} onClose={() => setIsEditing(false)} /></Suspense>}</AnimatePresence>
+      <AnimatePresence>{isEditing && <Suspense fallback={null}><EditProfile profile={profile} onSave={(p) => {
+        updateProfile(p);
+        const runtime = loadRuntimeConfig();
+        if (runtime && runtime.mode !== 'local') {
+          const card = profileToCard({ ...profile, ...p });
+          void queueOwnerMutation(runtime, '/card', {
+            method: 'PUT',
+            body: JSON.stringify({
+              name: card.name,
+              avatarUrl: card.avatarUrl,
+              headline: card.headline,
+              currentFocus: card.currentFocus,
+              canHelpWith: card.canHelpWith,
+              wantsToMeet: card.wantsToMeet,
+              topics: card.topics,
+              highlights: card.highlights,
+              agentEnabled: card.agentEnabled,
+            }),
+          });
+        }
+        setIsEditing(false);
+      }} onClose={() => setIsEditing(false)} /></Suspense>}</AnimatePresence>
     </div>
   );
 }

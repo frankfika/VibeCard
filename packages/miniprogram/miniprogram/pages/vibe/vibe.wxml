@@ -1,6 +1,11 @@
 <view class="page">
   <navbar title="我的 Vibe" />
 
+  <view wx:if="{{loadError}}" class="memory-bar">
+    <view class="memory-empty">{{loadError}}</view>
+    <view class="card-draft-entry" bindtap="onRetryLoad">重新加载</view>
+  </view>
+
   <!-- 已记住：只有主人确认过的记忆才会出现在这里 -->
   <view class="memory-bar">
     <view class="memory-bar-header">

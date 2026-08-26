@@ -26,10 +26,12 @@
 
 云开发控制台 → 数据库：
 
-- [ ] 确认集合存在：`users` / `memories` / `cards` / `now_items` / `conversations` / `connection_requests`（`now_items` 为 4.5 新增，不存在则手动创建）
+- [ ] 确认集合存在：`users` / `memories` / `now_items` / `conversations` / `requests` / `visitor_activity` / `visitor_evidence` / `request_gates` / `reports`（不存在则手动创建）
 - [ ] `now_items` 索引一：`ownerId` 升序 + `status` 升序 + `publishedAt` 降序
 - [ ] `now_items` 索引二：`ownerId` 升序 + `expiresAt` 升序
 - [ ] 索引说明见 `packages/miniprogram/cloudfunctions/now/README.md`
+- [ ] `visitor_evidence`：`ownerId + visitorId` 普通索引，并为 `expiresAt` 配置 24 小时 TTL；请求成功后记录也会立即删除
+- [ ] `request_gates`：确认集合存在；仅使用自动 `_id` 主键，不需要手动复合索引
 
 ### 1.3 模型配置（云端模式）
 

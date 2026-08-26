@@ -77,6 +77,46 @@ test('requests.loadInbox unauthorized：toast 登录提示，不回退演示', a
   delete require.cache[REQUESTS_PATH];
 });
 
+test('requests 网络失败：显示重试错误且不注入 fixture 请求', async () => {
+  cloudImpl = async () => { throw new Error('network down'); };
+  require(REQUESTS_PATH);
+  const page = makePage();
+  page.onLoad();
+  await flushAll();
+
+  assert.strictEqual(page.demoMode, false);
+  assert.deepStrictEqual(page.data.requestsList, []);
+  assert.match(page.data.loadError, /重试/);
+  delete require.cache[REQUESTS_PATH];
+});
+
+test('requests 真实摘要失败：明确不确定且不借用 fixture 理由', async () => {
+  cloudImpl = async () => { throw new Error('model down'); };
+  require(REQUESTS_PATH);
+  const page = makePage();
+  page.demoMode = false;
+  await page.loadSummary('real-request-1');
+
+  assert.strictEqual(page.data.vibeTake.summary, '我现在还判断不了。');
+  assert.deepStrictEqual(page.data.vibeTake.reasons, []);
+  assert.match(page.data.vibeTake.uncertainty, /重试/);
+  delete require.cache[REQUESTS_PATH];
+});
+
+test('vibe 记忆加载失败：显示重试错误且不注入 fixture 私人记忆', async () => {
+  cloudImpl = async () => { throw new Error('network down'); };
+  require(VIBE_PATH);
+  const page = makePage();
+  page.demoMode = false;
+  await page.loadMemories();
+
+  assert.strictEqual(page.demoMode, false);
+  assert.deepStrictEqual(page.data.memories, []);
+  assert.deepStrictEqual(page.data.messages, []);
+  assert.match(page.data.loadError, /重试/);
+  delete require.cache[VIBE_PATH];
+});
+
 test('vibe ownerMessage unauthorized：toast 登录提示，不追加兜底消息', async () => {
   toasts.length = 0;
   cloudImpl = async (name, data) => {

@@ -110,6 +110,8 @@ export interface ArchiveConversation {
   kind: 'owner_vibe' | 'visitor';
   visitorId: string | null;
   messages: ArchiveMessage[];
+  /** Server-validated, privacy-minimized topic labels from grounded visitor overlap. */
+  verifiedSharedContext?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -566,6 +568,7 @@ function checkConversation(value: unknown): value is ArchiveConversation {
         isString(m.text) &&
         isTimestamp(m.createdAt),
     ) &&
+    (value.verifiedSharedContext === undefined || isStringArray(value.verifiedSharedContext)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );

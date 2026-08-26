@@ -11,6 +11,7 @@ This directory has one current product path and one historical archive.
 | 3 | [`engineering/DEVELOPMENT_PLAN.md`](engineering/DEVELOPMENT_PLAN.md) | Ordered, checkable implementation work |
 | 4 | [`engineering/AI_BEHAVIOR.md`](engineering/AI_BEHAVIOR.md) | Memory, visitor, permission, and AI output rules |
 | 5 | [`engineering/ARCHITECTURE.md`](engineering/ARCHITECTURE.md) | Detailed technical reference when needed |
+| 6 | [`engineering/RELEASE.md`](engineering/RELEASE.md) | Production release, deployment, and verification gates |
 
 An AI developer should not read the archive before reading the current documents.
 

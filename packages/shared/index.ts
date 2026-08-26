@@ -89,6 +89,26 @@ export {
   applyBlockToRequest,
   resolveSharedContacts,
 } from './connection';
+
+// Owner-confirmed learning from connection decisions (task 2.6).
+export {
+  DECISION_LEARNING_SOURCE_PREFIX,
+  connectionDecisionSignal,
+  normalizeSafeDecisionTopic,
+  thirdPartyFragments,
+  validateExplicitDecisionPreference,
+  containsForbiddenThirdPartyInformation,
+  evaluateDecisionLearning,
+  decisionLearningIdempotencyKey,
+  finalizeDecisionLearningProposal,
+} from './decision-learning';
+export type {
+  ExplicitDecisionPreference,
+  DecisionLearningSignal,
+  DecisionLearningEvidence,
+  DecisionLearningProposal,
+  DecisionLearningEligibility,
+} from './decision-learning';
 export type {
   OwnerAction,
   ConnectionRequestPayload,
@@ -107,6 +127,7 @@ export {
   validateOwnerAgentResult,
   validateVisitorAgentResult,
   validateConnectionSummary,
+  validateDecisionLearningAgentResult,
   validateCardDraft,
 } from './agent-schema';
 export type {
@@ -116,6 +137,7 @@ export type {
   VisitorAgentResult,
   VisitorNextAction,
   ConnectionSummary,
+  DecisionLearningAgentResult,
   SummaryRecommendation,
   CardDraft,
   CardDraftHighlight,
@@ -281,6 +303,24 @@ export {
   KNOWLEDGE_SOURCE_ADAPTERS,
   retrieveKnowledgeChunks,
 } from './knowledge';
+
+// Portable canonical knowledge bundle (managed <-> self-hosted).
+export {
+  KNOWLEDGE_BUNDLE_FORMAT,
+  KNOWLEDGE_BUNDLE_SCHEMA_VERSION,
+  KNOWLEDGE_BUNDLE_MAX_SOURCE_BYTES,
+  KNOWLEDGE_BUNDLE_MAX_TOTAL_BYTES,
+  exportKnowledgeBundle,
+  importKnowledgeBundle,
+} from './knowledge-bundle';
+export type {
+  PortableKnowledgeBundle,
+  PortableKnowledgeSource,
+  CanonicalKnowledgeSource,
+  ImportedKnowledgeBundle,
+  KnowledgeBundleErrorCode,
+  KnowledgeBundleResult,
+} from './knowledge-bundle';
 export type {
   KnowledgeSourceKind,
   KnowledgeProvenance,

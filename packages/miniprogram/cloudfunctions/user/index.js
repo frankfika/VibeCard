@@ -80,18 +80,40 @@ async function updateProfile(openid, event) {
 }
 
 async function updateNamecard(openid, event) {
-  const namecard = event.namecard || {};
+  if (!openid) throw new Error('Login required');
+  const profile = event.profile || {};
+  const supplied = event.namecard || {};
+  const tagLabels = Array.isArray(profile.tags)
+    ? profile.tags.map((item) => typeof item === 'string' ? item : item && item.label).filter((item) => typeof item === 'string')
+    : [];
+  const namecard = {
+    intro: typeof profile.bio === 'string' ? profile.bio : (typeof supplied.intro === 'string' ? supplied.intro : ''),
+    motto: typeof profile.handle === 'string' ? profile.handle : (typeof supplied.motto === 'string' ? supplied.motto : ''),
+    interests: tagLabels.length ? tagLabels : (Array.isArray(supplied.interests) ? supplied.interests.filter((item) => typeof item === 'string') : []),
+    theme: typeof supplied.theme === 'string' ? supplied.theme : 'romantic',
+    coverImage: typeof supplied.coverImage === 'string' ? supplied.coverImage : '',
+    currentFocus: typeof profile.bio === 'string' ? profile.bio : '',
+    canHelpWith: Array.isArray(profile.canHelpWith) ? profile.canHelpWith.filter((item) => typeof item === 'string') : [],
+    wantsToMeet: typeof profile.lookingFor === 'string' && profile.lookingFor.trim() ? [profile.lookingFor.trim()] : [],
+    topics: tagLabels,
+    highlights: Array.isArray(profile.highlights) ? profile.highlights.flatMap((item) => {
+      if (!item || typeof item.title !== 'string' || !item.title.trim()) return [];
+      return [{ id: String(item.id || ''), title: item.title.trim(), ...(typeof item.link === 'string' && item.link ? { url: item.link } : {}) }];
+    }).slice(0, 6) : [],
+    agentEnabled: profile.agentEnabled !== false,
+  };
+  const now = new Date();
+  const updateData = { namecard, updatedAt: now };
+  if (typeof profile.name === 'string') updateData.nickname = profile.name;
+  if (typeof profile.avatar === 'string') updateData.avatar = profile.avatar;
+  const existing = await db.collection('users').where({ openid }).get();
+  if (existing.data.length) {
+    await db.collection('users').where({ openid }).update({ data: updateData });
+  } else {
+    await db.collection('users').add({ data: { openid, ...updateData, createdAt: now } });
+  }
 
-  await db.collection('users').where({
-    openid: openid
-  }).update({
-    data: {
-      namecard: namecard,
-      updatedAt: new Date()
-    }
-  });
-
-  return { success: true };
+  return { success: true, ownerId: openid };
 }
 
 async function migrateData(openid, event) {

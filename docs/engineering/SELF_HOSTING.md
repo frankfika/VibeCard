@@ -23,12 +23,18 @@ cp deploy/.env.example deploy/.env   # set VIBECARD_OWNER_TOKEN
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
-The server listens on `http://127.0.0.1:8787` (localhost-mapped by default)
-with data persisted in the `vibecard-data` volume. Verify:
+The private API listens on `http://127.0.0.1:8787`; the built H5/PWA and its
+same-origin API proxy listen on `http://127.0.0.1:8080`. Data is persisted in
+the `vibecard-data` and `vibecard-web-data` volumes. Verify both layers:
 
 ```bash
 curl http://127.0.0.1:8787/healthz
+curl http://127.0.0.1:8080/healthz
 ```
+
+Open `http://127.0.0.1:8080`, choose self-hosted mode, and keep the default
+service address. On a public deployment that default becomes the current HTTPS
+origin; `/api/v1/*` stays same-origin and is forwarded inside Docker.
 
 ### Without Docker (Node 24+)
 
@@ -71,6 +77,12 @@ Everything is an environment variable; the full documented template is
 | `AI_PROVIDER` | auto (`mock`) | `mock` or `openai-compatible` |
 | `AI_API_BASE` / `AI_MODEL` / `AI_API_KEY` | — | OpenAI-compatible endpoint (managed, BYOK, or local) |
 | `AI_TIMEOUT_MS` | `15000` | Model request timeout |
+| `REQUIRE_MODERATION` | `0` localhost quickstart | Set to `1` before public exposure; Core refuses unsafe startup and Web rejects public snapshot publication unless an HTTP moderation service is configured |
+| `MODERATION_API_URL` | *(none)* | `POST {"text":"..."}` endpoint returning `{ "ok": true }` or `{ "ok": false, "reason": "..." }` |
+| `MODERATION_API_KEY` | *(none)* | Optional bearer token sent only to the moderation endpoint |
+| `MODERATION_TIMEOUT_MS` | `5000` | Moderation request timeout; timeout fails closed |
+| `ENABLE_PUBLIC_SNAPSHOTS` | `0` | Operator-only compatibility endpoint; normal local/remote sharing creates no Web snapshot |
+| `PUBLIC_SNAPSHOT_TTL_MS` | `604800000` (7d) | Compatibility snapshot lifetime; Web clamps it to at most 30 days |
 | `RATE_LIMIT_CHAT_PER_HOUR` | `30` | Visitor chat token bucket (per visitor id + IP) |
 | `RATE_LIMIT_REQUESTS_PER_HOUR` | `10` | Connection-request token bucket |
 | `MAX_BODY_BYTES` | `2097152` | Max JSON body size |
@@ -109,6 +121,9 @@ and send CORS headers for browser clients.
 | `GET /api/v1/owner/requests/:id/summary` | Evidence-based AI summary (never a score) |
 | `POST /api/v1/owner/requests/:id/action` | `connect` (requires `sharedContactMethodIds`) / `later` / `decline` |
 | `GET /api/v1/owner/export?kind=private\|public&includeConversations=1` | `.vibe` archive export |
+| `POST /api/v1/owner/knowledge/import` | Import a validated `vibecard-knowledge-bundle` owned by the current identity |
+| `GET /api/v1/owner/knowledge/export` | Export exact Base64 UTF-8 source text + metadata; chunks are rebuilt (no embeddings/provider metadata) |
+| `POST /api/v1/owner/knowledge/search` | Owner retrieval across all allowed knowledge visibility levels |
 | `POST /api/v1/owner/delete-all` | Erase everything; **requires a private export newer than the last write** |
 
 ### Public (unauthenticated, rate-limited, moderated)
@@ -119,6 +134,7 @@ and send CORS headers for browser clients.
 | `POST /api/v1/public/chat` | Visitor conversation with the public Vibe (public evidence only) |
 | `POST /api/v1/public/requests` | Submit a connection request (specific reason required) |
 | `GET /api/v1/public/requests/:id?visitorId=` | Visitor views their own request; unlocked contacts appear only after owner `connect` |
+| `POST /api/v1/public/knowledge/search` | Moderated/rate-limited structured retrieval over `public` chunks only (`visitorId`, `query`) |
 
 ### Health
 
@@ -153,20 +169,36 @@ and send CORS headers for browser clients.
 
 ### Moderation hook
 
-Every stranger-supplied text (chat messages, request fields) passes a
+Every stranger-supplied text (chat messages, request fields, and every public
+string projected into an anonymous Web Card snapshot) passes a
 `moderate(text)` hook **before** storage or model invocation:
 
 ```ts
 type ModerationHook = (text: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
 ```
 
-Pass your hook to `createApp({ config, provider, moderate })`. The default
-self-hosted hook is a passthrough (it never invents a verdict); the WeChat
-deployment plugs `msgSecCheck` into the same seam. **The contract is
+Pass your hook to `createApp({ config, provider, moderate })`, or configure
+`MODERATION_API_URL` for the packaged server. The default self-hosted hook is
+a passthrough for loopback-only development. The copied Compose template binds
+both ports to loopback and keeps `REQUIRE_MODERATION=0`, so the documented
+visitor loop works without a placeholder service. Compose passes the same
+moderation URL, key, timeout, and required flag to both Core and Web. Before
+public exposure, set `REQUIRE_MODERATION=1` and a real `MODERATION_API_URL`;
+startup and runtime then fail closed without that hook. A rejected, unavailable,
+timed-out, or malformed verdict cannot create a public snapshot. The WeChat deployment plugs `msgSecCheck` into the same
+seam. **The contract is
 fail-closed**: if the hook throws or returns a malformed verdict, the request
 fails with `moderation_unavailable` (503) and nothing is stored — stranger
 content is never defaulted to safe. A negative verdict fails with
 `moderation_rejected` (403).
+
+Normal sharing does not call the anonymous snapshot endpoint. Local mode puts
+only the public projection in the `?c=` URL; self-hosted and managed modes link
+that projection to the canonical public runtime via `source`. Therefore clearing
+a browser cannot strand a permanent server copy. `/api/cards` publication is
+retained only as an operator compatibility feature, defaults to disabled, always
+requires a working moderation hook when enabled, issues independent unguessable
+IDs, and expires every record within the configured TTL (hard maximum 30 days).
 
 ---
 
@@ -181,9 +213,14 @@ content is never defaulted to safe. A negative verdict fails with
    ```
    The archive carries integrity checksums and contains every data layer
    except credentials (the format has no fields for secrets by construction).
+   If knowledge was ingested, also export
+   `GET /api/v1/owner/knowledge/export`. Knowledge text is deliberately kept
+   in this separate versioned bundle because the `.vibe` knowledge section is
+   metadata-only. Delete-all requires both exports to be fresh when knowledge
+   sources exist, including whitespace-only sources that yield no chunks.
 2. **Disaster copy (optional):** with the server stopped, also copy the
    SQLite file (`vibecard.db` plus any `-wal`/`-shm` siblings) and the
-   `vibecard.db.owner.json` sidecar. With Docker, back up the
+   `vibecard.db.owner.json` and `vibecard.db.knowledge.json` sidecars. With Docker, back up the
    `vibecard-data` volume.
 
 ### Restore
@@ -199,6 +236,17 @@ or over HTTP with `POST /api/v1/owner/import`. Restore validates, migrates
 older archive versions, and verifies checksums; public archives are rejected
 (a projection can never prove private state). The automated backup/restore
 test proves a full round trip preserves the complete Core fixture state.
+After identity restore, import an accompanying knowledge bundle with:
+
+```bash
+jq -n --slurpfile bundle knowledge.json '{bundle:$bundle[0]}' |
+  curl -X POST http://127.0.0.1:8787/api/v1/owner/knowledge/import \
+    -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+    --data-binary @-
+```
+
+The Server rejects malformed, future-version, tampered, foreign-owner, and
+runtime-metadata-polluted bundles before changing stored retrieval state.
 
 ### Upgrade
 

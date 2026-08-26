@@ -103,6 +103,15 @@ export interface ConnectionSummary {
   evidenceRefs: string[];
 }
 
+/** Untrusted model output for task 2.6; server-owned source metadata is added later. */
+export interface DecisionLearningAgentResult {
+  proposal: {
+    kind: 'preference' | 'boundary';
+    content: string;
+    suggestedVisibility: 'private' | 'agent_only';
+  } | null;
+}
+
 /* ---------------------------------------------------------------------------
  * Card draft (AI_BEHAVIOR.md §9)
  * ------------------------------------------------------------------------- */
@@ -238,6 +247,21 @@ export function validateConnectionSummary(value: unknown): string | null {
     !value.evidenceRefs.every((r) => typeof r === 'string')
   ) {
     return 'invalid_evidence_refs';
+  }
+  return null;
+}
+
+export function validateDecisionLearningAgentResult(value: unknown): string | null {
+  if (!isRecord(value)) return 'not_an_object';
+  if (value.proposal === null) return null;
+  if (!isRecord(value.proposal)) return 'invalid_proposal';
+  const proposal = value.proposal;
+  if (proposal.kind !== 'preference' && proposal.kind !== 'boundary') return 'invalid_proposal_kind';
+  if (!isNonEmptyString(proposal.content) || proposal.content.length > 500) {
+    return 'invalid_proposal_content';
+  }
+  if (proposal.suggestedVisibility !== 'private' && proposal.suggestedVisibility !== 'agent_only') {
+    return 'invalid_proposal_visibility';
   }
   return null;
 }

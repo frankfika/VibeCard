@@ -3,6 +3,7 @@ const nav = require('../../utils/nav.js');
 const cloud = require('../../utils/cloud.js');
 const nowHelper = require('../../utils/now.js');
 const track = require('../../utils/track.js');
+const firstRun = require('../../utils/first-run.js');
 
 // 最近动态（任务 4.5）：云端/分享负载里来的都是已投影的公开字段
 // { id, text, topic, publishedAt }，这里只补展示标签，绝不补充内容
@@ -81,12 +82,6 @@ const LOOKING_FOR_OPTIONS = [
 ];
 const EVENT_OPTIONS = ['ETHGlobal', 'Devcon', 'Token2049', 'Hackathon', 'Remote', 'Local'];
 
-const ONBOARDING_STEPS = [
-  { title: '欢迎使用 vibecard', subtitle: '创建你的 AI 名片', hint: '让我们从基本信息开始' },
-  { title: '选择标签', subtitle: '最多选 5 个，也可以自定义', hint: '标签帮助他人快速了解你' },
-  { title: '完善资料', subtitle: '补充简介和意向', hint: '这些信息会展示在你的名片上' },
-];
-
 Page({
   data: {
     profile: null,
@@ -95,21 +90,14 @@ Page({
     showShare: false,
     isSharedView: false,
     showOnboarding: false,
-    onboardingStep: 0,
-    onboardingName: '',
-    onboardingHandle: '',
-    onboardingBio: '',
-    onboardingTags: [],
-    onboardingLookingFor: '',
-    onboardingEvent: '',
     editName: '',
     editHandle: '',
     editBio: '',
     editTags: [],
     editLookingFor: '',
+    editCanHelpWith: '',
     editEvent: '',
     editHighlights: [],
-    onboardingCustomTag: '',
     editCustomTag: '',
     tagOptions: TAG_OPTIONS,
     lookingForOptions: LOOKING_FOR_OPTIONS,
@@ -123,8 +111,21 @@ Page({
     editDiscord: '',
     editWechat: '',
     cardVisible: false,
-    onboardingSteps: ONBOARDING_STEPS,
     nowItems: [], // 最近动态（任务 4.5）：≤3 条已发布未过期；空则不渲染
+    // 任务 1.5：首次使用是五问对话，而不是结构化资料表。
+    firstRunStage: 'intro',
+    firstRunName: '',
+    firstRunQuestion: null,
+    firstRunQuestionNumber: 0,
+    firstRunAnswer: '',
+    firstRunHistory: [],
+    firstRunProposal: null,
+    firstRunProposalText: '',
+    firstRunProposalEditing: false,
+    firstRunDraft: null,
+    firstRunBusy: false,
+    firstRunError: '',
+    firstRunPermissionDenied: false,
   },
 
   onLoad(options) {
@@ -189,12 +190,430 @@ Page({
     }
     this.setData({ profile, isSetup, avatarFailed: false });
     if (!isSetup) {
-      this.setData({ showOnboarding: true, onboardingStep: 0, cardVisible: false });
+      this.startFirstRun();
     } else {
       // Trigger enter animation
       this.setData({ cardVisible: false });
       setTimeout(() => this.setData({ cardVisible: true }), 100);
       this.loadNowItems();
+    }
+  },
+
+  // ---------- 三分钟首次对话（任务 1.5） ----------
+
+  startFirstRun() {
+    if (!this.firstRunState) this.firstRunState = firstRun.load(wx);
+    const demoFlag = wx.getStorageSync && wx.getStorageSync('vibecard_demo_mode');
+    this.firstRunDemoMode = demoFlag === true || demoFlag === '1';
+    this.setData({ showOnboarding: true, cardVisible: false });
+    this.syncFirstRunView();
+    if (this.firstRunState.stage === 'draft-loading') this.prepareFirstRunDraft();
+  },
+
+  persistFirstRun() {
+    firstRun.save(wx, this.firstRunState);
+    this.syncFirstRunView();
+  },
+
+  syncFirstRunView() {
+    const state = this.firstRunState || firstRun.emptyState();
+    const question = firstRun.QUESTIONS[state.questionIndex] || null;
+    const reviewId = state.reviewIds[state.reviewIndex];
+    const decision = reviewId && state.memoryDecisions[reviewId];
+    const proposal = reviewId
+      ? firstRun.proposalFor(reviewId, decision && decision.content
+        ? decision.content.replace((firstRun.questionById(reviewId) || {}).memoryPrefix || '', '')
+        : state.answers[reviewId])
+      : null;
+    if (proposal && decision && decision.content) proposal.content = decision.content;
+    const history = firstRun.QUESTIONS.slice(0, state.questionIndex).map((item) => ({
+      id: item.id,
+      prompt: item.prompt,
+      answer: state.skipped[item.id] ? '已跳过' : state.answers[item.id],
+      skipped: !!state.skipped[item.id],
+    }));
+    this.setData({
+      firstRunStage: state.stage,
+      firstRunName: state.name || '',
+      firstRunQuestion: question,
+      firstRunQuestionNumber: state.questionIndex + 1,
+      firstRunAnswer: question ? (state.answers[question.id] || '') : '',
+      firstRunHistory: history,
+      firstRunProposal: proposal,
+      firstRunProposalText: proposal ? proposal.content : '',
+      firstRunProposalEditing: false,
+      firstRunDraft: state.draft,
+      firstRunError: state.stage === 'draft-error' ? (state.draftError || 'Vibe 暂时没起草成功。你的回答还在。') : '',
+      firstRunPermissionDenied: state.stage === 'draft-error' && state.draftErrorCode === 'permission',
+    });
+  },
+
+  onFirstRunNameInput(e) {
+    this.firstRunState.name = e.detail.value;
+    firstRun.save(wx, this.firstRunState);
+    this.setData({ firstRunName: e.detail.value });
+  },
+
+  onStartFirstRun() {
+    const name = String(this.data.firstRunName || '').trim();
+    if (!name) {
+      wx.showToast({ title: '先告诉我怎么称呼你', icon: 'none' });
+      return;
+    }
+    this.firstRunState.name = name;
+    this.firstRunState.stage = 'questions';
+    this.persistFirstRun();
+  },
+
+  onFirstRunAnswerInput(e) {
+    this.setData({ firstRunAnswer: e.detail.value });
+  },
+
+  onAnswerFirstRunQuestion() {
+    const answer = String(this.data.firstRunAnswer || '').trim();
+    const question = firstRun.QUESTIONS[this.firstRunState.questionIndex];
+    if (!question || !answer) {
+      wx.showToast({ title: '说一句，或者选择跳过', icon: 'none' });
+      return;
+    }
+    this.firstRunState.answers[question.id] = answer;
+    delete this.firstRunState.skipped[question.id];
+    this.advanceFirstRunQuestion();
+  },
+
+  onSkipFirstRunQuestion() {
+    const question = firstRun.QUESTIONS[this.firstRunState.questionIndex];
+    if (!question) return;
+    delete this.firstRunState.answers[question.id];
+    this.firstRunState.skipped[question.id] = true;
+    this.advanceFirstRunQuestion();
+  },
+
+  advanceFirstRunQuestion() {
+    if (this.firstRunState.questionIndex < firstRun.QUESTIONS.length - 1) {
+      this.firstRunState.questionIndex += 1;
+      this.persistFirstRun();
+      return;
+    }
+    this.firstRunState.reviewIds = firstRun.reviewIdsFor(this.firstRunState);
+    this.firstRunState.reviewIndex = 0;
+    this.firstRunState.stage = this.firstRunState.reviewIds.length ? 'memory-review' : 'draft';
+    if (this.firstRunState.stage === 'draft') {
+      // 全部跳过时没有可确认的记忆，只产生名字，不调用模型也不补字段。
+      this.firstRunState.draft = firstRun.draftFromAnswers(this.firstRunState, true);
+    }
+    this.persistFirstRun();
+  },
+
+  onBackFirstRunQuestion() {
+    if (this.firstRunState.questionIndex <= 0) return;
+    this.firstRunState.questionIndex -= 1;
+    this.persistFirstRun();
+  },
+
+  onEditFirstRunProposal() {
+    this.setData({ firstRunProposalEditing: true });
+  },
+
+  onFirstRunProposalInput(e) {
+    this.setData({ firstRunProposalText: e.detail.value });
+  },
+
+  onCancelFirstRunProposalEdit() {
+    this.setData({
+      firstRunProposalEditing: false,
+      firstRunProposalText: this.data.firstRunProposal && this.data.firstRunProposal.content,
+    });
+  },
+
+  async onConfirmFirstRunMemory() {
+    if (this.data.firstRunBusy) return;
+    const proposal = this.data.firstRunProposal;
+    const content = String(this.data.firstRunProposalText || '').trim();
+    if (!proposal || !content) {
+      wx.showToast({ title: '记忆内容不能为空', icon: 'none' });
+      return;
+    }
+    this.setData({ firstRunBusy: true, firstRunError: '', firstRunPermissionDenied: false });
+    const state = this.firstRunState;
+    const saved = state.memoryDecisions[proposal.questionId] || {};
+    if (this.firstRunDemoMode) {
+      state.memoryDecisions[proposal.questionId] = {
+        decision: 'confirmed',
+        memoryId: 'demo-' + proposal.key,
+        content,
+        visibility: proposal.questionId === 'boundary' ? 'private' : proposal.visibility,
+      };
+      this.setData({ firstRunBusy: false });
+      await this.advanceFirstRunReview();
+      return;
+    }
+    try {
+      // 先查已确认记忆：确认响应丢失后再次进入，也不会重复创建或确认。
+      const listed = await cloud.callFunction('memory', { action: 'listMemories', status: 'confirmed' });
+      const existing = (listed.memories || []).find((memory) => {
+        const refs = memory.sourceMessageIds || [];
+        return refs.includes(proposal.sourceMessageIds[0]) || memory.content === content;
+      });
+      let memoryId = existing && (existing._id || existing.id);
+      const desiredVisibility = proposal.questionId === 'boundary' ? 'private' : proposal.visibility;
+      if (existing && existing.visibility !== desiredVisibility) {
+        await cloud.callFunction('memory', {
+          action: 'editMemory',
+          memoryId,
+          visibility: desiredVisibility,
+        }, { idempotent: false });
+      }
+      if (!memoryId) {
+        memoryId = saved.memoryId;
+        if (!memoryId) {
+          // create 成功但响应丢失时，稳定 sourceMessageId 可找回 proposed 记录。
+          const proposed = await cloud.callFunction('memory', { action: 'listMemories', status: 'proposed' });
+          const recovered = (proposed.memories || []).find((memory) => {
+            const refs = memory.sourceMessageIds || [];
+            return refs.includes(proposal.sourceMessageIds[0]);
+          });
+          memoryId = recovered && (recovered._id || recovered.id);
+        }
+        if (!memoryId) {
+          const created = await cloud.callFunction('memory', {
+            action: 'createMemoryProposal',
+            kind: proposal.kind,
+            content,
+            // 隐私边界无论 UI/恢复数据如何变化，都在写入点再次强制 private。
+            visibility: proposal.questionId === 'boundary' ? 'private' : proposal.visibility,
+            sourceConversationId: 'first-run-onboarding',
+            sourceMessageIds: proposal.sourceMessageIds,
+          }, { idempotent: false });
+          memoryId = created.memory && (created.memory._id || created.memory.id);
+          if (!memoryId) throw new Error('memory_id_missing');
+          state.memoryDecisions[proposal.questionId] = {
+            decision: 'pending', memoryId, content, visibility: desiredVisibility,
+          };
+          firstRun.save(wx, state);
+        }
+        await cloud.callFunction('memory', {
+          action: 'confirmMemory',
+          memoryId,
+          content,
+          visibility: proposal.questionId === 'boundary' ? 'private' : proposal.visibility,
+        }, { idempotent: false });
+      }
+      state.memoryDecisions[proposal.questionId] = {
+        decision: 'confirmed', memoryId, content, visibility: desiredVisibility,
+      };
+      await this.advanceFirstRunReview();
+    } catch (err) {
+      const message = String((err && (err.code || err.message)) || '');
+      const denied = /unauthorized|permission|auth/i.test(message);
+      this.setData({
+        firstRunError: denied ? '需要先登录，才能把这条记忆安全地存给你。' : '这条记忆暂时没存上，答案还在，可以重试。',
+        firstRunPermissionDenied: denied,
+      });
+    } finally {
+      this.setData({ firstRunBusy: false });
+    }
+  },
+
+  async onDismissFirstRunMemory() {
+    const proposal = this.data.firstRunProposal;
+    if (!proposal || this.data.firstRunBusy) return;
+    this.firstRunState.memoryDecisions[proposal.questionId] = { decision: 'dismissed' };
+    await this.advanceFirstRunReview();
+  },
+
+  async advanceFirstRunReview() {
+    const state = this.firstRunState;
+    if (state.reviewIndex < state.reviewIds.length - 1) {
+      state.reviewIndex += 1;
+      this.persistFirstRun();
+    } else {
+      await this.prepareFirstRunDraft();
+    }
+  },
+
+  async prepareFirstRunDraft() {
+    const state = this.firstRunState;
+    if (!state || this.generatingFirstRunDraft) return;
+    const confirmedIds = state.reviewIds.filter((id) => {
+      const decision = state.memoryDecisions[id];
+      const question = firstRun.questionById(id);
+      return decision && decision.decision === 'confirmed'
+        && decision.visibility === 'public'
+        && question && question.visibility === 'public';
+    });
+    if (!confirmedIds.length) {
+      state.stage = 'draft';
+      state.draft = firstRun.draftFromAnswers(state, true);
+      this.persistFirstRun();
+      return;
+    }
+    if (this.firstRunDemoMode) {
+      state.stage = 'draft';
+      state.draft = firstRun.draftFromAnswers(state, true);
+      this.persistFirstRun();
+      return;
+    }
+    this.generatingFirstRunDraft = true;
+    state.stage = 'draft-loading';
+    firstRun.save(wx, state);
+    this.setData({
+      firstRunStage: 'draft-loading',
+      firstRunBusy: true,
+      firstRunError: '',
+      firstRunPermissionDenied: false,
+    });
+    try {
+      const res = await cloud.callFunction('agent', {
+        action: 'generateCardDraft',
+        cardDraftScope: 'public_only',
+        memoryIds: confirmedIds
+          .map((id) => state.memoryDecisions[id] && state.memoryDecisions[id].memoryId)
+          .filter(Boolean),
+        currentCard: {},
+      });
+      if (!res || res.ok !== true || !res.result || !res.result.draft) {
+        const code = res && res.error && res.error.code;
+        const err = new Error(code || 'invalid_card_draft');
+        err.code = code;
+        throw err;
+      }
+      state.draft = this.projectFirstRunAgentDraft(res.result.draft, confirmedIds);
+      state.stage = 'draft';
+      delete state.draftError;
+      delete state.draftErrorCode;
+      this.persistFirstRun();
+    } catch (err) {
+      const message = String((err && (err.code || err.message)) || '');
+      const denied = /unauthorized|permission|auth/i.test(message);
+      state.stage = 'draft-error';
+      state.draftError = denied
+        ? '需要先登录，才能用你确认的记忆起草 Card。'
+        : 'Vibe 暂时没起草成功。你的回答和已确认记忆都还在。';
+      state.draftErrorCode = denied ? 'permission' : 'unavailable';
+      firstRun.save(wx, state);
+      this.setData({
+        firstRunStage: 'draft-error',
+        firstRunError: state.draftError,
+        firstRunPermissionDenied: denied,
+      });
+    } finally {
+      this.generatingFirstRunDraft = false;
+      this.setData({ firstRunBusy: false });
+    }
+  },
+
+  projectFirstRunAgentDraft(raw, confirmedIds) {
+    const allowed = new Set(confirmedIds);
+    const draft = { name: String(this.firstRunState.name || '').trim() };
+    if (allowed.has('current')) {
+      const bio = String(raw.currentFocus || raw.headline || '').trim();
+      if (bio) draft.bio = bio;
+    }
+    if (allowed.has('work') && Array.isArray(raw.highlights) && raw.highlights.length) {
+      draft.highlights = raw.highlights.map((item, index) => ({
+        id: item.id || 'first-run-work-' + index,
+        title: String(item.title || '').trim(),
+        icon: '✨',
+        link: item.url || '',
+      })).filter((item) => item.title);
+    }
+    if (allowed.has('help') && Array.isArray(raw.canHelpWith)) {
+      draft.canHelpWith = raw.canHelpWith.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (allowed.has('meet') && Array.isArray(raw.wantsToMeet)) {
+      const lookingFor = raw.wantsToMeet.map((item) => String(item).trim()).filter(Boolean).join('、');
+      if (lookingFor) draft.lookingFor = lookingFor;
+    }
+    // 结构合法但遗漏某个已确认区块时，用主人原话补齐；仍只来自已确认记忆，
+    // 不会把跳过、拒绝或 boundary 内容投影到公开 Card。
+    const grounded = firstRun.draftFromAnswers(this.firstRunState, true);
+    if (allowed.has('current') && !draft.bio && grounded.bio) draft.bio = grounded.bio;
+    if (allowed.has('work') && (!draft.highlights || !draft.highlights.length) && grounded.highlights) {
+      draft.highlights = grounded.highlights;
+    }
+    if (allowed.has('help') && (!draft.canHelpWith || !draft.canHelpWith.length) && grounded.canHelpWith) {
+      draft.canHelpWith = grounded.canHelpWith;
+    }
+    if (allowed.has('meet') && !draft.lookingFor && grounded.lookingFor) draft.lookingFor = grounded.lookingFor;
+    return draft;
+  },
+
+  onRetryFirstRunDraft() {
+    this.prepareFirstRunDraft();
+  },
+
+  onUseConfirmedAnswersDraft() {
+    const state = this.firstRunState;
+    state.draft = firstRun.draftFromAnswers(state, true);
+    state.stage = 'draft';
+    this.persistFirstRun();
+  },
+
+  onFirstRunDraftInput(e) {
+    const key = e.currentTarget.dataset.key;
+    if (!['name', 'bio', 'work', 'help', 'lookingFor'].includes(key)) return;
+    const draft = Object.assign({}, this.firstRunState.draft || {});
+    const value = e.detail.value;
+    if (key === 'work') {
+      draft.highlights = value.trim()
+        ? [{ id: 'first-run-work', title: value, icon: '✨', link: '' }]
+        : [];
+    } else if (key === 'help') {
+      draft.canHelpWith = value.trim() ? [value] : [];
+    } else {
+      draft[key] = value;
+    }
+    this.firstRunState.draft = draft;
+    firstRun.save(wx, this.firstRunState);
+    this.setData({ firstRunDraft: draft });
+  },
+
+  async onPublishFirstRunCard() {
+    if (this.data.firstRunBusy) return;
+    const draft = this.firstRunState.draft || {};
+    const name = String(draft.name || '').trim();
+    if (!name) {
+      wx.showToast({ title: 'Card 需要一个名字', icon: 'none' });
+      return;
+    }
+    this.setData({ firstRunBusy: true, firstRunError: '' });
+    const updates = {
+      name,
+      handle: '',
+      bio: String(draft.bio || '').trim(),
+      tags: [],
+      lookingFor: String(draft.lookingFor || '').trim(),
+      canHelpWith: (draft.canHelpWith || []).map((item) => String(item).trim()).filter(Boolean),
+      highlights: (draft.highlights || []).filter((item) => item && String(item.title || '').trim()),
+      verified: { wallet: '', twitter: '', discord: '', wechat: '' },
+    };
+    // Production 先写权威 users 文档并取得 ownerId；只有显式 demo 才只写本地。
+    // 云端 updateNamecard 是 upsert，响应丢失后的重试不会产生第二张 Card。
+    try {
+      const answered = firstRun.reviewIdsFor(this.firstRunState).length;
+      if (!this.firstRunDemoMode) {
+        const result = await cloud.callFunction('user', {
+          action: 'updateNamecard',
+          profile: updates,
+        });
+        const ownerId = result && (result.ownerId || result.openid);
+        if (!ownerId) throw new Error('owner identity missing after publish');
+        updates.ownerId = ownerId;
+        updates.openid = ownerId;
+      }
+      store.setProfile(updates);
+      this.firstRunState.published = true;
+      firstRun.clear(wx);
+      this.firstRunState = null;
+      this.setData({ showOnboarding: false, firstRunBusy: false });
+      track.event('first_run_card_published', { answered });
+      this.loadProfile();
+    } catch (err) {
+      this.setData({
+        firstRunBusy: false,
+        firstRunError: 'Card 暂时没有发布成功，草稿还在，请重试。',
+      });
     }
   },
 
@@ -217,107 +636,6 @@ Page({
     this.setData({ avatarFailed: true });
   },
 
-  // Onboarding
-  onOnboardingNameInput(e) {
-    this.setData({ onboardingName: e.detail.value });
-  },
-  onOnboardingHandleInput(e) {
-    this.setData({ onboardingHandle: e.detail.value });
-  },
-  onOnboardingBioInput(e) {
-    this.setData({ onboardingBio: e.detail.value });
-  },
-  onOnboardingTagSelect(e) {
-    const tag = e.currentTarget.dataset.tag;
-    const tags = this.data.onboardingTags;
-    if (tags.includes(tag)) {
-      this.setData({ onboardingTags: tags.filter(t => t !== tag) });
-    } else if (tags.length < 5) {
-      this.setData({ onboardingTags: [...tags, tag] });
-    }
-  },
-  onOnboardingCustomTagInput(e) {
-    this.setData({ onboardingCustomTag: e.detail.value });
-  },
-  addOnboardingCustomTag() {
-    const tag = this.data.onboardingCustomTag.trim();
-    if (!tag) return;
-    const tags = this.data.onboardingTags;
-    if (tags.includes(tag)) {
-      wx.showToast({ title: '标签已存在', icon: 'none' });
-      return;
-    }
-    if (tags.length >= 5) {
-      wx.showToast({ title: '最多5个标签', icon: 'none' });
-      return;
-    }
-    this.setData({ onboardingTags: [...tags, tag], onboardingCustomTag: '' });
-  },
-  onOnboardingLookingSelect(e) {
-    this.setData({ onboardingLookingFor: e.currentTarget.dataset.item });
-  },
-  onOnboardingEventSelect(e) {
-    this.setData({ onboardingEvent: e.currentTarget.dataset.item });
-  },
-  nextOnboardingStep() {
-    const step = this.data.onboardingStep;
-    if (step === 0 && !this.data.onboardingName.trim()) {
-      wx.showToast({ title: '请输入名字', icon: 'none' });
-      return;
-    }
-    if (step >= 2) {
-      this.completeOnboarding();
-      return;
-    }
-    this.setData({ onboardingStep: step + 1 });
-  },
-  prevOnboardingStep() {
-    const step = this.data.onboardingStep;
-    if (step > 0) {
-      this.setData({ onboardingStep: step - 1 });
-    }
-  },
-  skipOnboarding() {
-    wx.showModal({
-      title: '跳过引导',
-      content: '你可以随时在"编辑名片"中完善资料，是否跳过？',
-      confirmText: '跳过',
-      cancelText: '继续',
-      success: (res) => {
-        if (res.confirm) {
-          const profile = {
-            name: this.data.onboardingName.trim() || 'Viber',
-            handle: this.data.onboardingHandle.trim(),
-            bio: this.data.onboardingBio.trim(),
-            tags: this.data.onboardingTags.map(t => ({ label: t, icon: '' })),
-            lookingFor: this.data.onboardingLookingFor,
-            event: this.data.onboardingEvent,
-            highlights: [],
-            verified: { wallet: '', twitter: '', discord: '', wechat: '' },
-          };
-          store.setProfile(profile);
-          this.setData({ showOnboarding: false, isSetup: true });
-          this.loadProfile();
-        }
-      }
-    });
-  },
-  completeOnboarding() {
-    const profile = {
-      name: this.data.onboardingName.trim(),
-      handle: this.data.onboardingHandle.trim(),
-      bio: this.data.onboardingBio.trim(),
-      tags: this.data.onboardingTags.map(t => ({ label: t, icon: '' })),
-      lookingFor: this.data.onboardingLookingFor,
-      event: this.data.onboardingEvent,
-      highlights: [],
-      verified: { wallet: '', twitter: '', discord: '', wechat: '' },
-    };
-    store.setProfile(profile);
-    this.setData({ showOnboarding: false, isSetup: true });
-    this.loadProfile();
-  },
-
   // Edit
   openEdit() {
     const p = this.data.profile || {};
@@ -335,6 +653,7 @@ Page({
       editBio: p.bio || '',
       editTags: (p.tags || []).map(t => t.label),
       editLookingFor: p.lookingFor || '',
+      editCanHelpWith: (p.canHelpWith || []).join('\n'),
       editEvent: p.event || '',
       editHighlights: p.highlights || [],
       editCustomTag: '',
@@ -381,6 +700,9 @@ Page({
   },
   onEditLookingSelect(e) {
     this.setData({ editLookingFor: e.currentTarget.dataset.item });
+  },
+  onEditCanHelpInput(e) {
+    this.setData({ editCanHelpWith: e.detail.value });
   },
   onEditEventSelect(e) {
     this.setData({ editEvent: e.currentTarget.dataset.item });
@@ -446,13 +768,14 @@ Page({
     this.setData({ editHighlights: highlights });
   },
 
-  saveEdit() {
+  async saveEdit() {
     const profile = {
       name: this.data.editName.trim(),
       handle: this.data.editHandle.trim(),
       bio: this.data.editBio.trim(),
       tags: this.data.editTags.map(t => ({ label: t, icon: '' })),
       lookingFor: this.data.editLookingFor,
+      canHelpWith: String(this.data.editCanHelpWith || '').split('\n').map((item) => item.trim()).filter(Boolean),
       event: this.data.editEvent,
       highlights: this.data.editHighlights,
       verified: {
@@ -464,9 +787,20 @@ Page({
       avatar: this.data.editAvatar
         || avatarUrlFor('notionists', this.data.editAvatarSeed || AVATAR_SEEDS[0]),
     };
-    store.setProfile(profile);
-    this.setData({ isEditing: false });
-    this.loadProfile();
+    try {
+      const demoFlag = wx.getStorageSync && wx.getStorageSync('vibecard_demo_mode');
+      if (!(demoFlag === true || demoFlag === '1')) {
+        const result = await cloud.callFunction('user', { action: 'updateNamecard', profile });
+        const ownerId = result && (result.ownerId || result.openid);
+        if (!ownerId) throw new Error('owner identity missing after save');
+        Object.assign(profile, { ownerId, openid: ownerId });
+      }
+      store.setProfile(profile);
+      this.setData({ isEditing: false });
+      this.loadProfile();
+    } catch (err) {
+      wx.showToast({ title: 'Card 没有保存，请重试', icon: 'none' });
+    }
   },
 
   // Share
@@ -485,12 +819,16 @@ Page({
   },
 
   // 访客视图入口：先和主人的 AI 分身聊聊（任务 0.4 mock + 任务 2.5 云链路）
-  // 分享资料里带 ownerId/openid 时透传给分身页，走真实云对话；否则回退 fixture 演示
+  // 分享资料里带 ownerId/openid 时透传给分身页，走真实云对话。fixture
+  // 只能由显式 demo 开关进入；缺 ownerId 的真实页面会显示链接不完整。
   goVisitorChat() {
     track.event('cta_click', { cta_id: 'go_visitor_chat', view: this.data.isSharedView ? 'visitor' : 'owner' });
     const p = this.data.profile || {};
     const ownerId = p.ownerId || p.openid || '';
-    const query = ownerId ? '?ownerId=' + encodeURIComponent(ownerId) : '';
+    const demoFlag = wx.getStorageSync && wx.getStorageSync('vibecard_demo_mode');
+    const query = ownerId
+      ? '?ownerId=' + encodeURIComponent(ownerId)
+      : (demoFlag === true || demoFlag === '1') ? '?demo=1' : '';
     nav.navigateTo('/pages/visitor-chat/visitor-chat' + query);
   },
 

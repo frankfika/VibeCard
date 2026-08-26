@@ -464,3 +464,19 @@
   border: 1rpx solid rgba(99, 102, 241, 0.3);
   background: #ffffff;
 }
+.learning-wrap { position: fixed; left: 28rpx; right: 28rpx; bottom: calc(170rpx + env(safe-area-inset-bottom)); z-index: 30; }
+.learning-card { padding: 28rpx; border-radius: 28rpx; background: #fff; box-shadow: 0 18rpx 60rpx rgba(20, 20, 35, 0.18); border: 2rpx solid rgba(99, 102, 241, 0.18); }
+.learning-loading { color: #6b6b75; font-size: 25rpx; text-align: center; }
+.learning-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.learning-title { color: #202027; font-size: 29rpx; font-weight: 750; }
+.learning-visibility { flex-shrink: 0; padding: 6rpx 14rpx; border-radius: 999rpx; background: #f0efff; color: #5751bd; font-size: 21rpx; }
+.learning-note { margin-top: 12rpx; color: #85858e; font-size: 22rpx; line-height: 1.5; }
+.learning-content { margin-top: 22rpx; color: #2f2f38; font-size: 27rpx; line-height: 1.55; }
+.learning-edit { width: 100%; box-sizing: border-box; min-height: 112rpx; margin-top: 20rpx; padding: 18rpx 20rpx; border: 2rpx solid #dedde9; border-radius: 18rpx; background: #fafafa; color: #292932; font-size: 26rpx; }
+.learning-actions { display: flex; gap: 12rpx; margin-top: 22rpx; }
+.learning-action { flex: 1; padding: 17rpx 8rpx; border-radius: 999rpx; background: #f0f0f3; color: #50505a; text-align: center; font-size: 24rpx; }
+.learning-action-primary { background: #6366f1; color: #fff; }
+.learning-action-quiet { background: transparent; color: #8b8b94; }
+.learning-error { margin-top: 14rpx; color: #a63b31; font-size: 23rpx; line-height: 1.45; }
+.learning-done { margin-top: 20rpx; color: #555762; font-size: 24rpx; line-height: 1.5; }
+.learning-close { margin-top: 16rpx; color: #6366f1; font-size: 24rpx; font-weight: 700; text-align: right; }

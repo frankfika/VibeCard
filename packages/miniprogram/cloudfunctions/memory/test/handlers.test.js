@@ -29,6 +29,7 @@ function createFakeCloud() {
         where(conds) {
           return {
             orderBy() { return this; },
+            limit() { return this; },
             async get() {
               const data = [...coll.entries()]
                 .filter(([, v]) => Object.entries(conds).every(([k, val]) => v[k] === val))
@@ -62,6 +63,10 @@ function createFakeCloud() {
               }
               coll.set(_id, next);
               return { stats: { updated: 1 } };
+            },
+            async set({ data }) {
+              coll.set(_id, data);
+              return { stats: { created: 1, updated: 0 } };
             },
           };
         },
@@ -100,6 +105,24 @@ test('owner can create proposals at every visibility level and list them', async
   const publicOnly = await call({ action: 'listMemories', visibility: 'public' });
   assert.equal(publicOnly.memories.length, 1);
   assert.equal(publicOnly.memories[0].visibility, 'public');
+});
+
+test('stable decision-learning source key is idempotent, including after rejection', async () => {
+  const input = {
+    action: 'createMemoryProposal',
+    kind: 'boundary',
+    content: '我希望连接邀请先说明具体问题。',
+    visibility: 'agent_only',
+    idempotencyKey: 'connection-decision:stable-test',
+    sourceMessageIds: ['req-1'],
+  };
+  const first = await call(input);
+  assert.equal(first.deduplicated, false);
+  await call({ action: 'deleteMemory', memoryId: first.memory._id });
+  const retry = await call(input);
+  assert.equal(retry.deduplicated, true);
+  assert.equal(retry.memory._id, first.memory._id);
+  assert.equal(retry.memory.status, 'deleted');
 });
 
 test('a stranger sees nothing and cannot touch owner memories', async () => {

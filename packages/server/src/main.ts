@@ -11,10 +11,26 @@ import { loadConfig } from './config';
 import { selectProvider } from './provider';
 import { createApp, listen } from './app';
 import { redactSecrets } from './redact';
+import { createHttpModerationHook } from './moderation';
 
 const config = loadConfig();
+if (process.env.NODE_ENV === 'production') {
+  if (config.ownerTokenGenerated || config.ownerToken.startsWith('change-me')) {
+    throw new Error('Production startup requires a non-placeholder VIBECARD_OWNER_TOKEN.');
+  }
+  if (config.requireModeration && !config.moderationApiUrl) {
+    throw new Error('Production startup requires MODERATION_API_URL when REQUIRE_MODERATION=1.');
+  }
+}
 const provider = selectProvider(config);
-const app = createApp({ config, provider });
+const moderate = config.moderationApiUrl
+  ? createHttpModerationHook({
+      url: config.moderationApiUrl,
+      apiKey: config.moderationApiKey,
+      timeoutMs: config.moderationTimeoutMs,
+    })
+  : undefined;
+const app = createApp({ config, provider, moderate });
 const server = await listen(app, config.host, config.port);
 
 const address = server.address();

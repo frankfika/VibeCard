@@ -58,6 +58,32 @@ test('projection matches the VibeCard shape', () => {
   assert.equal(card.updatedAt, 5000);
 });
 
+test('owner-edited canonical Card fields override the older confirmed-memory fallback', () => {
+  const user = {
+    ...V1_USER,
+    namecard: {
+      ...V1_USER.namecard,
+      currentFocus: '主人在预览里改过的当前方向',
+      canHelpWith: ['主人改过的帮助'],
+      wantsToMeet: ['主人改过的目标'],
+      topics: ['主人主题'],
+      highlights: [{ id: 'work-1', title: '主人保留的代表经历', url: 'https://example.com/work' }],
+    },
+  };
+  const memories = [
+    confirmedMemory('current', 'public', '旧当前方向'),
+    confirmedMemory('fact', 'public', '旧帮助'),
+    confirmedMemory('preference', 'public', '旧目标'),
+  ];
+  const card = core.buildPublicCard({ ownerId: OWNER, user, memories }, 5000);
+  assert.equal(card.currentFocus, '主人在预览里改过的当前方向');
+  assert.deepEqual(card.canHelpWith, ['主人改过的帮助']);
+  assert.deepEqual(card.wantsToMeet, ['主人改过的目标']);
+  assert.deepEqual(card.topics, ['主人主题']);
+  assert.deepEqual(card.highlights, [{ id: 'work-1', title: '主人保留的代表经历', url: 'https://example.com/work' }]);
+  assert.doesNotMatch(JSON.stringify(card), /旧当前方向|旧帮助|旧目标/);
+});
+
 test('contact details are stripped from the projection', () => {
   const card = core.buildPublicCard({ ownerId: OWNER, user: V1_USER, memories: [] }, 5000);
   const serialized = JSON.stringify(card);

@@ -21,12 +21,14 @@ import {
   validateOwnerAgentResult,
   validateVisitorAgentResult,
   validateConnectionSummary,
+  validateDecisionLearningAgentResult,
   validateCardDraft,
 } from './agent-schema';
 import type {
   OwnerAgentResult,
   VisitorAgentResult,
   ConnectionSummary,
+  DecisionLearningAgentResult,
   CardDraft,
 } from './agent-schema';
 
@@ -177,7 +179,7 @@ export interface CardDraftModelResult {
 }
 
 /**
- * The four typed operations the agent boundary needs (ARCHITECTURE §6). Each
+ * The typed operations the agent boundary needs (ARCHITECTURE §6). Each
  * returns a schema-validated Core result or a typed error — invalid output is
  * retried exactly once, then rejected as `invalid_model_output`.
  */
@@ -187,6 +189,7 @@ export interface AgentModel {
   visitorMessage(input: AgentModelInput): Promise<ModelCallOutcome<VisitorAgentResult>>;
   generateCardDraft(input: AgentModelInput): Promise<ModelCallOutcome<CardDraftModelResult>>;
   summarizeConnection(input: AgentModelInput): Promise<ModelCallOutcome<ConnectionSummary>>;
+  extractDecisionLearning(input: AgentModelInput): Promise<ModelCallOutcome<DecisionLearningAgentResult>>;
 }
 
 type StringValidator = (value: unknown) => string | null;
@@ -310,6 +313,14 @@ export function createAgentModel(provider: ModelProvider): AgentModel {
 
     async summarizeConnection(input) {
       return callValidatedWithRetry<ConnectionSummary>(provider, input, validateConnectionSummary);
+    },
+
+    async extractDecisionLearning(input) {
+      return callValidatedWithRetry<DecisionLearningAgentResult>(
+        provider,
+        input,
+        validateDecisionLearningAgentResult,
+      );
     },
   };
 }

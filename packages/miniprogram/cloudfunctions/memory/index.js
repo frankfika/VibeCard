@@ -79,18 +79,38 @@ async function createMemoryProposal(openid, event) {
   const invalid = core.validateMemoryPayload(payload);
   if (invalid) throw new Error(invalid);
 
+  // Optional stable source key for cross-function retries (task 2.6). A
+  // rejected/deleted proposal also counts as handled and must not be recreated.
+  const idempotencyKey = typeof event.idempotencyKey === 'string' && event.idempotencyKey.trim()
+    ? event.idempotencyKey.trim().slice(0, 200)
+    : '';
+  if (idempotencyKey) {
+    const deterministicId = `decision-${idempotencyKey.slice(idempotencyKey.lastIndexOf(':') + 1)}`;
+    const existing = await db.collection('memories').doc(deterministicId).get().catch(() => null);
+    if (existing && existing.data) {
+      return { memory: { _id: deterministicId, ...existing.data }, deduplicated: true };
+    }
+  }
+
   const now = Date.now();
   const memory = core.buildMemory({
     ownerId: openid,
     kind: payload.kind,
     content: payload.content,
     visibility: payload.visibility,
-    sourceConversationId: event.sourceConversationId || '',
+    sourceConversationId: idempotencyKey || event.sourceConversationId || '',
     sourceMessageIds: event.sourceMessageIds || [],
   }, now);
 
+  if (idempotencyKey) {
+    // Deterministic document id makes concurrent retries converge on one
+    // record. Both writes are byte-equivalent proposed records.
+    const deterministicId = `decision-${idempotencyKey.slice(idempotencyKey.lastIndexOf(':') + 1)}`;
+    await db.collection('memories').doc(deterministicId).set({ data: memory });
+    return { memory: { _id: deterministicId, ...memory }, deduplicated: false };
+  }
   const result = await db.collection('memories').add({ data: memory });
-  return { memory: { _id: result._id, ...memory } };
+  return { memory: { _id: result._id, ...memory }, deduplicated: false };
 }
 
 async function confirmMemory(openid, event) {

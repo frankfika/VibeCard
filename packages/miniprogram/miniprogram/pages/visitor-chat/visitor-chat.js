@@ -10,7 +10,8 @@
  *      blocked / rate_limited / declined_cooldown 给温和提示；
  *      moderation_blocked 退回理由编辑（草稿保留），moderation_unavailable 可重试。
  *
- * 云不可用（无 ownerId / 调用失败）回退任务 0.4 的 fixture 演示流程。
+ * 只有没有 ownerId 的显式演示入口才使用 fixture。真实分享链接发生网络或
+ * 云函数故障时必须显示可重试错误，绝不能把另一位 fixture 主人冒充成目标主人。
  *
  * 产品规则：分身必须声明自己是 AI；全程绝不显示联系方式；
  * 检索不到证据就承认不确定，不编造。
@@ -74,8 +75,8 @@ function nextMessageId(prefix) {
 
 Page({
   data: {
-    ownerName: fixtureCard.name,
-    stage: 'chat', // chat | reason | preview | done
+    ownerName: '这位主人',
+    stage: 'loading', // loading | chat | reason | preview | done | unavailable
     messages: [],
     chips: [],
     answeredCount: 0,
@@ -89,6 +90,7 @@ Page({
     scrollIntoId: '',
     unavailableTitle: '', // stage 'unavailable' 终态标题/描述（名片收回/找不到/分身休息）
     unavailableDesc: '',
+    unavailableRetry: false,
     doneTitle: '已送达',
     doneDesc: '你的理由已经交给他的 Vibe，是否认识由他决定。',
     doneSub: '如果他有兴趣，他会选一种联系方式给你。',
@@ -96,14 +98,18 @@ Page({
 
   onLoad(options) {
     track.event('page_view', { page: 'visitor_chat', has_owner: !!((options && options.ownerId)) });
-    this.demoMode = true;
+    this.demoMode = false;
     this.sending = false;
     this.ownerId = (options && options.ownerId) || '';
-    this.roundCount = 0;
-    if (this.ownerId) {
+    this.conversationId = '';
+    const storedDemo = wx.getStorageSync && wx.getStorageSync('vibecard_demo_mode');
+    const explicitDemo = (options && options.demo === '1') || storedDemo === true || storedDemo === '1';
+    if (explicitDemo) {
+      this.initDemoMode();
+    } else if (this.ownerId) {
       this.initCloudMode();
     } else {
-      this.initDemoMode();
+      this.setUnavailable('这张分享链接不完整', '请让主人重新分享一次。');
     }
   },
 
@@ -146,21 +152,28 @@ Page({
         text: '我是' + (card.name || '这位主人') + '的 AI 分身。你可以先通过我了解他，也可以告诉我你为什么想认识他。',
       };
       this.setData({
+        stage: 'chat',
         ownerName: card.name || '他',
         messages: [opening],
         chips,
         scrollIntoId: opening.id,
       });
     } catch (err) {
-      // 云未部署/网络失败：回退 fixture 演示模式
-      console.warn('[visitor-chat] cloud unavailable, fallback to fixture demo:', err && err.message);
-      this.initDemoMode();
+      console.warn('[visitor-chat] public card unavailable:', err && err.message);
+      this.demoMode = false;
+      this.setUnavailable('暂时连不上这张名片', '网络恢复后再试一次；我不会用演示数据替代真实主人。', true);
     }
   },
 
   // 终态：名片不可用/分身休息。不渲染输入框、不追加任何对话
-  setUnavailable(title, desc) {
-    this.setData({ stage: 'unavailable', unavailableTitle: title, unavailableDesc: desc });
+  setUnavailable(title, desc, retry) {
+    this.setData({ stage: 'unavailable', unavailableTitle: title, unavailableDesc: desc, unavailableRetry: !!retry });
+  },
+
+  onRetryInit() {
+    if (!this.ownerId || this.sending) return;
+    this.setData({ stage: 'loading', messages: [], chips: [], unavailableRetry: false });
+    this.initCloudMode();
   },
 
   initDemoMode() {
@@ -171,6 +184,7 @@ Page({
       text: '我是' + fixtureCard.name + '的 AI 分身。你可以先通过我了解他，也可以告诉我你为什么想认识他。',
     };
     this.setData({
+      stage: 'chat',
       ownerName: fixtureCard.name,
       messages: [opening],
       chips: FIXTURE_PRESET_QUESTIONS.map((q) => ({ id: q.id, text: q.text, used: false })),
@@ -256,15 +270,11 @@ Page({
     this.appendMessages([{ id: nextMessageId('visitor'), role: 'visitor', text }]);
     this.sending = true;
     try {
-      const history = this.data.messages.slice(-12).map((m) => ({
-        role: m.role === 'visitor' ? 'user' : 'assistant',
-        content: m.text,
-      }));
       const res = await cloud.callFunction('agent', {
         action: 'visitorMessage',
         ownerId: this.ownerId,
-        messages: history,
-        roundCount: this.roundCount,
+        message: text,
+        ...(this.conversationId ? { conversationId: this.conversationId } : {}),
       });
       if (!res || res.ok !== true) {
         const code = res && res.error && res.error.code;
@@ -292,13 +302,37 @@ Page({
           this.setData({ ended: true });
           return;
         }
+        if (code === 'round_limit') {
+          this.appendMessages([{
+            id: nextMessageId('agent'),
+            role: 'agent',
+            text: (res.error && res.error.message) || '这次先聊到这里，你可以把具体理由告诉我。',
+          }]);
+          this.setData({ ended: true, guided: true });
+          return;
+        }
+        if (code === 'moderation_blocked') {
+          this.appendMessages([{
+            id: nextMessageId('agent'), role: 'agent',
+            text: '这句话可能不方便继续处理，换一种说法试试？',
+          }]);
+          return;
+        }
+        if (code === 'moderation_unavailable') {
+          this.appendMessages([{
+            id: nextMessageId('agent'), role: 'agent',
+            text: '内容检查暂时不可用，请稍后重试这句话。',
+          }]);
+          return;
+        }
         // 模型不可用：不编造回答，给出不确定回复并引导到理由
         this.appendMessages([{ id: nextMessageId('agent'), role: 'agent', text: CLOUD_FALLBACK_REPLY }]);
         this.setData({ guided: true });
         return;
       }
-      this.roundCount += 1;
       const result = res.result || {};
+      if (typeof result.conversationId === 'string' && result.conversationId) this.conversationId = result.conversationId;
+      if (typeof result.evidenceId === 'string' && result.evidenceId) this.evidenceId = result.evidenceId;
       const replyMsg = { id: nextMessageId('agent'), role: 'agent', text: result.reply || CLOUD_FALLBACK_REPLY };
       // 共同点发现时刻：分身发现了访客与主人的真实交集（最多 3 条）
       const sharedContext = Array.isArray(result.sharedContext)
@@ -408,7 +442,11 @@ Page({
         ownerId: this.ownerId,
         visitorSummary: '一位通过 AI 分身对话而来的访客',
         reason: this.data.preview.reason,
-        possibleSharedContext: [],
+        possibleSharedContext: Array.isArray(this.data.preview.possibleSharedContext)
+          ? this.data.preview.possibleSharedContext.slice(0, 3)
+          : [],
+        ...(this.evidenceId ? { evidenceId: this.evidenceId } : {}),
+        ...(this.conversationId ? { conversationId: this.conversationId } : {}),
       }, { idempotent: false });
       if (res && res.ok === true) {
         // 等订阅结果回来（即使失败也无妨），再显示完成态

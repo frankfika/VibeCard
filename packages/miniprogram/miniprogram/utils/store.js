@@ -5,7 +5,7 @@ const GAME_KEY = 'vibecard_game';
 
 const DEFAULT_PROFILE = {
   name: '', handle: '', avatar: '', bio: '', tags: [],
-  lookingFor: '', highlights: [],
+  lookingFor: '', canHelpWith: [], highlights: [],
   verified: { wallet: '', twitter: '', discord: '', wechat: '' },
   event: ''
 };

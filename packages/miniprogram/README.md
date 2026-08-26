@@ -79,7 +79,7 @@ Full DevTools + device checklist: see `docs/engineering/DEVELOPMENT_PLAN.md` §4
   - 申请并发布两个模板，把真实 `tmplId` 填入 `miniprogram/utils/subscribe.js` 的 `TMPL`：
     - `OWNER_NEW_REQUEST`：主人收到新连接请求
     - `VISITOR_REQUEST_ACCEPTED`：访客收到请求被通过
-- [ ] **云开发环境**（如使用）：开通、绑定、上传所有 `cloudfunctions/`、创建数据库集合（`memories` / `conversations` / `requests` / `now_items` / `users` / `visitor_activity`）和所需索引。
+- [ ] **云开发环境**（如使用）：开通、绑定、上传所有 `cloudfunctions/`，并按 [`LAUNCH_KIT.md`](./LAUNCH_KIT.md) 创建 9 个数据库集合（`users` / `memories` / `conversations` / `requests` / `now_items` / `visitor_activity` / `visitor_evidence` / `request_gates` / `reports`）、索引及 `visitor_evidence.expiresAt` 24 小时 TTL。
 
 ### B. 代码与配置
 

@@ -72,6 +72,7 @@ test('conversation excerpt joins the evidence when present', async () => {
   assert.equal(outcome.ok, true);
   assert.ok(seenSystem.includes('[conv:excerpt]'));
   assert.ok(seenSystem.includes('visitor: 我认真看过你的名片'));
+  assert.ok(seenSystem.includes('访客自述作品链接（未验证）'));
 });
 
 test('validator enforces the not-a-score contract', () => {

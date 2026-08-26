@@ -6,7 +6,8 @@
  *   -> actOnRequest(decision: connect|later|decline) -> connect 时从返回结果里
  *   拿到主人勾选的联系方式值（仅 connect 状态才会附带）。
  *
- * 云环境未部署或调用失败时回退到任务 0.4 的 fixture 演示模式，演示路径不中断。
+ * fixture 只在显式开启 vibecard_demo_mode 时使用。真实模式故障显示可重试
+ * 错误，不能把虚构访客展示成真实请求。
  *
  * 产品规则：联系方式只在主人 connect 之后可见；是否认识永远由主人决定。
  */
@@ -30,7 +31,7 @@ const STATUS_TEXT = {
   connect: '已认识',
 };
 
-// fixture 演示模式下「Vibe 的看法」，云端 summarizeConnection 失败时也回退到它
+// fixture 演示模式下「Vibe 的看法」。真实模式绝不使用这份虚构证据。
 const FIXTURE_VIBE_TAKE = {
   summary: '我觉得你们值得聊一次。',
   reasons: [
@@ -48,6 +49,12 @@ const FIXTURE_WEAK_VIBE_TAKE = {
     '也没有留下可以了解的背景或作品。',
   ],
   uncertainty: '仍不确定：对方是否真的了解过你在做的事。',
+};
+
+const UNAVAILABLE_VIBE_TAKE = {
+  summary: '我现在还判断不了。',
+  reasons: [],
+  uncertainty: '暂时没能读取这条请求的判断依据，请稍后重试。',
 };
 
 function formatTime(ts) {
@@ -81,12 +88,25 @@ Page({
     decidedAction: '', // 仅 demo 模式：'' | 'connected' | 'later' | 'declined'
     acting: false,
     avatarErr: {}, // 头像加载失败的请求 id -> true，失败后回退为首字头像
+    loading: false,
+    loadError: '',
+    // 任务 2.6：连接决定先保存；学习候选是独立、可失败的 owner-only 后续。
+    learningStatus: '',
+    learningLoading: false,
+    learningProposal: null,
+    learningError: '',
   },
 
   onLoad() {
     track.event('page_view', { page: 'requests' });
     this.demoMode = false;
-    this.loadInbox({ allowFallback: true });
+    const demoFlag = wx.getStorageSync && wx.getStorageSync('vibecard_demo_mode');
+    if (demoFlag === true || demoFlag === '1') {
+      this.demoMode = true;
+      this.loadFixtureDemo();
+      return;
+    }
+    this.loadInbox();
   },
 
   onShow() {
@@ -97,30 +117,31 @@ Page({
 
   // ---------- 数据加载 ----------
 
-  async loadInbox({ allowFallback } = {}) {
+  async loadInbox() {
+    this.setData({ loading: true, loadError: '' });
     try {
       const res = await cloud.callFunction('requests', { action: 'listInbox' });
       if (!res || res.ok !== true) {
         if (res && res.error && res.error.code === 'unauthorized') {
           // 未登录：提示并保持当前页面状态，不回退演示（避免给未登录主人展示假数据）
           wx.showToast({ title: '请先登录后再试', icon: 'none' });
+          this.setData({ loading: false, loadError: '请先登录后再试。' });
           return;
         }
         throw new Error((res && res.error && res.error.message) || 'listInbox failed');
       }
       this.demoMode = false;
       const requestsList = (res.result.requests || []).map((r) => this.mapCloudRequest(r));
-      this.setData({ requestsList, demoMode: false });
+      this.setData({ requestsList, demoMode: false, loading: false, loadError: '' });
     } catch (err) {
-      if (!allowFallback) {
-        console.warn('[requests] refresh inbox failed:', err && err.message);
-        return;
-      }
-      // 云未部署/未登录：回退到 fixture 演示模式（任务 0.4 路径保持可用）
-      console.warn('[requests] cloud unavailable, fallback to fixture demo:', err && err.message);
-      this.demoMode = true;
-      this.loadFixtureDemo();
+      console.warn('[requests] inbox unavailable:', err && err.message);
+      this.demoMode = false;
+      this.setData({ requestsList: [], demoMode: false, loading: false, loadError: '暂时无法加载请求，请检查网络后重试。' });
     }
+  },
+
+  onRetryInbox() {
+    this.loadInbox();
   },
 
   mapCloudRequest(r) {
@@ -178,7 +199,15 @@ Page({
     const id = e.currentTarget.dataset.id;
     const found = this.data.requestsList.find((r) => r.id === id) || this.data.requestsList[0];
     if (!found) return;
-    this.setData({ currentRequest: found, view: 'detail', vibeTake: null });
+    this.setData({
+      currentRequest: found,
+      view: 'detail',
+      vibeTake: null,
+      learningStatus: '',
+      learningLoading: false,
+      learningProposal: null,
+      learningError: '',
+    });
 
     if (this.demoMode) {
       const take = found.id === fixtures.fixtureWeakConnectionRequest.id
@@ -190,7 +219,8 @@ Page({
     this.loadSummary(found.id);
   },
 
-  // 「你的 Vibe 的看法」：agent.summarizeConnection；失败回退 fixture 看法，页面保持可用
+  // 「你的 Vibe 的看法」：agent.summarizeConnection；失败时明确不确定，
+  // 绝不借用 fixture 的理由冒充真实证据。
   async loadSummary(requestId) {
     this.setData({ summaryLoading: true });
     try {
@@ -205,21 +235,32 @@ Page({
       this.setData({
         vibeTake: {
           summary: RECOMMENDATION_TEXT[s.recommendation] || '我还没想好。',
-          reasons: Array.isArray(s.why) && s.why.length > 0 ? s.why : FIXTURE_VIBE_TAKE.reasons,
-          uncertainty: s.uncertainty ? '仍不确定：' + s.uncertainty : FIXTURE_VIBE_TAKE.uncertainty,
+          reasons: Array.isArray(s.why) ? s.why : [],
+          uncertainty: s.uncertainty ? '仍不确定：' + s.uncertainty : '',
         },
       });
     } catch (err) {
-      console.warn('[requests] summarizeConnection failed, fallback to fixture take:', err && err.message);
-      this.setData({ vibeTake: FIXTURE_VIBE_TAKE });
+      console.warn('[requests] summarizeConnection unavailable:', err && err.message);
+      this.setData({ vibeTake: UNAVAILABLE_VIBE_TAKE });
     } finally {
       this.setData({ summaryLoading: false });
     }
   },
 
+  onRetrySummary() {
+    if (this.data.currentRequest) this.loadSummary(this.data.currentRequest.id);
+  },
+
   backToList() {
-    this.setData({ view: 'list', currentRequest: null });
-    if (!this.demoMode) this.loadInbox({ allowFallback: false });
+    this.setData({
+      view: 'list',
+      currentRequest: null,
+      learningStatus: '',
+      learningLoading: false,
+      learningProposal: null,
+      learningError: '',
+    });
+    if (!this.demoMode) this.loadInbox();
   },
 
   // 从联系方式选择返回详情（不重新加载 summary）
@@ -332,6 +373,7 @@ Page({
         view: 'connected',
         sharedContacts: res.result.sharedContacts || [],
       });
+      this.loadDecisionLearning(res.result);
       track.event('connection_made', { request_id: this.data.currentRequest && this.data.currentRequest.id });
       // 等订阅结果回来（失败也无妨），不阻塞页面
       if (subscribePromise) {
@@ -378,11 +420,117 @@ Page({
         return;
       }
       this.setData({ view });
+      this.loadDecisionLearning(res.result);
     } catch (err) {
       console.warn('[requests] actOnRequest(' + decision + ') failed:', err && err.message);
       wx.showToast({ title: '操作失败，稍后再试', icon: 'none' });
     } finally {
       this.setData({ acting: false });
+    }
+  },
+
+  // ---------- 从连接决定中学习（任务 2.6） ----------
+
+  async loadDecisionLearning(result) {
+    const learningStatus = result && result.learningStatus;
+    const proposalId = result && result.learningProposalId;
+    this.setData({ learningStatus: learningStatus || '', learningError: '' });
+    if (!proposalId || (learningStatus !== 'proposed' && learningStatus !== 'already_handled')) return;
+    this.setData({ learningLoading: true });
+    try {
+      const listed = await cloud.callFunction('memory', { action: 'listMemories', status: 'proposed' });
+      const memory = (listed.memories || []).find(item => (item._id || item.id) === proposalId);
+      // already_handled 可能表示这条候选此前已确认/删除；没有 proposed 就不重复展示。
+      if (!memory) return;
+      this.setData({
+        learningProposal: {
+          id: proposalId,
+          content: memory.content,
+          kind: memory.kind,
+          visibility: memory.visibility,
+          visibilityLabel: memory.visibility === 'private' ? '仅自己可见' : '仅分身可见',
+          state: 'pending',
+          editText: '',
+        },
+      });
+    } catch (err) {
+      console.warn('[requests] decision learning proposal unavailable:', err && err.message);
+      // 连接决定已经保存；这里的失败只能影响候选展示。
+      this.setData({ learningError: '决定已经保存，但学习候选暂时没加载出来。' });
+    } finally {
+      this.setData({ learningLoading: false });
+    }
+  },
+
+  onCloseDecisionLearning() {
+    this.setData({ learningProposal: null, learningError: '', learningLoading: false });
+  },
+
+  onEditLearningProposal() {
+    const proposal = this.data.learningProposal;
+    if (!proposal || proposal.state !== 'pending') return;
+    this.setData({
+      learningProposal: Object.assign({}, proposal, { state: 'editing', editText: proposal.content }),
+      learningError: '',
+    });
+  },
+
+  onLearningProposalInput(e) {
+    const proposal = this.data.learningProposal;
+    if (!proposal) return;
+    this.setData({ learningProposal: Object.assign({}, proposal, { editText: e.detail.value }) });
+  },
+
+  onCancelLearningEdit() {
+    const proposal = this.data.learningProposal;
+    if (!proposal) return;
+    this.setData({
+      learningProposal: Object.assign({}, proposal, { state: 'pending', editText: '' }),
+      learningError: '',
+    });
+  },
+
+  async onConfirmLearningProposal() {
+    const proposal = this.data.learningProposal;
+    if (!proposal || this.data.learningLoading) return;
+    const content = String(proposal.state === 'editing' ? proposal.editText : proposal.content).trim();
+    if (!content) {
+      wx.showToast({ title: '记忆内容不能为空', icon: 'none' });
+      return;
+    }
+    this.setData({ learningLoading: true, learningError: '' });
+    try {
+      await cloud.callFunction('memory', {
+        action: 'confirmMemory',
+        memoryId: proposal.id,
+        content,
+      }, { idempotent: false });
+      this.setData({
+        learningProposal: Object.assign({}, proposal, { state: 'confirmed', content, editText: '' }),
+      });
+    } catch (err) {
+      console.warn('[requests] confirm learning proposal failed:', err && err.message);
+      this.setData({ learningError: '你的决定已经保存；这条记忆没存上，可以重试。' });
+    } finally {
+      this.setData({ learningLoading: false });
+    }
+  },
+
+  async onDismissLearningProposal() {
+    const proposal = this.data.learningProposal;
+    if (!proposal || this.data.learningLoading) return;
+    this.setData({ learningLoading: true, learningError: '' });
+    try {
+      await cloud.callFunction('memory', {
+        action: 'deleteMemory',
+        memoryId: proposal.id,
+      }, { idempotent: false });
+      this.setData({ learningProposal: Object.assign({}, proposal, { state: 'dismissed' }) });
+    } catch (err) {
+      console.warn('[requests] dismiss learning proposal failed:', err && err.message);
+      this.setData({ learningError: '你的决定已经保存；候选暂时没删掉，可以重试。' });
+    } finally {
+      this.setData({ learningLoading: false });
     }
   },
 

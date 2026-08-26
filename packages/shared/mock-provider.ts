@@ -132,6 +132,18 @@ export function createMockModelProvider(): ModelProvider {
       if (system && system.includes('总结一个连接请求')) {
         return JSON.stringify(mockConnectionSummary(system));
       }
+      // Task 2.6: the server has already established clear evidence and
+      // supplied a privacy-safe suggested statement. The model may refine at
+      // most one proposal; the server validates it again before persistence.
+      if (system && system.includes('连接决定学习')) {
+        const kind = (system.match(/候选类型：(preference|boundary)/) || [])[1] || 'preference';
+        const content = (system.match(/候选内容：([^\n]+)/) || [])[1] || '';
+        return JSON.stringify({
+          proposal: content
+            ? { kind, content, suggestedVisibility: kind === 'boundary' ? 'agent_only' : 'private' }
+            : null,
+        });
+      }
       // Deterministic visitor-mode replies, identified by the persona marker.
       if (system && system.includes('AI 分身')) {
         return JSON.stringify(mockVisitorReply(system, lastUserContent(messages)));

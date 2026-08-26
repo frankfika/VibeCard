@@ -24,8 +24,11 @@ COPY packages/server packages/server
 # isolation boundary), store data on a volume. Override via env / .env file.
 ENV HOST=0.0.0.0 \
     PORT=8787 \
+    NODE_ENV=production \
     VIBECARD_DB_PATH=/data/vibecard.db
 
+RUN mkdir -p /data && chown -R node:node /app /data
+USER node
 VOLUME /data
 EXPOSE 8787
 

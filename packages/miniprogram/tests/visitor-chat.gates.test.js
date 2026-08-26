@@ -91,6 +91,27 @@ test('rate_limited：分身消息使用云端 message，ended=true', async () =>
   assert.strictEqual(page.sending, false);
 });
 
+test('round_limit：服务端六轮上限结束对话并引导具体理由', async () => {
+  nextCloudResult = { ok: false, error: { code: 'round_limit', message: '这次先聊到这里，你可以把具体理由告诉我' } };
+  const page = makePage();
+  page.onSend();
+  await flushAll();
+  assert.strictEqual(page.data.ended, true);
+  assert.strictEqual(page.data.guided, true);
+  assert.match(lastMessage(page).text, /具体理由/);
+});
+
+test('visitor moderation 失败：不伪造模型回复，保留重试语义', async () => {
+  for (const code of ['moderation_blocked', 'moderation_unavailable']) {
+    nextCloudResult = { ok: false, error: { code } };
+    const page = makePage();
+    page.onSend();
+    await flushAll();
+    assert.strictEqual(page.data.ended, false);
+    assert.match(lastMessage(page).text, code === 'moderation_blocked' ? /换一种说法/ : /稍后重试/);
+  }
+});
+
 test('其他失败（回归）：CLOUD_FALLBACK_REPLY，ended=false，guided=true', async () => {
   nextCloudResult = { ok: false, error: { code: 'provider_unavailable', message: 'down' } };
   const page = makePage();

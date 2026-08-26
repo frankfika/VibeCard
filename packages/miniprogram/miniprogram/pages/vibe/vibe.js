@@ -6,8 +6,8 @@
  *   -> memory.appendMessage 持久化 -> 提议卡片（记住/改一下/别记这个）
  *   -> memory.confirmMemory / deleteMemory -> 「已记住」列表来自 listMemories。
  *
- * 云环境未部署或调用失败时自动回退到本地 fixture 演示模式，保证比赛演示
- * 不中断；聊天主流程在记忆提取失败时依然可用（AI_BEHAVIOR.md 失败行为）。
+ * fixture 只在显式开启 vibecard_demo_mode 时使用。真实模式的云故障保留
+ * 页面与输入，并显示可重试状态，不能注入虚构的私人记忆或对话。
  *
  * 产品规则：Vibe 可以提议记忆，但只有主人确认后才会真正记住。
  */
@@ -51,6 +51,7 @@ Page({
     nowEditingId: '',    // 正在编辑的动态 id
     nowEditText: '',
     nowProposal: null,   // Vibe 提议的 Now 草稿 { id, nowId, text, topic, state, editText }
+    loadError: '',
   },
 
   onLoad() {
@@ -58,8 +59,13 @@ Page({
     this.demoMode = false;
     this.conversationId = '';
     this.sending = false;
-    this.loadMemories();
-    this.loadNowItems();
+    const demoFlag = wx.getStorageSync && wx.getStorageSync('vibecard_demo_mode');
+    if (demoFlag === true || demoFlag === '1') {
+      this.enterDemoMode();
+    } else {
+      this.loadMemories();
+      this.loadNowItems();
+    }
   },
 
   onShow() {
@@ -71,6 +77,7 @@ Page({
   // ---------- 记忆列表（listMemories，仅已确认） ----------
 
   async loadMemories() {
+    this.setData({ loadError: '' });
     try {
       const res = await cloud.callFunction('memory', {
         action: 'listMemories',
@@ -83,10 +90,15 @@ Page({
       }));
       this.setData({ memories });
     } catch (err) {
-      // 云未部署/未登录：回退到 fixture 演示模式（任务 0.4 的演示路径保持可用）
-      console.warn('[vibe] cloud unavailable, fallback to fixture demo:', err && err.message);
-      this.demoMode = true;
-      const memories = fixtures.fixtureOwnerMemories
+      console.warn('[vibe] memories unavailable:', err && err.message);
+      this.demoMode = false;
+      this.setData({ memories: [], loadError: '暂时无法加载你的记忆。刚才输入的内容不会丢，请稍后重试。' });
+    }
+  },
+
+  enterDemoMode() {
+    this.demoMode = true;
+    const memories = fixtures.fixtureOwnerMemories
         .filter((m) => m.status === 'confirmed')
         .map((m) => ({
           id: m.id,
@@ -121,8 +133,13 @@ Page({
           editText: '',
         },
       });
-      this.loadFixtureNowItems();
-    }
+    this.loadFixtureNowItems();
+  },
+
+  onRetryLoad() {
+    if (this.demoMode) return;
+    this.loadMemories();
+    this.loadNowItems();
   },
 
   // ---------- 最近动态（任务 4.5） ----------
@@ -145,10 +162,8 @@ Page({
       const res = await cloud.callFunction('now', { action: 'listNowItems' });
       this.setData({ nowItems: nowHelper.ownerNowList(res.nowItems || []) });
     } catch (err) {
-      // 云未部署：Now 面板回退到 fixture 演示（demo 标志由 loadMemories 设置；
-      // 若它还没跑完，这里静默失败，不阻塞页面）
       console.warn('[vibe] listNowItems failed:', err && err.message);
-      if (this.demoMode) this.loadFixtureNowItems();
+      if (!this.demoMode) this.setData({ nowItems: [] });
     }
   },
 
@@ -413,7 +428,7 @@ Page({
   // 并在对话里追加一条「我记住了：…」的确认消息（AI_BEHAVIOR §5 确认时刻）。
   // 失败时提示并可重试，提议卡片保持 pending。
   async confirmMemoryOnServer(memoryId, { content }) {
-    if (this.demoMode || !memoryId) {
+    if (this.demoMode) {
       const memory = {
         id: 'fixture-memory-confirmed-' + Date.now(),
         content,
@@ -422,6 +437,11 @@ Page({
       this.setData({ memories: this.data.memories.concat(memory) });
       this.appendVibeMessage('我记住了：' + content);
       return true;
+    }
+    if (!memoryId) {
+      console.warn('[vibe] confirmMemory refused: proposal id missing');
+      wx.showToast({ title: '这条提议不完整，请重新发送', icon: 'none' });
+      return false;
     }
     try {
       await cloud.callFunction('memory', { action: 'confirmMemory', memoryId, content }, { idempotent: false });

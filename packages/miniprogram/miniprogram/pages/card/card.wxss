@@ -77,6 +77,46 @@
 .btn-text { font-size: 28rpx; color: #6b6b72; font-weight: 500; padding: 16rpx; }
 .btn-skip { color: #a8a8b0; }
 
+/* Conversational first-run onboarding (task 1.5) */
+.first-run-brand { font-size: 22rpx; font-weight: 700; letter-spacing: 3rpx; color: #6366f1; margin-bottom: 40rpx; }
+.first-run-scene { display: flex; flex-direction: column; gap: 24rpx; }
+.first-run-vibe-bubble { align-self: flex-start; max-width: 88%; padding: 28rpx 32rpx; border-radius: 8rpx 32rpx 32rpx 32rpx; background: #eeeefe; color: #252539; font-size: 30rpx; line-height: 1.65; }
+.first-run-privacy, .first-run-private-note { padding: 22rpx 24rpx; border-radius: 20rpx; background: #f4f4f5; color: #65656f; font-size: 24rpx; line-height: 1.55; }
+.first-run-input, .first-run-textarea, .first-run-draft-input { width: 100%; box-sizing: border-box; padding: 24rpx 28rpx; border: 2rpx solid #e4e4e7; border-radius: 24rpx; background: #fff; color: #17171b; font-size: 30rpx; line-height: 1.55; }
+.first-run-input { height: 96rpx; }
+.first-run-textarea { min-height: 136rpx; }
+.first-run-primary { margin-top: 8rpx; width: 100%; }
+.first-run-progress { color: #787881; font-size: 24rpx; font-weight: 650; }
+.first-run-history { display: flex; flex-direction: column; gap: 12rpx; }
+.first-run-exchange { padding: 18rpx 22rpx; background: rgba(248, 248, 250, 0.88); border-radius: 18rpx; }
+.first-run-history-q { color: #8b8b94; font-size: 22rpx; margin-bottom: 6rpx; }
+.first-run-history-a { color: #303036; font-size: 25rpx; line-height: 1.5; }
+.first-run-muted { color: #aaaab2; }
+.first-run-row { display: flex; justify-content: space-between; align-items: center; min-height: 64rpx; }
+.first-run-link { color: #64646e; font-size: 27rpx; padding: 12rpx 4rpx; }
+.first-run-link-right { margin-left: auto; color: #8d8d96; }
+.first-run-memory-card { padding: 28rpx; border: 2rpx solid rgba(99, 102, 241, 0.28); border-radius: 28rpx; background: #fff; box-shadow: 0 12rpx 36rpx rgba(59, 55, 120, 0.08); }
+.first-run-memory-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; color: #61616c; font-size: 23rpx; margin-bottom: 20rpx; }
+.first-run-memory-visibility { flex-shrink: 0; padding: 7rpx 14rpx; border-radius: 999rpx; background: #f0f0ff; color: #595bd4; }
+.first-run-memory-content { color: #1f1f26; font-size: 30rpx; line-height: 1.6; }
+.first-run-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16rpx; }
+.first-run-action-main { flex: 1 0 100%; width: 100%; }
+.first-run-action { flex: 1; text-align: center; padding: 20rpx 12rpx; border-radius: 999rpx; background: #f0f0f3; color: #4f4f59; font-size: 26rpx; }
+.first-run-action-quiet { background: transparent; color: #8d8d96; }
+.first-run-status { color: #65656f; font-size: 25rpx; text-align: center; padding: 18rpx; }
+.first-run-error { padding: 22rpx 24rpx; border-radius: 20rpx; background: #fff2f0; color: #9d342a; font-size: 25rpx; line-height: 1.5; }
+.first-run-retry { display: inline-block; margin-top: 12rpx; color: #7133cc; font-weight: 700; }
+.first-run-draft { padding: 28rpx; border-radius: 28rpx; background: #fff; box-shadow: 0 12rpx 40rpx rgba(17, 17, 19, 0.07); }
+.first-run-draft-field { margin-bottom: 24rpx; }
+.first-run-draft-field:last-child { margin-bottom: 0; }
+.first-run-draft-label { margin-bottom: 10rpx; color: #71717a; font-size: 23rpx; font-weight: 650; }
+.first-run-draft-input { min-height: 80rpx; padding: 18rpx 20rpx; background: #fafafa; font-size: 27rpx; }
+.first-run-empty { padding: 26rpx; border-radius: 20rpx; background: #fafafa; color: #777780; font-size: 25rpx; line-height: 1.6; }
+.first-run-center { align-items: center; text-align: center; padding-top: 96rpx; }
+.first-run-orb { display: flex; align-items: center; justify-content: center; width: 112rpx; height: 112rpx; border-radius: 50%; color: #fff; font-size: 46rpx; background: linear-gradient(135deg, #7779ef, #4e46bc); box-shadow: 0 20rpx 50rpx rgba(78, 70, 188, 0.25); animation: first-run-pulse 1.5s ease-in-out infinite; }
+.first-run-loading-title { color: #292932; font-size: 32rpx; font-weight: 700; }
+@keyframes first-run-pulse { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.08); opacity: 1; } }
+
 /* Card */
 .page { background: #f7f7f8; }
 .card-container { flex: 1; display: flex; flex-direction: column; position: relative; }

@@ -269,9 +269,9 @@ node deploy/deploy-cloud.js
 | `requests` | 连接请求 | 仅创建者可读写 |
 | `now_items` | 主人最近动态（公开） | 所有用户可读，仅创建者可写 |
 | `visitor_activity` | 访客活动计数（限流用） | 仅创建者可读写 |
+| `visitor_evidence` | 短期、单次消费的访客话题证据 | 仅云函数读写 |
+| `request_gates` | owner + visitor 24 小时请求闸门 | 仅云函数读写 |
 | `reports` | 用户举报记录 | 仅创建者可读写 |
-| `blocks` | 黑名单（如单独建表） | 仅创建者可读写 |
-| `audit_logs` | 审核 / 安全日志 | 仅创建者可读写 |
 
 > 上面"权限"列是默认推荐；个别字段（如 `requests` 的 `decision`）由云函数代主人更新，所以实际权限都是"仅创建者可读写"，所有跨用户写入都通过云函数走。
 
@@ -283,11 +283,12 @@ node deploy/deploy-cloud.js
   索引 2：  字段 ownerId (正序) + updatedAt (倒序)
 
 集合：requests
-  索引 1：  字段 ownerId (正序) + status (正序) + createdAt (倒序)
+  索引 1：  字段 ownerId (正序) + ownerAction (正序) + createdAt (倒序)
   索引 2：  字段 visitorId (正序) + ownerId (正序) + createdAt (倒序)
 
 集合：now_items
   索引 1：  字段 ownerId (正序) + status (正序) + publishedAt (倒序)
+  索引 2：  字段 ownerId (正序) + expiresAt (正序)
 
 集合：conversations
   索引 1：  字段 ownerId (正序) + updatedAt (倒序)
@@ -295,6 +296,14 @@ node deploy/deploy-cloud.js
 集合：visitor_activity
   索引 1：  字段 _id (主键，自动存在)
             _id 格式约定：visitorId:ownerId:YYYY-MM-DD（East-8 日期）
+
+集合：visitor_evidence
+  索引 1：  字段 ownerId (正序) + visitorId (正序)
+  TTL：      字段 expiresAt，24 小时（成功提交请求后也立即删除）
+
+集合：request_gates
+  索引 1：  字段 _id（主键，自动存在）
+            _id 由 ownerId + visitorId 的 SHA-256 确定性生成
 ```
 
 ---
@@ -414,7 +423,7 @@ VibeCard 是一张「会越来越懂你」的 AI 名片。本小程序不涉及�
    - [ ] 把 2 个真实的模板 ID 替换到 `utils/subscribe.js`
    - [ ] 配置云函数环境变量（AI_API_BASE / AI_API_KEY / AI_MODEL）
    - [ ] 执行 `node deploy/deploy-cloud.js` 部署全部云函数
-   - [ ] 在云开发控制台按第 4 节建好 9 个集合 + 5 组索引
+   - [ ] 在云开发控制台按第 4 节建好 9 个集合、索引和 TTL
    - [ ] 打开 DevTools 编译一次，确保无报错
    - [ ] 按 `README.md` 第 C 节在真机上完整走一遍演示路径
 

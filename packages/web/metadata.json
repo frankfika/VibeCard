@@ -1,10 +1,8 @@
 {
-  "name": "Orbit",
-  "description": "A cross-platform Web3 identity card and connection layer.",
+  "name": "VibeCard",
+  "description": "A living AI namecard that helps people understand you before connecting.",
   "requestFramePermissions": [
     "clipboard-write"
   ],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }

@@ -29,6 +29,7 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
+import { chmodSync, closeSync, existsSync, openSync } from 'node:fs';
 
 export interface Migration {
   /** Monotonic version this migration upgrades the database TO. */
@@ -38,8 +39,17 @@ export interface Migration {
 }
 
 export function openDatabase(path: string): DatabaseSync {
+  if (path !== ':memory:') {
+    if (!existsSync(path)) closeSync(openSync(path, 'a', 0o600));
+    chmodSync(path, 0o600);
+  }
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL;');
+  if (path !== ':memory:') {
+    for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+      if (existsSync(file)) chmodSync(file, 0o600);
+    }
+  }
   db.exec('PRAGMA busy_timeout = 5000;');
   db.exec('PRAGMA foreign_keys = ON;');
   return db;

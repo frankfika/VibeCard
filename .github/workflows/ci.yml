@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -43,11 +43,42 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Production server tests
+        run: npm run test:server
+
+      - name: Production dependency audit
+        run: npm run audit:prod
+        working-directory: ${{ github.workspace }}
+
+      - name: Typecheck portable services
+        run: npm run typecheck:services
+        working-directory: ${{ github.workspace }}
+
+      - name: Test portable Core and services
+        run: npm run test:core
+        working-directory: ${{ github.workspace }}
+
+      - name: Test installable SDK package
+        run: npm run test:sdk-package
+        working-directory: ${{ github.workspace }}
+
+      - name: Test adapter contracts
+        run: npm run test:adapters
+        working-directory: ${{ github.workspace }}
+
+      - name: Test Mini Program cloud functions
+        run: npm run test:miniprogram-cloud
+        working-directory: ${{ github.workspace }}
+
+      - name: Test Mini Program page logic
+        run: npm run test:miniprogram-pages
+        working-directory: ${{ github.workspace }}
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
-        run: npx playwright test --project=chromium
+      - name: Run Playwright desktop and mobile tests
+        run: npx playwright test --project=chromium --project=mobile-chrome
 
       - name: Upload Playwright report
         if: failure()
@@ -70,7 +101,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: packages/contracts/package-lock.json
 

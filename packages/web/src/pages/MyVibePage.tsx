@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Send, Check, Pencil, X } from 'lucide-react';
+import { Sparkles, Send, Check, Pencil, X, LoaderCircle, RotateCcw } from 'lucide-react';
 import { vibeFixtures } from '@shared';
-import type { Memory } from '@shared';
+import type { CardDraft, Memory } from '@shared';
 // Owner memory selection comes from the Core so web never re-implements
 // retrieval or permission rules (task 5.2).
 import { memoriesForOwner } from '@shared';
 import { useNowItems } from '../lib/now';
+import { useProfile, type Profile } from '../store';
+import {
+  loadLocalMemories,
+  loadRuntimeConfig,
+  ownerApi,
+  saveLocalMemories,
+} from '../lib/runtime';
 
 /**
  * 我的 Vibe — owner conversation (task 0.4 mock story).
@@ -32,8 +39,9 @@ interface ChatMessage {
 }
 
 interface Proposal {
+  id?: string;
   content: string;
-  state: 'pending' | 'editing' | 'confirmed' | 'rejected';
+  state: 'idle' | 'pending' | 'editing' | 'confirmed' | 'rejected';
   draft: string;
 }
 
@@ -48,6 +56,13 @@ interface NowProposal {
   state: 'idle' | 'loading' | 'pending' | 'editing' | 'published' | 'dismissed';
   draft: string;
   error: string | null;
+}
+
+interface CardDraftState {
+  state: 'idle' | 'loading' | 'pending' | 'editing' | 'applying' | 'applied' | 'rejected' | 'error';
+  draft: CardDraft | null;
+  edit: CardDraft;
+  error: string;
 }
 
 // Deterministic mock projection: a public-safe update distilled from the
@@ -74,28 +89,77 @@ const initialMessages: ChatMessage[] = [
 ];
 
 export default function MyVibePage() {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const initialRuntime = loadRuntimeConfig();
+  const isLocal = !initialRuntime || initialRuntime.mode === 'local';
+  const isDemo = isLocal && localStorage.getItem('vibecard_demo_mode') === '1';
+  const [messages, setMessages] = useState<ChatMessage[]>(isDemo ? initialMessages : [{
+    id: 'remote-welcome',
+    role: 'vibe',
+    text: '我是你的 AI 分身，不是本人。和我聊聊吧；只有你确认的内容才会成为长期记忆。',
+  }]);
   const [input, setInput] = useState('');
   const [replyIndex, setReplyIndex] = useState(0);
   const [proposal, setProposal] = useState<Proposal>({
     content: '你最近更想认识真正做过 AI 社交产品的人。',
-    state: 'pending',
+    state: isDemo ? 'pending' : 'idle',
     draft: '你最近更想认识真正做过 AI 社交产品的人。',
   });
   const [remembered, setRemembered] = useState<Memory[]>(() =>
-    memoriesForOwner(vibeFixtures.fixtureOwnerMemories),
+    isLocal && loadLocalMemories().length > 0
+      ? memoriesForOwner(loadLocalMemories())
+      : isDemo ? memoriesForOwner(vibeFixtures.fixtureOwnerMemories) : [],
   );
   const { addNow } = useNowItems();
+  const { profile: currentProfile, updateProfile } = useProfile();
   const [nowProposal, setNowProposal] = useState<NowProposal>({
     text: NOW_PROPOSAL_TEXT,
     state: 'idle',
     draft: NOW_PROPOSAL_TEXT,
     error: null,
   });
+  const [cardDraft, setCardDraft] = useState<CardDraftState>({ state: 'idle', draft: null, edit: {}, error: '' });
 
-  const send = () => {
+  useEffect(() => {
+    const runtime = loadRuntimeConfig();
+    if (!runtime || runtime.mode === 'local') return;
+    ownerApi<Memory[]>(runtime, '/memories?status=confirmed')
+      .then(setRemembered)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const runtime = loadRuntimeConfig();
+    if (!runtime || runtime.mode === 'local') saveLocalMemories(remembered);
+  }, [remembered]);
+
+  const send = async () => {
     const text = input.trim();
     if (!text) return;
+    const runtime = loadRuntimeConfig();
+    if (runtime && runtime.mode !== 'local') {
+      setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'owner', text }]);
+      setInput('');
+      try {
+        const result = await ownerApi<{
+          reply: string;
+          memoryProposalId?: string;
+          nowDraftId?: string;
+        }>(runtime, '/vibe/messages', { method: 'POST', body: JSON.stringify({ message: text }) });
+        setMessages(prev => [...prev, { id: `v-${Date.now()}`, role: 'vibe', text: result.reply }]);
+        if (result.memoryProposalId) {
+          const proposed = await ownerApi<Memory[]>(runtime, '/memories?status=proposed');
+          const memory = proposed.find(item => item.id === result.memoryProposalId);
+          if (memory) setProposal({ id: memory.id, content: memory.content, draft: memory.content, state: 'pending' });
+        }
+      } catch (error) {
+        setMessages(prev => [...prev, {
+          id: `v-error-${Date.now()}`,
+          role: 'vibe',
+          text: error instanceof Error ? `暂时没连上：${error.message}` : '暂时没连上，稍后再试。',
+        }]);
+      }
+      return;
+    }
     const reply = cannedReplies[replyIndex % cannedReplies.length];
     setReplyIndex(i => i + 1);
     setMessages(prev => [
@@ -104,6 +168,9 @@ export default function MyVibePage() {
       { id: `v-${Date.now()}`, role: 'vibe', text: reply },
     ]);
     setInput('');
+    if (proposal.state === 'idle') {
+      setProposal({ content: text, draft: text, state: 'pending' });
+    }
     // A meaningful owner message may trigger ONE Now proposal. Loading state
     // first (the Vibe "thinks"), then the proposal card — never auto-publish.
     setNowProposal(p => {
@@ -143,14 +210,29 @@ export default function MyVibePage() {
     ]);
   };
 
-  const confirmProposal = (content: string) => {
+  const confirmProposal = async (content: string) => {
+    const runtime = loadRuntimeConfig();
+    if (runtime && runtime.mode !== 'local' && proposal.id) {
+      try {
+        const memory = await ownerApi<Memory>(runtime, `/memories/${proposal.id}/confirm`, {
+          method: 'POST',
+          body: JSON.stringify({ content }),
+        });
+        setRemembered(prev => [...prev.filter(item => item.id !== memory.id), memory]);
+        setProposal(current => ({ ...current, state: 'confirmed' }));
+        setMessages(prev => [...prev, { id: `v-remember-${Date.now()}`, role: 'vibe', text: `我记住了：${content}`, moment: 'remember' }]);
+      } catch (error) {
+        setMessages(prev => [...prev, { id: `v-error-${Date.now()}`, role: 'vibe', text: error instanceof Error ? error.message : '没存上，再试一次。' }]);
+      }
+      return;
+    }
     const memory: Memory = {
       id: `fixture-memory-confirmed-${Date.now()}`,
       schemaVersion: 1,
       ownerId: vibeFixtures.fixtureOwner.id,
       kind: 'preference',
       content,
-      visibility: 'public',
+      visibility: 'agent_only',
       status: 'confirmed',
       sourceConversationId: 'fixture-conversation-owner-mock',
       sourceMessageIds: [],
@@ -165,12 +247,73 @@ export default function MyVibePage() {
     ]);
   };
 
-  const rejectProposal = () => {
+  const rejectProposal = async () => {
+    const runtime = loadRuntimeConfig();
+    if (runtime && runtime.mode !== 'local' && proposal.id) {
+      await ownerApi(runtime, `/memories/${proposal.id}/reject`, { method: 'POST', body: '{}' }).catch(() => {});
+    }
     setProposal(p => ({ ...p, state: 'rejected' }));
     setMessages(prev => [
       ...prev,
       { id: `v-forget-${Date.now()}`, role: 'vibe', text: '好的，这条我不会记住。' },
     ]);
+  };
+
+  const generateCardDraft = async () => {
+    if (cardDraft.state === 'loading' || cardDraft.state === 'applying') return;
+    setCardDraft(current => ({ ...current, state: 'loading', error: '' }));
+    const runtime = loadRuntimeConfig();
+    try {
+      let draft: CardDraft;
+      if (isDemo) {
+        draft = {
+          headline: vibeFixtures.fixtureOwnerCard.headline,
+          currentFocus: vibeFixtures.fixtureOwnerCard.currentFocus,
+          canHelpWith: vibeFixtures.fixtureOwnerCard.canHelpWith,
+          wantsToMeet: ['正在做个人 AI、也认真对待隐私边界的产品创造者'],
+          topics: vibeFixtures.fixtureOwnerCard.topics,
+          highlights: vibeFixtures.fixtureOwnerCard.highlights,
+        };
+      } else if (runtime && runtime.mode !== 'local') {
+        const result = await ownerApi<{ draft: CardDraft }>(runtime, '/card/draft', { method: 'POST', body: '{}' });
+        draft = result.draft;
+      } else {
+        const latest = remembered.filter(memory => memory.status === 'confirmed' && memory.visibility === 'public' && memory.kind !== 'boundary').at(-1);
+        if (!latest) throw new Error('还没有可用于公开 Card 的已确认记忆，请先确认一条公开记忆。');
+        draft = latest.kind === 'current'
+          ? { currentFocus: latest.content }
+          : { wantsToMeet: [latest.content] };
+      }
+      setCardDraft({ state: 'pending', draft, edit: draft, error: '' });
+    } catch (error) {
+      setCardDraft(current => ({ ...current, state: 'error', error: error instanceof Error ? error.message : '暂时没能生成 Card 草稿。' }));
+    }
+  };
+
+  const applyCardDraft = async () => {
+    if (!cardDraft.draft || cardDraft.state === 'applying') return;
+    const chosen = cardDraft.state === 'editing' ? cardDraft.edit : cardDraft.draft;
+    setCardDraft(current => ({ ...current, state: 'applying', error: '' }));
+    const runtime = loadRuntimeConfig();
+    try {
+      if (runtime && runtime.mode !== 'local') {
+        await ownerApi(runtime, '/card', { method: 'PUT', body: JSON.stringify(chosen) });
+      }
+      const base = isDemo ? vibeFixtures.fixtureOwnerCard : null;
+      updateProfile({
+        ...(base ? { name: base.name, avatar: base.avatarUrl } : {}),
+        ...(chosen.headline !== undefined ? { handle: chosen.headline } : {}),
+        ...(chosen.currentFocus !== undefined ? { bio: chosen.currentFocus } : {}),
+        ...(chosen.canHelpWith !== undefined ? { canHelpWith: chosen.canHelpWith } : {}),
+        ...(chosen.wantsToMeet !== undefined ? { lookingFor: chosen.wantsToMeet[0] ?? '' } : {}),
+        ...(chosen.topics !== undefined ? { tags: chosen.topics.map(label => ({ label, icon: '' })) } : {}),
+        ...(chosen.highlights !== undefined ? { highlights: chosen.highlights.map((item, index) => ({ id: Date.now() + index, title: item.title, type: 'experience', icon: '✨', link: item.url ?? '' })) } : {}),
+      });
+      setCardDraft(current => ({ ...current, state: 'applied', draft: chosen, edit: chosen }));
+      setMessages(previous => [...previous, { id: `v-card-${Date.now()}`, role: 'vibe', text: 'Card 已按你确认的版本更新。没有采用的字段保持原样。' }]);
+    } catch (error) {
+      setCardDraft(current => ({ ...current, state: 'pending', error: error instanceof Error ? error.message : '发布失败，原 Card 没有改变。' }));
+    }
   };
 
   return (
@@ -183,6 +326,27 @@ export default function MyVibePage() {
 
       <main className="flex-1 overflow-y-auto px-5 sm:px-6 pt-4 pb-2 no-scrollbar">
         <div className="max-w-md mx-auto w-full space-y-4">
+          <section className="rounded-[20px] bg-white/70 border border-amber-900/5 p-4" data-testid="card-draft-control">
+            <div className="flex items-start justify-between gap-3">
+              <div><div className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">更新我的 Card</div><p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">只从已确认记忆生成建议；预览和采用是两个独立步骤。</p></div>
+              {(cardDraft.state === 'idle' || cardDraft.state === 'rejected' || cardDraft.state === 'applied') && <button onClick={() => void generateCardDraft()} data-testid="generate-card-draft" className="tap-target shrink-0 rounded-xl bg-foreground px-3 py-2 text-[12px] font-bold text-background">生成草稿</button>}
+            </div>
+            {cardDraft.state === 'loading' && <div className="mt-3 flex items-center gap-2 text-[12px] font-semibold text-muted-foreground" role="status" data-testid="card-draft-loading"><LoaderCircle className="w-4 h-4 animate-spin" />正在根据已确认记忆整理…</div>}
+            {cardDraft.state === 'error' && <div className="mt-3 rounded-xl bg-red-50 p-3 text-[12px] text-red-800" role="alert"><p>{cardDraft.error}</p><button onClick={() => void generateCardDraft()} className="mt-2 inline-flex items-center gap-1 font-bold underline"><RotateCcw className="w-3 h-3" />重试</button></div>}
+            {(cardDraft.state === 'pending' || cardDraft.state === 'editing' || cardDraft.state === 'applying') && cardDraft.draft && <div className="mt-4 rounded-[16px] border border-amber-700/15 bg-amber-50/70 p-4" data-testid="card-draft-preview">
+              <div className="mb-3 text-[11px] font-bold uppercase tracking-widest text-amber-800/70">发布前预览</div>
+              <CardDraftFields draft={cardDraft.state === 'editing' ? cardDraft.edit : cardDraft.draft} currentProfile={currentProfile} editing={cardDraft.state === 'editing'} onChange={edit => setCardDraft(current => ({ ...current, edit }))} />
+              {cardDraft.error && <p role="alert" className="mt-2 text-[12px] text-red-700">{cardDraft.error}</p>}
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => void applyCardDraft()} disabled={cardDraft.state === 'applying'} data-testid="card-draft-accept" className="tap-target flex-1 rounded-xl bg-foreground py-2 text-[13px] font-bold text-background disabled:opacity-50">{cardDraft.state === 'applying' ? '正在更新…' : cardDraft.state === 'editing' ? '确认并采用' : '采用'}</button>
+                <button onClick={() => setCardDraft(current => ({ ...current, state: current.state === 'editing' ? 'pending' : 'editing', edit: current.draft ?? {} }))} disabled={cardDraft.state === 'applying'} data-testid="card-draft-edit" className="tap-target rounded-xl border border-amber-700/15 bg-white px-3 py-2 text-[13px] font-bold"><Pencil className="inline w-3 h-3 mr-1" />{cardDraft.state === 'editing' ? '取消编辑' : '改一下'}</button>
+                <button onClick={() => setCardDraft(current => ({ ...current, state: 'rejected', draft: null, edit: {}, error: '' }))} disabled={cardDraft.state === 'applying'} data-testid="card-draft-reject" className="tap-target rounded-xl border border-amber-700/15 bg-white px-3 py-2 text-[13px] font-bold text-muted-foreground"><X className="inline w-3 h-3 mr-1" />放弃</button>
+              </div>
+            </div>}
+            {cardDraft.state === 'applied' && <p className="mt-3 flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700" data-testid="card-draft-applied"><Check className="w-4 h-4" />已采用并更新公开 Card</p>}
+            {cardDraft.state === 'rejected' && <p className="mt-3 text-[12px] font-semibold text-muted-foreground" data-testid="card-draft-rejected">草稿已放弃，公开 Card 没有改变。</p>}
+          </section>
+
           {/* Remembered memories (task 3.4: the empty state is designed too) */}
           {remembered.length > 0 ? (
             <div className="rounded-[20px] bg-white/70 border border-amber-900/5 p-4">
@@ -428,4 +592,24 @@ export default function MyVibePage() {
       </div>
     </div>
   );
+}
+
+function CardDraftFields({ draft, currentProfile, editing, onChange }: { draft: CardDraft; currentProfile: Profile; editing: boolean; onChange: (draft: CardDraft) => void }) {
+  const allEntries: { key: keyof CardDraft; label: string; value: string; oldValue: string }[] = [
+    { key: 'headline', label: '一句话介绍', value: draft.headline ?? '', oldValue: currentProfile.handle },
+    { key: 'currentFocus', label: '此刻的我', value: draft.currentFocus ?? '', oldValue: currentProfile.bio },
+    { key: 'canHelpWith', label: '我能帮什么', value: draft.canHelpWith?.join('\n') ?? '', oldValue: currentProfile.canHelpWith?.join('\n') ?? '' },
+    { key: 'wantsToMeet', label: '想遇见谁', value: draft.wantsToMeet?.join('\n') ?? '', oldValue: currentProfile.lookingFor ?? '' },
+    { key: 'topics', label: '话题', value: draft.topics?.join('、') ?? '', oldValue: currentProfile.tags.map(item => item.label).join('、') },
+  ];
+  const entries = allEntries.filter(item => editing || item.value);
+  const highlightValue = draft.highlights?.map(item => item.title).join('\n') ?? '';
+  const oldHighlights = currentProfile.highlights.map(item => item.title).join('\n');
+  return <div className="space-y-3">{entries.map(item => <label key={item.key} className="block"><span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{item.label}</span>{!editing && item.oldValue && item.oldValue !== item.value && <span className="mt-1 block text-[11px] text-muted-foreground line-through" data-testid={`card-draft-old-${item.key}`}>原：{item.oldValue}</span>}{editing ? <textarea value={item.value} data-testid={`card-draft-field-${item.key}`} onChange={event => {
+    const value = event.target.value;
+    const next: CardDraft = { ...draft };
+    if (item.key === 'headline' || item.key === 'currentFocus') next[item.key] = value;
+    else next[item.key] = value.split(item.key === 'topics' ? /[、，,\n]/ : /\n/).map(part => part.trim()).filter(Boolean);
+    onChange(next);
+  }} rows={item.value.includes('\n') ? 3 : 2} className="mt-1 w-full resize-none rounded-xl border border-amber-700/15 bg-white px-3 py-2 text-[13px] font-semibold outline-none focus:border-amber-700/40" /> : <p className="mt-1 text-[13px] font-semibold leading-relaxed text-foreground">{item.value}</p>}</label>)}{(editing || highlightValue) && <label className="block"><span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">代表作品 / 经历</span>{!editing && oldHighlights && oldHighlights !== highlightValue && <span className="mt-1 block text-[11px] text-muted-foreground line-through">原：{oldHighlights}</span>}{editing ? <textarea value={highlightValue} data-testid="card-draft-field-highlights" onChange={event => onChange({ ...draft, highlights: event.target.value.split(/\n/).map(title => title.trim()).filter(Boolean).slice(0, 3).map((title, index) => ({ id: `draft-highlight-${index + 1}`, title })) })} rows={3} className="mt-1 w-full resize-none rounded-xl border border-amber-700/15 bg-white px-3 py-2 text-[13px] font-semibold outline-none focus:border-amber-700/40" /> : <p className="mt-1 text-[13px] font-semibold leading-relaxed text-foreground">{highlightValue}</p>}</label>}</div>;
 }

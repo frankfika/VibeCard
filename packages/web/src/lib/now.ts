@@ -100,7 +100,7 @@ export function loadNowItems(): NowItem[] {
       if (Array.isArray(parsed)) return parsed as NowItem[];
     }
   } catch {}
-  return seedNowItems;
+  return localStorage.getItem('vibecard_demo_mode') === '1' ? seedNowItems : [];
 }
 
 export function saveNowItems(items: NowItem[]): void {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Send, X } from 'lucide-react';
 import { vibeFixtures } from '@shared';
@@ -40,12 +40,35 @@ type Stage = 'chat' | 'preview' | 'done';
 const NO_RECENT_UPDATE = '他最近还没有公开动态，我不想替他猜。';
 
 const RECENT_QUESTION = /最近|近况|在做|动态/;
+const MAX_VISITOR_ROUNDS = 6;
+
+function loadVisitorIdentity(isDemo: boolean, visitorId: string) {
+  if (isDemo) return vibeFixtures.fixtureVisitor.name;
+  const saved = localStorage.getItem('vibecard_public_visitor_name')?.trim();
+  return saved || `匿名访客 · ${visitorId.slice(-4).toUpperCase()}`;
+}
+
+function safeRequestError(code: unknown) {
+  switch (code) {
+    case 'weak_reason': return '请再具体一点：为什么现在想认识他，最想聊什么？';
+    case 'rate_limited': return '请求发送得有点频繁，请稍后再试。';
+    case 'declined_cooldown': return '最近已经提交过请求，请过一段时间再试。';
+    case 'blocked': return '这张名片目前不能接收你的请求。';
+    case 'moderation_blocked': return '这段内容暂时不能提交，请修改后再试。';
+    case 'moderation_unavailable': return '内容检查暂时不可用，你的文字还在，可以稍后重试。';
+    default: return '请求暂时没有送达。你的文字还在，可以稍后重试。';
+  }
+}
 
 export default function VisitorVibeChat({
   ownerName,
   onClose,
   nowItems = [],
-  currentFocus = vibeFixtures.fixtureOwnerCard.currentFocus,
+  currentFocus = '',
+  lookingFor = [],
+  publicEndpoint = '',
+  agentEnabled = true,
+  demoMode = false,
 }: {
   ownerName: string;
   onClose: () => void;
@@ -53,7 +76,21 @@ export default function VisitorVibeChat({
   nowItems?: NowItem[];
   /** Public current-focus memory text; empty string means none. */
   currentFocus?: string;
+  lookingFor?: string[];
+  publicEndpoint?: string;
+  agentEnabled?: boolean;
+  /** True only for the explicit local fixture snapshot, never inherited by a real shared link. */
+  demoMode?: boolean;
 }) {
+  const isDemo = demoMode;
+  const visitorId = (() => {
+    const key = 'vibecard_public_visitor_id';
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const created = `visitor-web-${crypto.randomUUID()}`;
+    localStorage.setItem(key, created);
+    return created;
+  })();
   const recentAnswer = (): string => {
     if (nowItems.length > 0) {
       return `他最近的公开动态：${nowItems.map(item => item.text).join('；')}`;
@@ -78,11 +115,15 @@ export default function VisitorVibeChat({
     },
     {
       q: '他可以帮别人什么？',
-      a: () => `他提到过自己能帮到这些：${vibeFixtures.fixtureOwnerCard.canHelpWith.join('、')}。`,
+      a: () => isDemo
+        ? `他提到过自己能帮到这些：${vibeFixtures.fixtureOwnerCard.canHelpWith.join('、')}。`
+        : '这部分他还没有公开，我不想替他猜。',
     },
     {
       q: '他现在想认识什么样的人？',
-      a: () => `他最近想认识：${vibeFixtures.fixtureOwnerCard.wantsToMeet.join('、')}。`,
+      a: () => lookingFor.length > 0
+        ? `他最近想认识：${lookingFor.join('、')}。`
+        : '这部分他还没有公开，我不想替他猜。',
     },
   ];
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -93,10 +134,24 @@ export default function VisitorVibeChat({
     },
   ]);
   const [input, setInput] = useState('');
-  const [askedReason, setAskedReason] = useState(false);
+  const [askedReason, setAskedReason] = useState(!agentEnabled);
   const [stage, setStage] = useState<Stage>('chat');
-  const [visitorName, setVisitorName] = useState(vibeFixtures.fixtureVisitor.name);
+  const [visitorName, setVisitorName] = useState(() => loadVisitorIdentity(isDemo, visitorId));
   const [reason, setReason] = useState('');
+  const [conversationId, setConversationId] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [chatError, setChatError] = useState('');
+  const [retryText, setRetryText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [roundCount, setRoundCount] = useState(0);
+  const [latestSharedContext, setLatestSharedContext] = useState<string[]>([]);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
 
   const pushVisitor = (text: string) => {
     setMessages(prev => [...prev, { id: `v-${Date.now()}-${Math.random()}`, role: 'visitor', text }]);
@@ -112,17 +167,49 @@ export default function VisitorVibeChat({
   };
 
   const askSuggestion = (q: string, a: (n: string) => string) => {
+    if (isSending || roundCount >= MAX_VISITOR_ROUNDS) return;
     pushVisitor(q);
     pushVibe(a(ownerName));
+    setRoundCount(value => value + 1);
     inviteReason();
   };
 
-  const send = () => {
-    const text = input.trim();
-    if (!text) return;
+  const send = async (retrying = false) => {
+    const text = (retrying ? retryText : input).trim();
+    if (!text || isSending) return;
+    if (roundCount >= MAX_VISITOR_ROUNDS && !askedReason) {
+      setAskedReason(true);
+      pushVibe('我们先聊到这里。你可以留下一个具体的认识理由，我会交给他本人决定。');
+      return;
+    }
+    setIsSending(true);
+    setChatError('');
+    setRetryText('');
     setInput('');
-    pushVisitor(text);
-    if (!askedReason) {
+    if (!retrying) {
+      pushVisitor(text);
+      setRoundCount(value => value + 1);
+    }
+    if (!askedReason && publicEndpoint) {
+      try {
+        const response = await fetch(`${publicEndpoint}/chat`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ visitorId, message: text, ...(conversationId ? { conversationId } : {}) }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(typeof data?.error?.code === 'string' ? data.error.code : 'unavailable');
+        setConversationId(data.conversationId || '');
+        const shared = Array.isArray(data.sharedContext) ? data.sharedContext.slice(0, 3) : [];
+        setLatestSharedContext(shared);
+        pushVibe(data.reply || '我暂时回答不了这个问题。', shared.length ? shared : undefined);
+        if (data.nextAction && data.nextAction !== 'continue') setAskedReason(true);
+        if (roundCount + 1 >= MAX_VISITOR_ROUNDS) setAskedReason(true);
+      } catch {
+        setChatError('分身暂时没连上。你的问题没有丢，可以重试，或直接留下认识理由。');
+        setRetryText(text);
+      }
+    } else if (!askedReason) {
       if (RECENT_QUESTION.test(text)) {
         // Task 4.5: recent-context questions are grounded in the active Now
         // snapshot (then public current focus), never invented.
@@ -139,10 +226,43 @@ export default function VisitorVibeChat({
       setReason(text);
       pushVibe(
         '我大概懂了。在交给他之前，先看看我理解的有没有错。',
-        vibeFixtures.fixtureConnectionRequest.possibleSharedContext,
+        isDemo ? vibeFixtures.fixtureConnectionRequest.possibleSharedContext : undefined,
       );
+      if (isDemo) setLatestSharedContext(vibeFixtures.fixtureConnectionRequest.possibleSharedContext);
       setStage('preview');
     }
+    setIsSending(false);
+  };
+
+  const submitRequest = async () => {
+    if (isSubmitting) return;
+    setSubmitError('');
+    const cleanName = visitorName.trim();
+    if (!cleanName) { setSubmitError('请填写一个称呼，也可以使用匿名称呼。'); return; }
+    if (!isDemo && !publicEndpoint) {
+      setSubmitError('这张名片目前离线，联系请求还不能送达。你的文字会保留在这里。');
+      return;
+    }
+    setIsSubmitting(true);
+    if (publicEndpoint && !isDemo) {
+      try {
+        const response = await fetch(`${publicEndpoint}/requests`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ visitorId, reason, visitorSummary: cleanName, possibleSharedContext: latestSharedContext }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(typeof data?.error?.code === 'string' ? data.error.code : 'unavailable');
+        localStorage.setItem(`vibecard_request_${data.id}`, JSON.stringify({ endpoint: publicEndpoint, visitorId }));
+        localStorage.setItem('vibecard_public_visitor_name', cleanName);
+      } catch (error) {
+        setSubmitError(safeRequestError(error instanceof Error ? error.message : 'unavailable'));
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    setIsSubmitting(false);
+    setStage('done');
   };
 
   return (
@@ -152,6 +272,9 @@ export default function VisitorVibeChat({
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[80] bg-[#050505] text-white flex flex-col"
       data-testid="visitor-vibe-chat"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${ownerName}的 AI 分身对话`}
     >
       <header className="px-5 py-4 flex items-center justify-between border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2.5">
@@ -221,6 +344,15 @@ export default function VisitorVibeChat({
             </div>
           )}
 
+          {stage === 'chat' && chatError && (
+            <div className="rounded-xl border border-red-300/20 bg-red-300/10 px-3 py-2.5 text-[12px] text-red-100" role="alert" data-testid="visitor-chat-error">
+              <p>{chatError}</p>
+              <button onClick={() => void send(true)} disabled={isSending} className="mt-2 font-bold underline underline-offset-4 disabled:opacity-50">
+                {isSending ? '正在重试…' : '重试刚才的问题'}
+              </button>
+            </div>
+          )}
+
           <AnimatePresence>
             {stage === 'preview' && (
               <motion.div
@@ -236,8 +368,11 @@ export default function VisitorVibeChat({
                   <input
                     value={visitorName}
                     onChange={e => setVisitorName(e.target.value)}
+                    aria-label="你的称呼"
+                    maxLength={80}
                     className="w-full rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2 text-[14px] font-medium outline-none focus:border-white/30"
                   />
+                  {!isDemo && <p className="mt-1 text-[10px] text-white/40">这是提交给主人的身份，可保留匿名，也可以改成你希望对方看到的称呼。</p>}
                 </div>
                 <div>
                   <div className="text-[11px] text-white/45 mb-1">你想认识他的理由</div>
@@ -246,18 +381,20 @@ export default function VisitorVibeChat({
                 <div>
                   <div className="text-[11px] text-white/45 mb-1">我注意到的可能共同点</div>
                   <ul className="space-y-1">
-                    {vibeFixtures.fixtureConnectionRequest.possibleSharedContext.map(c => (
+                    {latestSharedContext.map(c => (
                       <li key={c} className="text-[12px] text-white/70">· {c}</li>
                     ))}
+                    {latestSharedContext.length === 0 && <li className="text-[12px] text-white/45">暂时没有足够证据，不会强行编造共同点。</li>}
                   </ul>
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button
-                    onClick={() => setStage('done')}
+                    onClick={submitRequest}
+                    disabled={isSubmitting}
                     data-testid="request-submit"
-                    className="tap-target flex-1 py-2.5 rounded-xl bg-white text-black text-[13px] font-bold"
+                    className="tap-target flex-1 py-2.5 rounded-xl bg-white text-black text-[13px] font-bold disabled:opacity-50"
                   >
-                    确认提交
+                    {isSubmitting ? '正在提交…' : '确认提交'}
                   </button>
                   <button
                     onClick={() => { setStage('chat'); pushVibe('好，那你再说一次？我听着。'); }}
@@ -266,6 +403,7 @@ export default function VisitorVibeChat({
                     再改改
                   </button>
                 </div>
+                {submitError && <p role="alert" className="text-xs text-red-300">{submitError}</p>}
               </motion.div>
             )}
 
@@ -291,23 +429,25 @@ export default function VisitorVibeChat({
         <div className="shrink-0 px-5 pb-5 pt-1">
           <div className="max-w-md mx-auto flex gap-2">
             <input
+              autoFocus
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') send(); }}
+              onKeyDown={e => { if (e.key === 'Enter') void send(); }}
               placeholder={askedReason ? '说说你为什么想认识他…' : '问一个和他有关的问题…'}
               data-testid="visitor-input"
               className="flex-1 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-[14px] font-medium outline-none focus:border-white/30 placeholder:text-white/35"
             />
             <button
-              onClick={send}
-              disabled={!input.trim()}
+              onClick={() => void send()}
+              disabled={!input.trim() || isSending}
               data-testid="visitor-send"
               aria-label="发送"
               className="tap-target w-12 rounded-2xl bg-white text-black flex items-center justify-center disabled:opacity-40"
             >
-              <Send className="w-4 h-4" />
+              {isSending ? <span className="text-[10px] font-bold">发送中</span> : <Send className="w-4 h-4" />}
             </button>
           </div>
+          <p className="mt-1.5 text-right text-[10px] text-white/30">最多 6 轮 · 已进行 {Math.min(roundCount, MAX_VISITOR_ROUNDS)} 轮</p>
         </div>
       )}
     </motion.div>

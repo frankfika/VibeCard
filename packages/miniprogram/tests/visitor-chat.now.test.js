@@ -41,7 +41,7 @@ function makeDemoPage() {
   page.setData = function (patch) {
     Object.assign(this.data, patch);
   };
-  page.onLoad({});
+  page.onLoad({ demo: '1' });
   return page;
 }
 

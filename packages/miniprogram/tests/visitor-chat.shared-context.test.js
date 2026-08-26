@@ -66,9 +66,11 @@ function lastMessage(page) {
 
 test('云模式：sharedContext 挂在 agent 消息上，latestSharedContext 更新并进预览', async () => {
   const shared = ['都在做微信生态里的个人 AI 产品', '都在研究私人记忆和公开身份的边界'];
+  const calls = [];
   cloudImpl = async (name, data) => {
+    calls.push({ name, data });
     if (name === 'agent' && data.action === 'visitorMessage') {
-      return { ok: true, result: { reply: '他最近在打磨 VibeCard 的访客对话。', evidenceRefs: [], nextAction: 'continue', sharedContext: shared } };
+      return { ok: true, result: { reply: '他最近在打磨 VibeCard 的访客对话。', evidenceRefs: [], nextAction: 'continue', sharedContext: shared, conversationId: 'server-conv-1', evidenceId: 'evidence-1' } };
     }
     throw new Error('unexpected: ' + name);
   };
@@ -80,6 +82,10 @@ test('云模式：sharedContext 挂在 agent 消息上，latestSharedContext 更
   assert.strictEqual(last.role, 'agent');
   assert.deepStrictEqual(last.sharedContext, shared, '消息带 sharedContext');
   assert.deepStrictEqual(page.data.latestSharedContext, shared, 'latestSharedContext 更新');
+  assert.deepStrictEqual(calls[0].data, {
+    action: 'visitorMessage', ownerId: 'owner-1', message: '他最近在忙什么？',
+  }, '客户端只上传本轮文本，不上传历史或轮数');
+  assert.strictEqual(page.conversationId, 'server-conv-1');
 
   page.setData({ reasonValue: '我也在开发个人 AI 小程序，想交流一次权限设计。' });
   page.buildPreview();

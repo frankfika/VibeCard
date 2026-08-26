@@ -140,16 +140,12 @@ export function buildConnectionSummarySystem(
   request: ConnectionRequest,
   conversationExcerpt?: string | null,
 ): string {
-  const sharedContext = Array.isArray(request.possibleSharedContext)
-    ? request.possibleSharedContext.filter((s) => typeof s === 'string' && s.trim()).join('、')
-    : '';
   const evidenceLines = [
     `- [req:visitor_summary] 访客自述：${request.visitorSummary || '（无）'}`,
     `- [req:reason] 理由：${request.reason || '（无）'}`,
-    `- [req:shared_context] 可能的共同点：${sharedContext || '（无）'}`,
   ];
   if (typeof request.visitorWorkUrl === 'string' && request.visitorWorkUrl.trim()) {
-    evidenceLines.push(`- [req:work_url] 作品链接：${request.visitorWorkUrl}`);
+    evidenceLines.push(`- [req:work_url] 访客自述作品链接（未验证）：${request.visitorWorkUrl}`);
   }
   if (typeof conversationExcerpt === 'string' && conversationExcerpt.trim()) {
     evidenceLines.push(`- [conv:excerpt] 访客对话摘录：${conversationExcerpt.trim().slice(0, 1500)}`);

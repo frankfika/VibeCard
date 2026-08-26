@@ -15,13 +15,65 @@ services:
       dockerfile: packages/server/Dockerfile
     image: vibecard-server:local
     env_file:
-      - .env
+      - path: .env
+        required: false
+    environment:
+      # Compose refuses to start a production-shaped stack with an ephemeral
+      # owner credential. deploy/.env is loaded automatically for interpolation.
+      VIBECARD_OWNER_TOKEN: ${VIBECARD_OWNER_TOKEN:?Set a long random VIBECARD_OWNER_TOKEN in deploy/.env}
+      REQUIRE_MODERATION: ${REQUIRE_MODERATION:-0}
     ports:
       # Localhost-only by default; put a reverse proxy in front to expose.
       - "127.0.0.1:${PORT:-8787}:8787"
     volumes:
       - vibecard-data:/data
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  vibecard-web:
+    build:
+      context: ..
+      dockerfile: packages/web/Dockerfile
+    image: vibecard-web:local
+    environment:
+      PORT: 8080
+      SERVE_WEB: "1"
+      VIBECARD_API_UPSTREAM: http://vibecard-server:8787
+      CORS_ORIGIN: same-origin
+      DATA_DIR: /data/cards
+      # The anonymous public-Card snapshot endpoint uses the same fail-closed
+      # moderation policy as Core visitor endpoints.
+      REQUIRE_MODERATION: ${REQUIRE_MODERATION:-0}
+      MODERATION_API_URL: ${MODERATION_API_URL:-}
+      MODERATION_API_KEY: ${MODERATION_API_KEY:-}
+      MODERATION_TIMEOUT_MS: ${MODERATION_TIMEOUT_MS:-5000}
+      ENABLE_PUBLIC_SNAPSHOTS: ${ENABLE_PUBLIC_SNAPSHOTS:-0}
+      PUBLIC_SNAPSHOT_TTL_MS: ${PUBLIC_SNAPSHOT_TTL_MS:-604800000}
+    ports:
+      # Public entrypoint. Keep loopback-only until a TLS reverse proxy is set.
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    volumes:
+      - vibecard-web-data:/data/cards
+    depends_on:
+      vibecard-server:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
 volumes:
   vibecard-data:
+  vibecard-web-data:

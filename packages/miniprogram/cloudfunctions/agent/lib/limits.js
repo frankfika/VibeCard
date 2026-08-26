@@ -24,6 +24,11 @@ function activityDocId(visitorId, ownerId, dateStr) {
   return `${visitorId}:${ownerId}:${dateStr}`;
 }
 
+/** Deterministic aggregate doc id for one visitor's distinct-owner budget. */
+function activityDailyDocId(visitorId, dateStr) {
+  return `__daily__:${visitorId}:${dateStr}`;
+}
+
 /** The owner's users document carries a blockedUsers array of openids. */
 function isBlocked(ownerUser, visitorId) {
   return Array.isArray(ownerUser && ownerUser.blockedUsers) && ownerUser.blockedUsers.includes(visitorId);
@@ -51,6 +56,7 @@ module.exports = {
   VISITOR_NEW_CONVERSATIONS_PER_DAY,
   todayStr,
   activityDocId,
+  activityDailyDocId,
   isBlocked,
   checkVisitorActivity,
 };

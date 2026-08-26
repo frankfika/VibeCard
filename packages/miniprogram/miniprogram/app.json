@@ -62,8 +62,5 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "__usePrivacyCheck__": true,
-  "requiredPrivateInfos": [
-    "chooseAvatar"
-  ]
+  "__usePrivacyCheck__": true
 }

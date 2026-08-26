@@ -87,6 +87,10 @@ The existing legacy implementations may remain in the repository until the focus
 ```text
 packages/web/                    React web and public Card
 packages/miniprogram/            WeChat Mini Program and cloud functions
+packages/server/                 Open self-hosted Server and portable HTTP API
+packages/cloud/                  Optional managed gateway composed from Server/Core
+packages/sdk/                    Provider/database-neutral TypeScript SDK
+packages/desktop/                Optional macOS SwiftUI companion
 packages/shared/                 Cross-client domain contracts
 packages/contracts/              Legacy/optional Web3 contracts
 packages/platforms/              Future platform adapters
@@ -219,7 +223,7 @@ npx playwright install chromium    # once per new machine or Playwright upgrade
 npm run test:e2e --workspace=packages/web
 ```
 
-Current verified baseline on 2026-07-20: the full Playwright suite passes 54/54
+Current verified baseline on 2026-08-08: the focused Playwright suite passes 70/70
 across desktop and mobile projects.
 
 For contract work only:

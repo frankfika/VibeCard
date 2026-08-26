@@ -4,70 +4,100 @@
   <!-- Onboarding -->
   <view wx:if="{{showOnboarding}}" class="onboarding">
     <view class="onboarding-content">
-      <!-- Step Indicator -->
-      <view class="step-indicator">
-        <view wx:for="{{[0,1,2]}}" wx:key="*this" class="step-dot {{onboardingStep === item ? 'step-dot-active' : ''}} {{onboardingStep > item ? 'step-dot-completed' : ''}}"></view>
-      </view>
-      <view class="step-line">
-        <view class="step-line-progress" style="width: {{(onboardingStep / 2) * 100}}%"></view>
-      </view>
+      <view class="first-run-brand">VIBECARD · 私人 Vibe</view>
 
-      <view class="onboarding-step-wrap">
-        <view class="onboarding-step-title">{{onboardingSteps[onboardingStep].title}}</view>
-        <view class="onboarding-step-subtitle">{{onboardingSteps[onboardingStep].subtitle}}</view>
-        <view class="onboarding-step-hint">{{onboardingSteps[onboardingStep].hint}}</view>
-      </view>
-
-      <view wx:if="{{onboardingStep === 0}}" class="onboarding-step-body">
-        <view class="input-group">
-          <view class="input-label">你的名字 <text class="input-required">*</text></view>
-          <input class="input input-focusable" placeholder="例如：Alex Chen" placeholder-style="color: #a3a3a3;" value="{{onboardingName}}" bindinput="onOnboardingNameInput" />
+      <view wx:if="{{firstRunStage === 'intro'}}" class="first-run-scene">
+        <view class="first-run-vibe-bubble">
+          我是你的私人 Vibe。我们聊五个小问题，我会先把值得记住的事交给你确认，再一起发布第一张 Card。
         </view>
-        <view class="input-group">
-          <view class="input-label">vibecard ID</view>
-          <input class="input input-focusable" placeholder="你的专属标识" placeholder-style="color: #a3a3a3;" value="{{onboardingHandle}}" bindinput="onOnboardingHandleInput" />
-          <view class="input-tip">ID 会显示在你的名片链接中</view>
-        </view>
+        <view class="first-run-privacy">对话默认不公开；没有你的确认，记忆不会生效，Card 也不会发布。</view>
+        <input class="first-run-input" placeholder="我该怎么称呼你？" placeholder-style="color: #9b9ba4;" value="{{firstRunName}}" bindinput="onFirstRunNameInput" maxlength="40" />
+        <button class="btn-primary first-run-primary" bindtap="onStartFirstRun">开始聊聊</button>
       </view>
 
-      <view wx:if="{{onboardingStep === 1}}" class="onboarding-step-body">
-        <view class="input-group">
-          <view class="input-label">选择标签 <text class="input-count">{{onboardingTags.length}}/5</text></view>
-          <view class="tag-grid">
-            <view wx:for="{{tagOptions}}" wx:key="*this" class="tag-item {{onboardingTags.includes(item) ? 'tag-active' : ''}}" bindtap="onOnboardingTagSelect" data-tag="{{item}}">{{item}}</view>
+      <view wx:if="{{firstRunStage === 'questions'}}" class="first-run-scene">
+        <view class="first-run-progress">问题 {{firstRunQuestionNumber}} / 5</view>
+        <view class="first-run-history">
+          <view wx:for="{{firstRunHistory}}" wx:key="id" class="first-run-exchange">
+            <view class="first-run-history-q">{{item.prompt}}</view>
+            <view class="first-run-history-a {{item.skipped ? 'first-run-muted' : ''}}">{{item.answer}}</view>
           </view>
         </view>
-        <view class="custom-tag-row">
-          <input class="custom-tag-input" placeholder="自定义标签..." placeholder-style="color: #a3a3a3;" value="{{onboardingCustomTag}}" bindinput="onOnboardingCustomTagInput" />
-          <view class="custom-tag-btn {{onboardingCustomTag ? 'custom-tag-btn-active' : ''}}" bindtap="addOnboardingCustomTag">添加</view>
+        <view class="first-run-vibe-bubble">{{firstRunQuestion.prompt}}</view>
+        <textarea class="first-run-textarea" placeholder="{{firstRunQuestion.placeholder}}" placeholder-style="color: #9b9ba4;" value="{{firstRunAnswer}}" bindinput="onFirstRunAnswerInput" auto-height maxlength="240" />
+        <button class="btn-primary first-run-primary" bindtap="onAnswerFirstRunQuestion">告诉 Vibe</button>
+        <view class="first-run-row">
+          <view wx:if="{{firstRunQuestionNumber > 1}}" class="first-run-link" bindtap="onBackFirstRunQuestion">← 返回纠正</view>
+          <view class="first-run-link first-run-link-right" bindtap="onSkipFirstRunQuestion">先跳过</view>
+        </view>
+        <view wx:if="{{firstRunQuestion.id === 'boundary'}}" class="first-run-private-note">这条即使被记住，也会强制保持「仅自己可见」。</view>
+      </view>
+
+      <view wx:if="{{firstRunStage === 'memory-review'}}" class="first-run-scene">
+        <view class="first-run-progress">由你决定要不要记住</view>
+        <view class="first-run-vibe-bubble">这件事以后可能有用。我先提议，不会自动记住。</view>
+        <view class="first-run-memory-card">
+          <view class="first-run-memory-head">
+            <text>可能值得记住</text>
+            <text class="first-run-memory-visibility">{{firstRunProposal.visibilityLabel}}</text>
+          </view>
+          <view wx:if="{{!firstRunProposalEditing}}" class="first-run-memory-content">{{firstRunProposal.content}}</view>
+          <textarea wx:else class="first-run-textarea" value="{{firstRunProposalText}}" bindinput="onFirstRunProposalInput" auto-height maxlength="240" />
+        </view>
+        <view wx:if="{{firstRunBusy}}" class="first-run-status">正在安全保存…</view>
+        <view wx:if="{{firstRunError}}" class="first-run-error">
+          <view>{{firstRunError}}</view>
+          <view class="first-run-retry" bindtap="onConfirmFirstRunMemory">{{firstRunPermissionDenied ? '登录后重试' : '重新保存'}}</view>
+        </view>
+        <view wx:if="{{!firstRunBusy}}" class="first-run-actions">
+          <button class="btn-primary first-run-action-main" bindtap="onConfirmFirstRunMemory">{{firstRunProposalEditing ? '确认记住修改' : '记住'}}</button>
+          <view wx:if="{{!firstRunProposalEditing}}" class="first-run-action" bindtap="onEditFirstRunProposal">改一下</view>
+          <view wx:else class="first-run-action" bindtap="onCancelFirstRunProposalEdit">取消修改</view>
+          <view class="first-run-action first-run-action-quiet" bindtap="onDismissFirstRunMemory">别记这个</view>
         </view>
       </view>
 
-      <view wx:if="{{onboardingStep === 2}}" class="onboarding-step-body">
-        <view class="input-group">
-          <view class="input-label">个人简介</view>
-          <textarea class="textarea textarea-focusable" placeholder="一句话介绍自己..." placeholder-style="color: #a3a3a3;" value="{{onboardingBio}}" bindinput="onOnboardingBioInput" />
-        </view>
-        <view class="input-group">
-          <view class="input-label">Looking for</view>
-          <view class="option-list">
-            <view wx:for="{{lookingForOptions}}" wx:key="*this" class="option-item {{onboardingLookingFor === item ? 'option-active' : ''}}" bindtap="onOnboardingLookingSelect" data-item="{{item}}">{{item}}</view>
-          </view>
-        </view>
-        <view class="input-group">
-          <view class="input-label">当前活动</view>
-          <view class="option-list">
-            <view wx:for="{{eventOptions}}" wx:key="*this" class="option-item {{onboardingEvent === item ? 'option-active' : ''}}" bindtap="onOnboardingEventSelect" data-item="{{item}}">{{item}}</view>
-          </view>
-        </view>
+      <view wx:if="{{firstRunStage === 'draft-loading'}}" class="first-run-scene first-run-center">
+        <view class="first-run-orb">✦</view>
+        <view class="first-run-loading-title">Vibe 正在起草你的 Card…</view>
+        <view class="first-run-privacy">只使用你刚才明确确认过的记忆；跳过或拒绝的内容不会进入草稿。</view>
       </view>
 
-      <view class="onboarding-actions">
-        <button class="btn-primary" bindtap="nextOnboardingStep">{{onboardingStep >= 2 ? '完成' : '下一步'}}</button>
-        <view class="onboarding-secondary">
-          <view wx:if="{{onboardingStep > 0}}" class="btn-text" bindtap="prevOnboardingStep">← 上一步</view>
-          <view class="btn-text btn-skip" bindtap="skipOnboarding">跳过，稍后完善</view>
+      <view wx:if="{{firstRunStage === 'draft-error'}}" class="first-run-scene">
+        <view class="first-run-vibe-bubble">{{firstRunError}}</view>
+        <button class="btn-primary first-run-primary" bindtap="onRetryFirstRunDraft">{{firstRunPermissionDenied ? '登录后重试' : '重新起草'}}</button>
+        <view class="first-run-link first-run-link-right" bindtap="onUseConfirmedAnswersDraft">先用已确认的原话起草</view>
+      </view>
+
+      <view wx:if="{{firstRunStage === 'draft'}}" class="first-run-scene">
+        <view class="first-run-progress">发布前的最后确认</view>
+        <view class="first-run-vibe-bubble">我试着把此刻的你写成了一张 Card。空白项会保持空白，不会替你猜。</view>
+        <view class="first-run-draft">
+          <view class="first-run-draft-field">
+            <view class="first-run-draft-label">名字</view>
+            <input class="first-run-draft-input" value="{{firstRunDraft.name}}" bindinput="onFirstRunDraftInput" data-key="name" maxlength="40" />
+          </view>
+          <view wx:if="{{firstRunDraft.bio !== undefined}}" class="first-run-draft-field">
+            <view class="first-run-draft-label">此刻的我</view>
+            <textarea class="first-run-draft-input" value="{{firstRunDraft.bio}}" bindinput="onFirstRunDraftInput" data-key="bio" auto-height maxlength="240" />
+          </view>
+          <view wx:if="{{firstRunDraft.highlights && firstRunDraft.highlights.length}}" class="first-run-draft-field">
+            <view class="first-run-draft-label">代表作品 / 经历</view>
+            <textarea class="first-run-draft-input" value="{{firstRunDraft.highlights[0].title}}" bindinput="onFirstRunDraftInput" data-key="work" auto-height maxlength="240" />
+          </view>
+          <view wx:if="{{firstRunDraft.canHelpWith && firstRunDraft.canHelpWith.length}}" class="first-run-draft-field">
+            <view class="first-run-draft-label">我能帮什么</view>
+            <textarea class="first-run-draft-input" value="{{firstRunDraft.canHelpWith[0]}}" bindinput="onFirstRunDraftInput" data-key="help" auto-height maxlength="240" />
+          </view>
+          <view wx:if="{{firstRunDraft.lookingFor !== undefined}}" class="first-run-draft-field">
+            <view class="first-run-draft-label">我想遇见谁</view>
+            <textarea class="first-run-draft-input" value="{{firstRunDraft.lookingFor}}" bindinput="onFirstRunDraftInput" data-key="lookingFor" auto-height maxlength="240" />
+          </view>
+          <view wx:if="{{!firstRunDraft.bio && (!firstRunDraft.highlights || !firstRunDraft.highlights.length) && (!firstRunDraft.canHelpWith || !firstRunDraft.canHelpWith.length) && !firstRunDraft.lookingFor}}" class="first-run-empty">你跳过了全部内容，这张 Card 只会发布名字。之后可以用结构化编辑器慢慢补充。</view>
         </view>
+        <view class="first-run-private-note">隐私边界不会出现在公开 Card 中。发布后仍可使用「编辑名片」精细调整。</view>
+        <view wx:if="{{firstRunError}}" class="first-run-error">{{firstRunError}}</view>
+        <button class="btn-primary first-run-primary" bindtap="onPublishFirstRunCard" loading="{{firstRunBusy}}">确认并发布 Card</button>
       </view>
     </view>
   </view>
@@ -106,6 +136,14 @@
           <view class="looking-content">
             <view class="looking-label">LOOKING FOR</view>
             <view class="looking-value">{{profile.lookingFor}}</view>
+          </view>
+        </view>
+
+        <view wx:if="{{profile.canHelpWith && profile.canHelpWith.length}}" class="looking-card can-help-card">
+          <view class="looking-icon">+</view>
+          <view class="looking-content">
+            <view class="looking-label">我能帮什么</view>
+            <view wx:for="{{profile.canHelpWith}}" wx:key="*this" class="looking-value">{{item}}</view>
           </view>
         </view>
 
@@ -239,6 +277,12 @@
           <view class="pill-grid">
             <view wx:for="{{lookingForOptions}}" wx:key="*this" class="pill-card {{editLookingFor === item ? 'pill-card-active' : ''}}" bindtap="onEditLookingSelect" data-item="{{item}}">{{item}}</view>
           </view>
+        </view>
+
+        <view class="edit-section">
+          <view class="section-title-new">我能帮什么</view>
+          <view class="field-tip">一行一项；这是公开 Card 内容</view>
+          <textarea class="textarea textarea-focusable" value="{{editCanHelpWith}}" placeholder="例如：把复杂产品梳理成清晰流程" bindinput="onEditCanHelpInput" maxlength="360" />
         </view>
 
         <!-- Event -->

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "strict": false,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "adapter-contract.ts",
+    "adapter-runtime.ts",
+    "process-adapter-host.ts",
+    "reference-json-export.ts",
+    "reference-note-knowledge.ts",
+    "adapter-conformance.ts",
+    "adapter-contract.test.ts"
+  ]
+}

@@ -15,7 +15,7 @@
  * (SQLite single-writer discipline) or pointed at a copy of the database.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { importArchive } from '../../shared/index';
 import type { NowItem } from '../../shared/index';
@@ -55,7 +55,8 @@ async function backup(args: CliArgs): Promise<void> {
     const archive = await exportPrivateFromRepos(repos, meta, Date.now(), true);
     const json = JSON.stringify(archive, null, 2);
     if (args.out) {
-      writeFileSync(args.out, json);
+      writeFileSync(args.out, json, { mode: 0o600 });
+      chmodSync(args.out, 0o600);
       console.log(`backup written to ${args.out} (owner ${meta.ownerId})`);
     } else {
       process.stdout.write(json);

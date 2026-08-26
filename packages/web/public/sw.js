@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `vibecard-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
@@ -36,7 +36,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
 
   // API 请求：Network First with cache fallback
-  if (url.pathname.startsWith('/api/') || url.host.includes('rpc.') || url.host.includes('alchemy')) {
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(req)
         .then((networkRes) => {
@@ -47,6 +47,23 @@ self.addEventListener('fetch', (event) => {
           return networkRes;
         })
         .catch(() => caches.match(req) || new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } }))
+    );
+    return;
+  }
+
+  // Navigations are network-first so a new deployment cannot keep serving
+  // an old HTML shell that references removed content-hashed bundles.
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((networkRes) => {
+          if (networkRes && networkRes.ok) {
+            const clone = networkRes.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+          }
+          return networkRes;
+        })
+        .catch(() => caches.match('/index.html'))
     );
     return;
   }

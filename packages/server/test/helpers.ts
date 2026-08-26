@@ -56,6 +56,8 @@ export async function startApp(options: {
   moderate?: ModerationHook;
   chatRatePerHour?: number;
   requestRatePerHour?: number;
+  now?: () => number;
+  knowledgeImportBarrier?: (stage: 'after_stage' | 'after_metadata' | 'after_commit') => Promise<void>;
 } = {}): Promise<RunningApp> {
   const dbDir = mkdtempSync(join(tmpdir(), 'vibecard-server-test-'));
   const config: ServerConfig = {
@@ -71,6 +73,10 @@ export async function startApp(options: {
     aiApiKey: null,
     aiApiHeaders: null,
     aiTimeoutMs: 5000,
+    moderationApiUrl: null,
+    moderationApiKey: null,
+    moderationTimeoutMs: 1000,
+    requireModeration: false,
     chatRatePerHour: options.chatRatePerHour ?? 1000,
     requestRatePerHour: options.requestRatePerHour ?? 1000,
     maxBodyBytes: 2 * 1024 * 1024,
@@ -79,6 +85,8 @@ export async function startApp(options: {
     config,
     provider: options.provider ?? createMockModelProvider(),
     ...(options.moderate ? { moderate: options.moderate } : {}),
+    ...(options.now ? { now: options.now } : {}),
+    ...(options.knowledgeImportBarrier ? { knowledgeImportBarrier: options.knowledgeImportBarrier } : {}),
     logger: () => undefined,
   });
   const server = await listen(app, '127.0.0.1', 0);

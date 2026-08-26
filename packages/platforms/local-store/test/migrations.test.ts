@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,6 +33,21 @@ test('fresh database migrates to the current schema version', () => {
   try {
     const local = createLocalRepositories(path);
     assert.equal(local.schemaVersion(), SCHEMA_VERSION);
+    local.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('database, WAL, and shared-memory files are owner-only', () => {
+  const { dir, path } = tempDbPath();
+  try {
+    chmodSync(dir, 0o755);
+    const local = createLocalRepositories(path);
+    for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+      if (existsSync(file)) assert.equal(statSync(file).mode & 0o777, 0o600, file);
+    }
+    assert.equal(statSync(dir).mode & 0o777, 0o755, 'pre-existing parent permissions');
     local.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

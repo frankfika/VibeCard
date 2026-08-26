@@ -1,7 +1,7 @@
 {
   "name": "vibecard",
   "short_name": "vibecard",
-  "description": "你的 Web3 社交名片",
+  "description": "一张会越来越懂你的 AI 名片",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

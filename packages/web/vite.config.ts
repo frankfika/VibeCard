@@ -1,13 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig, loadEnv, type PluginOption } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 import { compression } from 'vite-plugin-compression2';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { request as httpRequest, type IncomingMessage, type ServerResponse, type RequestOptions } from 'node:http';
 import net from 'node:net';
 
-const NAMECARD_SERVER_PORT = 3001;
+const NAMECARD_SERVER_PORT = Number(process.env.NAMECARD_SERVER_PORT || 3001);
 const NAMECARD_SERVER_SCRIPT = path.resolve(__dirname, 'server.js');
 
 /**
@@ -60,25 +60,6 @@ function isPortFree(port: number): Promise<boolean> {
   });
 }
 
-/**
- * Dev-only same-origin proxy for the local Hardhat JSON-RPC, used by the
- * chain-sync e2e page. The Hardhat node's own CORS headers do not allow
- * POST from a browser (`Access-Control-Allow-Methods: OPTIONS, GET`), so
- * browser-side chain calls would fail preflight; going through this proxy
- * keeps the request same-origin (task 4.1).
- */
-function hardhatRpcProxyPlugin(): PluginOption {
-  return {
-    name: 'vibecard:hardhat-rpc-proxy',
-    apply: 'serve',
-    configureServer(server) {
-      server.middlewares.use('/hardhat-rpc', (req, res, next) => {
-        proxyHttp(req, res, 'http://127.0.0.1:8545', '', next);
-      });
-    },
-  };
-}
-
 function proxyHttp(
   req: IncomingMessage,
   res: ServerResponse,
@@ -102,18 +83,13 @@ function proxyHttp(
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
   return {
     plugins: [
       react(),
       tailwindcss(),
       namecardServerPlugin(),
-      hardhatRpcProxyPlugin(),
       compression({ algorithms: ['brotliCompress'], exclude: [/\.(br)$/, /\.(gz)$/] }),
     ],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -131,7 +107,6 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             vendor: ['react', 'react-dom', 'motion'],
-            web3: ['wagmi', 'viem', '@rainbow-me/rainbowkit'],
             utils: ['html-to-image', 'qrcode'],
           },
         },

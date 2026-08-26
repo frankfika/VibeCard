@@ -5,13 +5,23 @@
   <view wx:if="{{view === 'list'}}" class="list-wrap">
     <view class="list-hint">带着具体理由来的人，会出现在这里。是否认识，永远由你决定。</view>
 
+    <view wx:if="{{loading}}" class="empty">
+      <view class="empty-title">正在加载请求…</view>
+    </view>
+
+    <view wx:elif="{{loadError}}" class="empty">
+      <view class="empty-title">暂时没连上</view>
+      <view class="empty-desc">{{loadError}}</view>
+      <view class="result-btn" bindtap="onRetryInbox">重新加载</view>
+    </view>
+
     <!-- 空收件箱 -->
-    <view wx:if="{{requestsList.length === 0}}" class="empty">
+    <view wx:elif="{{requestsList.length === 0}}" class="empty">
             <view class="empty-title">还没有人想认识你</view>
       <view class="empty-desc">分享你的 Card，真正理解你的人会带着具体的理由来找你。是否认识，永远由你决定。</view>
     </view>
 
-    <view wx:for="{{requestsList}}" wx:key="id" class="request-card" bindtap="openDetail" data-id="{{item.id}}">
+    <view wx:if="{{!loading && !loadError}}" wx:for="{{requestsList}}" wx:key="id" class="request-card" bindtap="openDetail" data-id="{{item.id}}">
       <image wx:if="{{item.visitorAvatarUrl && !avatarErr[item.id]}}" class="request-avatar" src="{{item.visitorAvatarUrl}}" mode="aspectFill" binderror="onAvatarError" data-id="{{item.id}}" />
       <view wx:else class="request-avatar request-avatar-placeholder">{{item.visitorName[0]}}</view>
       <view class="request-main">
@@ -61,6 +71,7 @@
           <view class="vibe-take-summary">{{vibeTake.summary}}</view>
           <view wx:for="{{vibeTake.reasons}}" wx:key="*this" class="vibe-take-item">· {{item}}</view>
           <view wx:if="{{vibeTake.uncertainty}}" class="vibe-take-uncertain">{{vibeTake.uncertainty}}</view>
+          <view wx:if="{{vibeTake.reasons.length === 0}}" class="detail-back" bindtap="onRetrySummary">重新判断</view>
         </block>
       </view>
 
@@ -127,5 +138,36 @@
     <view class="result-title">已礼貌回绝</view>
     <view class="result-desc">对方不会收到尴尬的提醒，只会知道你的 Vibe 现在不方便。</view>
     <view class="result-btn" bindtap="backToList">返回列表</view>
+  </view>
+
+  <!-- 连接决定已先保存；这个候选是独立的可选学习，不会反过来改变决定。 -->
+  <view wx:if="{{(view === 'connected' || view === 'later' || view === 'declined') && (learningLoading || learningProposal || learningError)}}" class="learning-wrap">
+    <view wx:if="{{learningLoading && !learningProposal}}" class="learning-card learning-loading">Vibe 正在看看这次选择有没有值得记住的偏好…</view>
+    <view wx:if="{{learningProposal}}" class="learning-card">
+      <view class="learning-head">
+        <view class="learning-title">这件事值得记住吗？</view>
+        <view class="learning-visibility">{{learningProposal.visibilityLabel}}</view>
+      </view>
+      <view class="learning-note">连接决定已经保存；只有你确认，这条偏好才会影响以后。</view>
+      <view wx:if="{{learningProposal.state !== 'editing'}}" class="learning-content">{{learningProposal.content}}</view>
+      <textarea wx:else class="learning-edit" value="{{learningProposal.editText}}" bindinput="onLearningProposalInput" auto-height maxlength="200" />
+      <view wx:if="{{learningError}}" class="learning-error">{{learningError}}</view>
+      <view wx:if="{{learningProposal.state === 'pending'}}" class="learning-actions">
+        <view class="learning-action learning-action-primary" bindtap="onConfirmLearningProposal">记住</view>
+        <view class="learning-action" bindtap="onEditLearningProposal">改一下</view>
+        <view class="learning-action learning-action-quiet" bindtap="onDismissLearningProposal">别记这个</view>
+      </view>
+      <view wx:if="{{learningProposal.state === 'editing'}}" class="learning-actions">
+        <view class="learning-action learning-action-primary" bindtap="onConfirmLearningProposal">确认记住</view>
+        <view class="learning-action learning-action-quiet" bindtap="onCancelLearningEdit">取消</view>
+      </view>
+      <view wx:if="{{learningProposal.state === 'confirmed'}}" class="learning-done">✓ 已记住。之后可以在「我的 Vibe」里修改或删除。</view>
+      <view wx:if="{{learningProposal.state === 'dismissed'}}" class="learning-done">好的，这条不会进入记忆。</view>
+      <view wx:if="{{learningProposal.state === 'confirmed' || learningProposal.state === 'dismissed'}}" class="learning-close" bindtap="onCloseDecisionLearning">收起</view>
+    </view>
+    <view wx:elif="{{learningError}}" class="learning-card learning-error">
+      <view>{{learningError}}</view>
+      <view class="learning-close" bindtap="onCloseDecisionLearning">知道了</view>
+    </view>
   </view>
 </view>

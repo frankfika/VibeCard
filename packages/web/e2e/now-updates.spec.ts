@@ -100,8 +100,10 @@ test.describe('Personal Now updates (task 4.5)', () => {
       '最近在准备 VibeCard 的比赛演示。',
     );
 
-    // The public Card shows the same published snapshot (local demo store)
-    await page.goto(`/?c=${encodeProfile(publicProfile)}`);
+    // A public Card reads the owner's explicitly shared snapshot; it must not
+    // borrow the viewer browser's local Now store.
+    const publishedNow = await page.evaluate(() => JSON.parse(localStorage.getItem('vibecard_now') || '[]'));
+    await page.goto(`/?c=${encodeProfile({ ...publicProfile, nowItems: publishedNow })}`);
     await expect(page.getByTestId('public-now-item')).toContainText('最近在准备 VibeCard 的比赛演示。');
   });
 
@@ -124,7 +126,7 @@ test.describe('Personal Now updates (task 4.5)', () => {
     await page.getByTestId('now-proposal-publish').click();
     await expect(page.locator('text=好，这条已经放到你的最近动态了')).toBeVisible();
     // Publishing the Now item did not create or change any confirmed memory
-    await expect(page.locator('text=已记住 · 3')).toBeVisible();
+    await expect(page.getByText('还没有记住任何事。聊点什么吧。')).toBeVisible();
 
     // The published update appears on My Card
     await page.getByRole('tab', { name: '名片' }).click();
@@ -158,7 +160,7 @@ test.describe('Personal Now updates (task 4.5)', () => {
     const item = makeNowItem({ id: 'e2e-now-archive', text: '这条马上要被归档。' });
     await seedOwner(page, [item]);
 
-    await page.goto(`/?c=${encodeProfile(publicProfile)}`);
+    await page.goto(`/?c=${encodeProfile({ ...publicProfile, nowItems: [item] })}`);
     await expect(page.getByTestId('public-now-item')).toContainText('这条马上要被归档。');
 
     await page.goto('/');
@@ -166,7 +168,8 @@ test.describe('Personal Now updates (task 4.5)', () => {
     await page.getByTestId('now-archive-e2e-now-archive').click();
     await expect(page.getByTestId('now-empty')).toBeVisible();
 
-    await page.goto(`/?c=${encodeProfile(publicProfile)}`);
+    const archivedNow = await page.evaluate(() => JSON.parse(localStorage.getItem('vibecard_now') || '[]'));
+    await page.goto(`/?c=${encodeProfile({ ...publicProfile, nowItems: archivedNow })}`);
     await expect(page.getByTestId('public-now-section')).toHaveCount(0);
     await expect(page.locator('text=这条马上要被归档。')).toHaveCount(0);
   });

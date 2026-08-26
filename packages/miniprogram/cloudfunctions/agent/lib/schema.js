@@ -106,6 +106,17 @@ function validateConnectionSummary(value) {
   return null;
 }
 
+function validateDecisionLearningAgentResult(value) {
+  if (!value || typeof value !== 'object') return 'not_an_object';
+  if (value.proposal === null) return null;
+  const proposal = value.proposal;
+  if (!proposal || typeof proposal !== 'object') return 'invalid_proposal';
+  if (!['preference', 'boundary'].includes(proposal.kind)) return 'invalid_proposal_kind';
+  if (!isNonEmptyString(proposal.content) || proposal.content.length > 500) return 'invalid_proposal_content';
+  if (!['private', 'agent_only'].includes(proposal.suggestedVisibility)) return 'invalid_proposal_visibility';
+  return null;
+}
+
 function typedError(code, message) {
   return { ok: false, error: { code, message } };
 }
@@ -169,6 +180,7 @@ module.exports = {
   validateOwnerAgentResult,
   validateVisitorAgentResult,
   validateConnectionSummary,
+  validateDecisionLearningAgentResult,
   validateCardDraft,
   typedError,
   ok,

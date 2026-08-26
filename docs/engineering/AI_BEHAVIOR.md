@@ -186,6 +186,20 @@ interface OwnerAgentResult {
    * the callback to real memory content and never to an invented one.
    */
   referencedMemoryIds?: string[];
+  /**
+   * Optional owner-controlled Now draft. It is never published by this
+   * response; publishing remains a separate explicit owner action.
+   */
+  nowProposal?: {
+    text: string;
+    topic:
+      | 'current_work'
+      | 'completed_work'
+      | 'exploring'
+      | 'looking_for'
+      | 'offer_help';
+    expiresAt?: number | null;
+  };
 }
 ```
 
@@ -220,6 +234,7 @@ Avoid:
 ## Allowed
 
 - Explain public Card content
+- Point visitors to owner-confirmed HTTPS links on the public Card
 - Summarize public work and current focus
 - Find a concrete shared topic from visitor-provided information
 - Ask why the visitor wants to connect now
@@ -358,24 +373,17 @@ Bad:
 Minimal contract:
 
 ```ts
-export interface VibeCard {
-  id: string;
-  schemaVersion: 1;
-  ownerId: string;
-  name: string;
-  avatarUrl: string;
-  headline: string;
-  currentFocus: string;
-  canHelpWith: string[];
-  wantsToMeet: string[];
-  topics: string[];
-  highlights: Array<{
+export interface CardDraft {
+  headline?: string;
+  currentFocus?: string;
+  canHelpWith?: string[];
+  wantsToMeet?: string[];
+  topics?: string[];
+  highlights?: Array<{
     id: string;
     title: string;
     url?: string;
   }>;
-  agentEnabled: boolean;
-  updatedAt: number;
 }
 ```
 
@@ -386,6 +394,10 @@ Rules:
 - Keep owner-written text when it is more specific
 - Do not generate empty or repetitive sections
 - Do not include contact details in the public object
+
+Identity, ownership, avatar, contact, agent-enabled, schema-version, and
+timestamp fields are not model-generated draft fields. The application merges
+an accepted `CardDraft` into the existing owner-controlled `VibeCard`.
 
 ---
 
@@ -496,15 +508,16 @@ published automatically.
 
 ```json
 {
-  "type": "now_proposal",
-  "draft": {
+  "nowProposal": {
     "text": "最近在验证 AI 分身如何在保护私人记忆的同时帮助两个人建立联系。",
     "topic": "current_work",
     "expiresAt": null
-  },
-  "actions": ["publish", "edit", "not_now"]
+  }
 }
 ```
+
+The client renders Publish / Edit / Not now actions around this draft; those
+actions are not model output and never imply automatic publication.
 
 Rules:
 
@@ -521,3 +534,19 @@ Rules:
 When a visitor asks what the owner is doing recently, the public agent prefers
 fresh published Now items, then public current-focus memory. If neither exists,
 it says that it does not have a recent public update.
+
+---
+
+# 14. Learning From Connection Decisions
+
+An owner decision (`connect`, `later`, or `decline`) is interaction data, not a
+durable memory by itself.
+
+The agent may propose at most one `preference` or `boundary` memory when the
+decision provides clear, useful evidence. The proposal must:
+
+- Describe the owner's preference or boundary, not profile the visitor
+- Avoid inferring a stable preference from one ambiguous click
+- Follow the normal Remember / Edit / Do not remember flow
+- Remain inactive until the owner confirms it
+- Never expose the original request or visitor identity to other visitors

@@ -18,10 +18,11 @@ import { test, expect } from '@playwright/test';
  */
 
 const demoProfile = {
+  demoFixtureId: 'vibecard-official-fixture-v1',
   name: '林舟',
-  handle: 'linzhou',
+  handle: '在做一张会越来越懂你的 AI 名片',
   avatar: '',
-  bio: '在做一张会越来越懂你的 AI 名片',
+  bio: '把「先理解，再认识」做成一个真正可用的产品，最近在打磨访客和分身的前六轮对话。',
   tags: [{ label: 'AI', icon: '' }],
   lookingFor: '真正做过 AI 社交产品的人',
   event: '',
@@ -38,6 +39,10 @@ function encodeProfile(profile: object): string {
 }
 
 test('90-second demo (PRODUCT.md §17) fits the budget and hits every beat', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('vibecard_runtime_v1', JSON.stringify({ mode: 'local', endpoint: '', ownerToken: '' }));
+    localStorage.setItem('vibecard_demo_mode', '1');
+  });
   const startedAt = Date.now();
 
   // 1-2. Owner conversation: the Vibe already proposed the memory; the owner
@@ -49,9 +54,19 @@ test('90-second demo (PRODUCT.md §17) fits the budget and hits every beat', asy
   await page.getByTestId('proposal-remember').click();
   await expect(page.getByTestId('remember-moment')).toContainText('我记住了：你最近更想认识真正做过 AI 社交产品的人');
 
+  // The Vibe suggests a Card change, but the public Card stays untouched
+  // until the owner sees the draft and explicitly adopts it.
+  await page.getByTestId('generate-card-draft').click();
+  const cardDraft = page.getByTestId('card-draft-preview');
+  await expect(cardDraft).toContainText('正在做个人 AI、也认真对待隐私边界的产品创造者');
+  await page.getByTestId('card-draft-accept').click();
+  await expect(page.getByTestId('card-draft-applied')).toBeVisible();
+  await page.getByRole('tab', { name: '名片' }).click();
+  await expect(page.getByText('找: 正在做个人 AI、也认真对待隐私边界的产品创造者')).toBeVisible();
+
   // 3-4. The judge opens the shared Card and gets a grounded answer from the
   // public Vibe — contact details never appear.
-  await page.goto(`/?c=${encodeProfile(demoProfile)}`);
+  await page.goto(`/?c=${encodeProfile(demoProfile)}&demo=1`);
   await expect(page.locator('text=secret-wechat-id')).toHaveCount(0);
   await page.getByTestId('chat-with-vibe').click();
   const chat = page.getByTestId('visitor-vibe-chat');

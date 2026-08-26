@@ -1,0 +1,25 @@
+{
+  "name": "@vibecard/sdk",
+  "version": "0.1.0",
+  "private": false,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/sdk/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/sdk/src/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "LICENSE"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:package": "node scripts/package-smoke.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

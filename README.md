@@ -34,6 +34,7 @@ Product and development documents:
 2. [`docs/engineering/DEVELOPMENT_PLAN.md`](./docs/engineering/DEVELOPMENT_PLAN.md)
 3. [`docs/engineering/AI_BEHAVIOR.md`](./docs/engineering/AI_BEHAVIOR.md)
 4. [`docs/engineering/ARCHITECTURE.md`](./docs/engineering/ARCHITECTURE.md)
+5. [`docs/engineering/RELEASE.md`](./docs/engineering/RELEASE.md)
 
 Historical Bonjour, Orbit, Web3, games, and companion-discovery documents are under [`docs/archive/`](./docs/archive/).
 
@@ -69,13 +70,13 @@ VibeCard/
 | Mini Program | Native WeChat Mini Program, WeChat Cloud Development |
 | Shared | TypeScript domain types and fixtures |
 | Testing | TypeScript checks, Vite build, Playwright |
-| Optional legacy | Wagmi, Viem, IPFS, Hardhat |
+| Optional legacy | Solidity contracts in the isolated `packages/contracts` package |
 
 ## Web Development
 
 Requirements:
 
-- Node.js 20+
+- Node.js 24+
 - npm 9+
 
 Install and run:
@@ -90,14 +91,18 @@ The Web app runs at [http://localhost:3000](http://localhost:3000).
 Validate:
 
 ```bash
-npm run lint
-npm run build
+npm run release:check
 npx playwright install chromium    # first E2E run on a new machine
 npm run test:e2e --workspace=packages/web
 ```
 
-Current verified baseline on 2026-07-20: the full Playwright suite passes 54/54
+Current verified baseline on 2026-08-14: the focused Playwright suite passes 72/72
 across desktop and mobile projects.
+
+For an actual deployment—not only a successful build—follow the
+[`release runbook`](./docs/engineering/RELEASE.md). It includes the H5/PWA
+production stack, TLS and backup gates, and the required WeChat physical-device
+verification.
 
 ## WeChat Mini Program
 
@@ -113,6 +118,12 @@ Current project configuration:
 Mini Program root: miniprogram/
 Cloud function root: cloudfunctions/
 ```
+
+Before cloud deployment, create the nine required collections listed in
+[`packages/miniprogram/LAUNCH_KIT.md`](./packages/miniprogram/LAUNCH_KIT.md),
+including the short-lived `visitor_evidence` store and the doc-only
+`request_gates` concurrency gate. The authoritative index and TTL checklist is
+in [`PHYSICAL_DEVICE_VERIFICATION.md`](./docs/engineering/PHYSICAL_DEVICE_VERIFICATION.md).
 
 Mini Program work must verify both owner and visitor paths. A competition release also requires a physical-device share and deep-link test.
 
@@ -159,12 +170,12 @@ VibeCard is designed around three runtime modes:
   contracts, charging only for infrastructure and service — hosting, sync,
   backups, managed AI usage, and support.
 
-Honest status: the competition MVP in this repository today runs on WeChat
-Cloud Development (Mini Program + cloud functions + React web). The Local and
-Self-Hosted modes are the post-competition design direction; the
-platform-independent Core, provider adapters, and one-command self-host server
-are being extracted in Milestone 5. Nothing described as open source will ever
-require a proprietary server or a paid license.
+Honest status: the competition MVP runs on WeChat Cloud Development (Mini
+Program + cloud functions + React web), and the repository now also contains
+validated Local/Self-Hosted H5 paths, an optional managed gateway, a client SDK,
+and a macOS companion scaffold. The desktop build remains dependent on a
+matching Xcode/CommandLineTools toolchain. Nothing described as open source
+requires a proprietary server or paid license.
 
 The code is open under a two-tier license: the runnable product (Mini
 Program, web app, cloud functions) is **AGPL-3.0-only**, and the integration

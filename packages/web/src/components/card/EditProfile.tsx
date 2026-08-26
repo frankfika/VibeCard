@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import {
-  Wallet, Twitter, MessageCircle, Trash2, SmilePlus, Smile, Send,
+  Twitter, MessageCircle, Trash2, SmilePlus, Smile, Send,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useAccount, useDisconnect } from 'wagmi';
 import type { Profile, Contact } from '../../store';
-import WalletConnect from '../../components/WalletConnect';
 import {
   AVATAR_SEEDS,
   MBTI_OPTIONS,
@@ -20,6 +18,16 @@ import ChipSelector from '../ui/ChipSelector';
 
 type SaveStatus = 'saved' | 'saving';
 
+function normalizePublicLink(value: string): string {
+  if (!value.trim()) return '';
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
 export default function EditProfile({
   profile,
   onSave,
@@ -29,8 +37,6 @@ export default function EditProfile({
   onSave: (p: Partial<Profile>) => void;
   onClose: () => void;
 }) {
-  const { address } = useAccount();
-  const { disconnect } = useDisconnect();
   const [name, setName] = useState(profile.name);
   const [handle, setHandle] = useState(profile.handle);
   const [bio, setBio] = useState(profile.bio);
@@ -96,8 +102,12 @@ export default function EditProfile({
     age,
     location: location.trim() || undefined,
     tags: selectedTags,
-    highlights: highlights.filter(h => h.title.trim()),
-    verified: { wallet: address || profile.verified.wallet, twitter, discord, wechat, telegram },
+    highlights: highlights.filter(h => h.title.trim()).map(highlight => ({
+      ...highlight,
+      title: highlight.title.trim(),
+      link: normalizePublicLink(highlight.link),
+    })),
+    verified: { ...profile.verified, twitter, discord, wechat, telegram },
     contacts: buildContacts(),
     avatar: avatarMode === 'custom' && customAvatar ? customAvatar : `https://api.dicebear.com/7.x/notionists/svg?seed=${avatarSeed}&backgroundColor=transparent`,
   });
@@ -120,7 +130,7 @@ export default function EditProfile({
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [name, handle, bio, mbti, zodiac, age, location, selectedTags, highlights, twitter, discord, wechat, telegram, avatarSeed, avatarMode, customAvatar, address]);
+  }, [name, handle, bio, mbti, zodiac, age, location, selectedTags, highlights, twitter, discord, wechat, telegram, avatarSeed, avatarMode, customAvatar]);
 
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -337,35 +347,10 @@ export default function EditProfile({
           </div>
         </section>
 
-        {/* Verified accounts */}
+        {/* Contact accounts */}
         <section className="space-y-4 border-t border-border/40 pt-6">
-          <h3 className="text-[13px] font-bold text-foreground sticky top-[57px] bg-background/95 backdrop-blur-md py-2 z-10">已验证账号（选填）</h3>
+          <h3 className="text-[13px] font-bold text-foreground sticky top-[57px] bg-background/95 backdrop-blur-md py-2 z-10">联系账号（选填）</h3>
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                <Wallet className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1 flex items-center border border-border rounded-xl px-3 py-2 bg-background gap-2">
-                {address ? (
-                  <>
-                    <span className="text-[13px] font-medium text-foreground flex-1">{address.slice(0, 8)}…{address.slice(-6)}</span>
-                    <button
-                      type="button"
-                      onClick={() => disconnect()}
-                      data-testid="wallet-disconnect"
-                      className="tap-target text-[12px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      断开
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[13px] font-medium text-muted-foreground flex-1">未连接钱包</span>
-                    <WalletConnect />
-                  </>
-                )}
-              </div>
-            </div>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center shrink-0">
                 <Twitter className="w-4 h-4 text-[#1DA1F2]" />
@@ -436,6 +421,13 @@ export default function EditProfile({
                       onChange={e => updateHighlight(h.id, 'title', e.target.value)}
                       placeholder="一句话描述，如：拿到 A 轮融资"
                       className="w-full bg-transparent px-1 py-1.5 text-[14px] font-semibold outline-none placeholder:text-muted-foreground/50"
+                    />
+                    <input
+                      type="url"
+                      value={h.link}
+                      onChange={e => updateHighlight(h.id, 'link', e.target.value)}
+                      placeholder="https://个人主页或作品链接（选填）"
+                      className="mt-1 w-full bg-transparent px-1 py-1.5 text-[12px] font-medium text-muted-foreground outline-none placeholder:text-muted-foreground/50"
                     />
                   </div>
                   <button onClick={() => removeHighlight(h.id)} className="tap-target text-muted-foreground hover:text-foreground transition-colors mt-2 shrink-0">

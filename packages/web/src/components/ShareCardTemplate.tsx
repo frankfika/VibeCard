@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import {
-  Check, Hexagon, Zap, MapPin, Twitter, MessageCircle, Wallet, Github,
+  Hexagon, Zap, MapPin, Twitter, MessageCircle, Github,
   Send, Mail, Globe, Linkedin, Link as LinkIcon
 } from 'lucide-react';
 import { type Profile, type Contact } from '../store';
@@ -138,15 +138,6 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
     };
   });
 
-  if (profile.verified?.wallet && !socialItems.some(s => s.key === 'wallet')) {
-    socialItems.unshift({
-      key: 'wallet',
-      icon: getSocialIcon('wallet'),
-      label: 'Wallet',
-      value: `${profile.verified.wallet.slice(0, 6)}...${profile.verified.wallet.slice(-4)}`
-    });
-  }
-
   const fallbackSocial = null;
 
   const visibleCount = [
@@ -178,7 +169,6 @@ export const ShareCardTemplate = forwardRef<HTMLDivElement, ShareCardProps>(({
               <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: tokens.muted }}>{s.label}</span>
               <span className="text-[12px] font-bold leading-tight" style={{ color: tokens.primary }}>{s.value}</span>
             </div>
-            {s.key === 'wallet' && <Check className="w-3.5 h-3.5 text-emerald-500 ml-0.5" />}
           </div>
         ))}
       </div>

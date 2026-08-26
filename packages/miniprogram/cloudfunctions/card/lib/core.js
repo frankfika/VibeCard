@@ -34,7 +34,10 @@ const CONTACT_KEYS = [
 ];
 
 /** namecard keys that are safe to read for a public projection. */
-const PRESENTATIONAL_NAMECARD_KEYS = ['intro', 'motto', 'theme', 'coverImage', 'interests'];
+const PRESENTATIONAL_NAMECARD_KEYS = [
+  'intro', 'motto', 'theme', 'coverImage', 'interests', 'currentFocus',
+  'canHelpWith', 'wantsToMeet', 'topics', 'highlights', 'agentEnabled',
+];
 
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -139,15 +142,25 @@ function buildPublicCard({ ownerId, user, memories, nowItems }, now) {
     name: (user && user.nickname) || '',
     avatarUrl: (user && user.avatar) || '',
     headline: namecard.motto || (user && user.bio) || namecard.intro || '',
-    currentFocus: latestContent(projectable, 'current'),
-    canHelpWith: contentsOf(projectable, 'fact'),
-    wantsToMeet: contentsOf(projectable, 'preference'),
-    topics: Array.isArray(namecard.interests)
-      ? namecard.interests.filter(isNonEmptyString).slice(0, 8)
+    currentFocus: typeof namecard.currentFocus === 'string' ? namecard.currentFocus : latestContent(projectable, 'current'),
+    canHelpWith: Array.isArray(namecard.canHelpWith)
+      ? namecard.canHelpWith.filter(isNonEmptyString).slice(0, 5)
+      : contentsOf(projectable, 'fact'),
+    wantsToMeet: Array.isArray(namecard.wantsToMeet)
+      ? namecard.wantsToMeet.filter(isNonEmptyString).slice(0, 5)
+      : contentsOf(projectable, 'preference'),
+    topics: Array.isArray(namecard.topics)
+      ? namecard.topics.filter(isNonEmptyString).slice(0, 8)
+      : Array.isArray(namecard.interests)
+        ? namecard.interests.filter(isNonEmptyString).slice(0, 8)
       : [],
-    highlights: [],
+    highlights: Array.isArray(namecard.highlights)
+      ? namecard.highlights.flatMap(item => item && isNonEmptyString(item.title)
+        ? [{ id: String(item.id || ''), title: item.title, ...(isNonEmptyString(item.url) ? { url: item.url } : {}) }]
+        : []).slice(0, 6)
+      : [],
     now: projectActiveNowItems(nowItems, now),
-    agentEnabled: true,
+    agentEnabled: namecard.agentEnabled !== false,
     updatedAt: now,
   };
 }

@@ -142,6 +142,19 @@ test('云模式确认失败：toast「没存上，再试一次」，不追加确
   assert.strictEqual(page.data.proposal.state, 'pending', '提议保持 pending 可重试');
 });
 
+test('云模式提议缺 memoryId：拒绝假持久化，保持可重试', async () => {
+  toasts.length = 0;
+  const page = makePage({ demoMode: false });
+  page.data.memories = [];
+  page.data.messages = [];
+  const ok = await page.confirmMemoryOnServer('', { content: '一条不完整的提议' });
+
+  assert.strictEqual(ok, false);
+  assert.deepStrictEqual(page.data.memories, []);
+  assert.deepStrictEqual(page.data.messages, []);
+  assert.ok(toasts.includes('这条提议不完整，请重新发送'));
+});
+
 test('「别记这个」回归：仍是「好的，这条我不会记住。」', async () => {
   const page = makePage({ demoMode: true });
   await page.onDismissProposal();

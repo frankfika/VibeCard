@@ -27,6 +27,12 @@ export interface ServerConfig {
   aiApiKey: string | null;
   aiApiHeaders: Record<string, string> | null;
   aiTimeoutMs: number;
+  /** Optional HTTP moderation service. It receives { text } and returns { ok, reason? }. */
+  moderationApiUrl: string | null;
+  moderationApiKey: string | null;
+  moderationTimeoutMs: number;
+  /** Refuse startup without real moderation when this deployment accepts public text. */
+  requireModeration: boolean;
   /** Visitor rate limits (token bucket, per visitor id + ip). */
   chatRatePerHour: number;
   requestRatePerHour: number;
@@ -79,6 +85,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     aiApiKey: env.AI_API_KEY?.trim() || null,
     aiApiHeaders,
     aiTimeoutMs: intFromEnv(env.AI_TIMEOUT_MS, 15000, 1000),
+    moderationApiUrl: env.MODERATION_API_URL?.trim() || null,
+    moderationApiKey: env.MODERATION_API_KEY?.trim() || null,
+    moderationTimeoutMs: intFromEnv(env.MODERATION_TIMEOUT_MS, 5000, 500),
+    requireModeration: env.REQUIRE_MODERATION === '1',
     chatRatePerHour: intFromEnv(env.RATE_LIMIT_CHAT_PER_HOUR, 30, 1),
     requestRatePerHour: intFromEnv(env.RATE_LIMIT_REQUESTS_PER_HOUR, 10, 1),
     maxBodyBytes: intFromEnv(env.MAX_BODY_BYTES, 2 * 1024 * 1024, 1024),
