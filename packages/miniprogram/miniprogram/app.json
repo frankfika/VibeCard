@@ -3,7 +3,8 @@
     "pages/card/card",
     "pages/requests/requests",
     "pages/vibe/vibe",
-    "pages/visitor-chat/visitor-chat"
+    "pages/visitor-chat/visitor-chat",
+    "pages/settings/settings"
   ],
   "subPackages": [
     {

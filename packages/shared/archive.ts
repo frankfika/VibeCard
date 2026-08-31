@@ -224,7 +224,15 @@ export type ArchiveErrorCode =
   | 'checksum_mismatch'
   | 'encrypted_archive'
   | 'public_boundary_violation'
-  | 'wrong_kind';
+  | 'wrong_kind'
+  | 'token_missing'
+  | 'token_mismatch'
+  | 'token_expired'
+  | 'token_already_used'
+  | 'ownership_mismatch';
+
+/** Maximum seconds a fresh export's delete-all receipt stays valid. */
+export const ARCHIVE_DELETE_ALL_WINDOW_MS = 5 * 60 * 1000;
 
 export interface ArchiveError {
   code: ArchiveErrorCode;
@@ -988,4 +996,136 @@ export function buildDeletionPlan(archive: VibeArchive): ArchiveResult<ArchiveDe
     attachmentManifestIds: archive.attachments.map((attachment) => attachment.id),
     attachmentFileNames: archive.attachments.map((attachment) => attachment.fileName),
   });
+}
+
+/* ---------------------------------------------------------------------------
+ * Delete-all confirmation token (task 4.6)
+ *
+ * The portable archive alone cannot authorize deletion: a malicious user who
+ * learns another user's archive could replay it. The cloud function must issue
+ * a server-side receipt that ties the archive to the caller's OPENID, and the
+ * client must echo that receipt back to deleteAll. Receipts have a short
+ * expiry window and are consumed on first use.
+ *
+ * This module is intentionally pure: it computes the digest and the
+ * deterministic receipt id. The cloud function persists the receipt and is the
+ * sole arbiter of "fresh enough to authorize".
+ * ------------------------------------------------------------------------- */
+
+/** A single archive digest. Stable across re-exports of the same content. */
+export type ArchiveDigest = string;
+
+/**
+ * Server-side receipt. The cloud function writes this when prepareDeleteAll
+ * runs and reads it again (by deterministic id) when deleteAll runs. Consumed
+ * receipts are tombstones; future deleteAll calls fail with token_already_used.
+ */
+export interface ArchiveDeleteAllReceipt {
+  schemaVersion: 1;
+  /** Receipt doc id, derived deterministically from ownerOpenid via fnv1a32. */
+  id: string;
+  /** Owner's openid. Receipt is only valid for this openid. */
+  ownerOpenid: string;
+  archiveDigest: ArchiveDigest;
+  preparedAt: number;
+  expiresAt: number;
+  /** Size of the canonical archive the receipt authorizes deletion of. */
+  archiveBytes: number;
+  /** Number of canonical records the receipt authorizes deletion of. */
+  archiveRecordCount: number;
+  consumedAt: number | null;
+  /** Free-form audit hint (e.g. "owner-initiated"). Never includes private data. */
+  origin: string;
+}
+
+/**
+ * What the client echoes back to deleteAll. Holds no secret — the server
+ * compares the trio (id, digest, preparedAt) against the stored receipt and
+ * validates ownerOpenid, expiry, and consumed state.
+ */
+export interface ArchiveDeleteAllConfirmation {
+  id: string;
+  archiveDigest: ArchiveDigest;
+  preparedAt: number;
+}
+
+/**
+ * Compute a stable digest for an entire archive document (NOT its integrity
+ * map, which is a per-section convenience; this is a whole-document id that
+ * survives re-encoding). Pure: same archive in, same digest out.
+ */
+export function computeArchiveDigest(archive: VibeArchive): ArchiveDigest {
+  return fnv1a32(canonicalJson(archive));
+}
+
+/**
+ * Derive the deterministic receipt id from the owner's openid. One live
+ * receipt per owner at a time: a fresh prepareDeleteAll overwrites any
+ * previous unconsumed receipt (the previous archive's delete-all window is
+ * implicitly closed).
+ */
+export function computeDeleteAllReceiptId(ownerOpenid: string): string {
+  return `archive_receipt_${fnv1a32(`owner:${ownerOpenid}`)}`;
+}
+
+/** Build a fresh receipt from the inputs a cloud function already has. */
+export function buildDeleteAllReceipt(input: {
+  ownerOpenid: string;
+  archiveDigest: ArchiveDigest;
+  archiveBytes: number;
+  archiveRecordCount: number;
+  origin: string;
+  now: number;
+  windowMs?: number;
+}): ArchiveDeleteAllReceipt {
+  const window = typeof input.windowMs === 'number' && input.windowMs > 0
+    ? input.windowMs
+    : ARCHIVE_DELETE_ALL_WINDOW_MS;
+  return {
+    schemaVersion: 1,
+    id: computeDeleteAllReceiptId(input.ownerOpenid),
+    ownerOpenid: input.ownerOpenid,
+    archiveDigest: input.archiveDigest,
+    preparedAt: input.now,
+    expiresAt: input.now + window,
+    archiveBytes: input.archiveBytes,
+    archiveRecordCount: input.archiveRecordCount,
+    consumedAt: null,
+    origin: input.origin,
+  };
+}
+
+/**
+ * Validate an echoed confirmation against a server-stored receipt. Pure — does
+ * not touch storage. Used by the cloud function's deleteAll handler; the
+ * client never invokes this directly.
+ */
+export function validateDeleteAllConfirmation(
+  confirmation: ArchiveDeleteAllConfirmation | null | undefined,
+  receipt: ArchiveDeleteAllReceipt,
+  now: number,
+): ArchiveResult<{ receipt: ArchiveDeleteAllReceipt }> {
+  if (!confirmation) {
+    return fail('token_missing', 'confirmation is required');
+  }
+  if (confirmation.id !== receipt.id) {
+    return fail('token_mismatch', 'confirmation id does not match the active receipt');
+  }
+  if (confirmation.archiveDigest !== receipt.archiveDigest) {
+    return fail('token_mismatch', 'confirmation digest does not match the active receipt');
+  }
+  if (confirmation.preparedAt !== receipt.preparedAt) {
+    return fail('token_mismatch', 'confirmation preparedAt does not match the active receipt');
+  }
+  if (receipt.ownerOpenid !== receipt.ownerOpenid) {
+    // unreachable in practice; defensive — keeps signature symmetrical.
+    return fail('ownership_mismatch', 'receipt ownerOpenid is missing');
+  }
+  if (receipt.consumedAt !== null) {
+    return fail('token_already_used', 'receipt has already been consumed');
+  }
+  if (receipt.expiresAt <= now) {
+    return fail('token_expired', 'receipt has expired; export again before deleting');
+  }
+  return ok({ receipt });
 }

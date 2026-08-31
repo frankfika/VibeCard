@@ -1,0 +1,171 @@
+<view class="page">
+  <navbar title="数据与隐私" />
+
+  <scroll-view scroll-y class="content">
+    <!-- 说明卡 -->
+    <view class="intro-card">
+      <view class="intro-title">你的数据，从哪里来到哪里去</view>
+      <view class="intro-line">· 你随时可以导出 / 导入 / 删除你的 Vibe 数据。</view>
+      <view class="intro-line">· 删除前系统会先做一份新的私有归档存到云端，留 5 分钟给你带走。</view>
+      <view class="intro-line">· 删除不可逆。删除后访客会看到「这张名片已被主人收回」。</view>
+    </view>
+
+    <!-- ===== 导出我的 Vibe ===== -->
+    <view class="card">
+      <view class="card-title">导出我的 Vibe</view>
+      <view class="card-desc">把当前所有记忆、动态、对话、连接请求打包成一份 .vibe 文件存到你的设备。文件里不会包含任何密钥或令牌。</view>
+
+      <view class="opt-row">
+        <view class="opt-check {{optIncludeConversations ? 'opt-check-on' : ''}}" bindtap="onToggleIncludeConversations">
+          <view class="opt-check-dot {{optIncludeConversations ? 'opt-check-dot-on' : ''}}" wx:if="{{optIncludeConversations}}"></view>
+        </view>
+        <view class="opt-text">
+          <view class="opt-text-title">同时导出与 Vibe 的对话内容</view>
+          <view class="opt-text-sub">默认不导出。这段内容最私密，只有你需要恢复时才勾选。</view>
+        </view>
+      </view>
+
+      <button class="btn-primary" bindtap="onExport" loading="{{exportState === 'progress'}}">导出我的 Vibe</button>
+
+      <view wx:if="{{exportState === 'success'}}" class="state state-success">
+        <view class="state-title">已保存到本地</view>
+        <view class="state-detail">文件：{{exportResult.fileName}}（{{exportResult.bytes}} 字节，包含 {{exportResult.records}} 条记录）</view>
+        <view class="state-detail" wx:if="{{exportResult.includeConversations}}">含原始对话；不含密钥。</view>
+        <view class="state-detail" wx:else>不含对话；如需重导入请保留本机备份。</view>
+      </view>
+
+      <view wx:elif="{{exportState === 'progress'}}" class="state state-progress">
+        <view class="state-title">正在生成归档…</view>
+      </view>
+
+      <view wx:elif="{{exportState === 'permission_denied'}}" class="state state-error">
+        <view class="state-title">需要先登录</view>
+        <view class="state-detail">{{exportMessage}}</view>
+      </view>
+
+      <view wx:elif="{{exportState === 'failure' || exportState === 'retry'}}" class="state state-error">
+        <view class="state-title">{{exportState === 'retry' ? '云函数暂时连不上' : '导出未完成'}}</view>
+        <view class="state-detail">{{exportMessage}}</view>
+        <view class="state-retry" bindtap="onExport">{{exportState === 'retry' ? '重试' : '再试一次'}}</view>
+      </view>
+    </view>
+
+    <!-- ===== 导入 Vibe ===== -->
+    <view class="card">
+      <view class="card-title">导入 Vibe</view>
+      <view class="card-desc">从你之前导出的 .vibe 文件恢复内容。仅你本人导出的文件能导入成功；其它 OPENID 的归档会被拒绝。</view>
+
+      <button class="btn-secondary" bindtap="onPickImportFile">选择 .vibe 文件</button>
+
+      <view wx:if="{{importFileName}}" class="state state-info">
+        <view class="state-title">已选择文件</view>
+        <view class="state-detail">{{importFileName}}</view>
+        <view wx:if="{{importReport}}" class="state-detail">
+          写入 {{importReport.totals.created}} 条新建、{{importReport.totals.updated}} 条更新、{{importReport.totals.skipped}} 条跳过
+        </view>
+      </view>
+
+      <view wx:if="{{importState === 'progress'}}" class="state state-progress">
+        <view class="state-title">正在校验并恢复…</view>
+      </view>
+
+      <view wx:elif="{{importState === 'success'}}" class="state state-success">
+        <view class="state-title">导入完成</view>
+        <view class="state-detail" wx:for="{{importPerCollection}}" wx:key="collection">
+          · {{item.label}}：新建 {{item.created}}，更新 {{item.updated}}，跳过 {{item.skipped}}
+        </view>
+      </view>
+
+      <view wx:elif="{{importState === 'permission_denied'}}" class="state state-error">
+        <view class="state-title">无法导入这份文件</view>
+        <view class="state-detail">{{importMessage}}</view>
+      </view>
+
+      <view wx:elif="{{importState === 'failure'}}" class="state state-error">
+        <view class="state-title">导入未通过校验</view>
+        <view class="state-detail">{{importMessage}}</view>
+      </view>
+
+      <view wx:elif="{{importState === 'retry'}}" class="state state-error">
+        <view class="state-title">云函数暂时连不上</view>
+        <view class="state-detail">{{importMessage}}</view>
+        <view class="state-retry" bindtap="onConfirmImport" wx:if="{{importFileName}}">重试</view>
+      </view>
+
+      <view wx:if="{{importConfirmVisible}}" class="confirm-overlay" bindtap="onCancelImportConfirm">
+        <view class="confirm-sheet" catchtap="noop">
+          <view class="confirm-title">覆盖现有数据</view>
+          <view class="confirm-desc">导入会用归档中的记录补齐/覆盖你当前的记忆、最近动态与连接请求。这不会删除任何已有内容，但相同 id 的记录会被更新。</view>
+          <view class="confirm-desc" style="color:#b91c1c;">如果你想完全替换，请先点击下方「删除我的 Vibe 数据」，再回来导入。</view>
+          <view class="confirm-actions">
+            <view class="confirm-btn confirm-btn-cancel" bindtap="onCancelImportConfirm">取消</view>
+            <view class="confirm-btn confirm-btn-danger" bindtap="onConfirmImport">确认导入</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 删除全部 ===== -->
+    <view class="card card-danger">
+      <view class="card-title card-title-danger">删除我的 Vibe 数据</view>
+      <view class="card-desc">删除所有记忆、最近动态、连接请求、联系方式、对话。访客看到的名片会变成「已被主人收回」。</view>
+
+      <view class="step-list">
+        <view class="step {{deleteStep >= 1 ? 'step-done' : ''}}">
+          <view class="step-num">1</view>
+          <view class="step-body">
+            <view class="step-title">先做一份新的私有归档</view>
+            <view class="step-desc">云端会保留 5 分钟，让你下载一份再确认删除。</view>
+            <view wx:if="{{deleteStep === 1 && deleteState === 'progress'}}" class="state state-progress">
+              <view class="state-title">正在生成新归档…</view>
+            </view>
+            <view wx:if="{{deleteStep === 1 && deleteState === 'permission_denied'}}" class="state state-error">
+              <view class="state-title">需要先登录</view>
+              <view class="state-detail">{{deleteMessage}}</view>
+            </view>
+            <view wx:if="{{deleteStep === 1 && (deleteState === 'failure' || deleteState === 'retry')}}" class="state state-error">
+              <view class="state-title">{{deleteState === 'retry' ? '云函数暂时连不上' : '没有可用的归档'}}</view>
+              <view class="state-detail">{{deleteMessage}}</view>
+              <view class="state-retry" bindtap="onDeleteStep1">重试</view>
+            </view>
+          </view>
+        </view>
+        <view class="step {{deleteStep >= 2 ? 'step-done' : ''}}">
+          <view class="step-num">2</view>
+          <view class="step-body">
+            <view class="step-title">看清后果并下载备份</view>
+            <view class="step-desc" wx:if="{{deleteReceipt}}">归档大小：{{deleteReceipt.archiveBytes}} 字节；包含 {{deleteReceipt.archiveRecordCount}} 条记录；签名：{{deleteReceipt.archiveDigest}}</view>
+            <view class="step-desc" wx:if="{{!deleteReceipt && deleteStep >= 2}}">没有可下载的归档（前面的步骤还没成功）。</view>
+            <button class="btn-secondary btn-secondary-tight" bindtap="onDownloadPreDeleteBackup" wx:if="{{deleteReceipt}}">下载本次归档</button>
+          </view>
+        </view>
+        <view class="step {{deleteStep >= 3 ? 'step-done' : ''}}">
+          <view class="step-num">3</view>
+          <view class="step-body">
+            <view class="step-title">二次确认删除</view>
+            <view class="step-desc">输入「DELETE」并点击下方红色按钮，删除才会真正执行。</view>
+            <input class="delete-input" placeholder="DELETE" value="{{deleteConfirmText}}" bindinput="onDeleteConfirmInput" maxlength="6" />
+            <button class="btn-danger" bindtap="onDeleteStep3" disabled="{{deleteConfirmText !== 'DELETE' || deleteExecuting}}" loading="{{deleteExecuting}}">永久删除我的 Vibe 数据</button>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{deleteState === 'partial_cleanup'}}" class="state state-error">
+        <view class="state-title">删除不完整，需要人工对账</view>
+        <view class="state-detail">{{deleteMessage}}</view>
+        <view class="state-detail">残留集合：</view>
+        <view class="state-detail" wx:for="{{deleteLeftovers}}" wx:key="collection">
+          · {{item.collection}}（{{item.count}} 条）：{{item.ids}}
+        </view>
+        <view class="state-retry" bindtap="onDeleteStep3">重试删除</view>
+      </view>
+
+      <view wx:elif="{{deleteState === 'success' && deleteCompleted}}" class="state state-success">
+        <view class="state-title">删除完成</view>
+        <view class="state-detail">云端你的所有数据已清理；公共名片已收回。</view>
+      </view>
+    </view>
+
+    <view class="bottom-space" />
+  </scroll-view>
+</view>

@@ -1,0 +1,13 @@
+{
+  "name": "archive-delete-all",
+  "version": "1.0.0",
+  "description": "VibeCard owner-scoped delete-all with mandatory fresh-export confirmation and partial-cleanup reporting (task 4.6)",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  },
+  "license": "AGPL-3.0-only"
+}
