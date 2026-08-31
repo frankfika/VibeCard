@@ -1004,16 +1004,100 @@ Dependencies: 1.4 and 2.1
 
 ## 4.6 Add WeChat Private Archive And Delete-All Controls
 
-Status: `[ ]`
+Status: `[x]`
 
-Audit finding (2026-08-23):
+Completion:
 
-- The portable `.vibe` format and deletion plan exist in Core, H5, self-hosted,
-  and managed modes, but the WeChat client/cloud-functions do not yet expose a
-  private export, validated import, or complete owner deletion workflow. A
-  physical-device pass in 4.2 cannot substitute for this product capability.
+- 2026-09-01, on `main`. Owner-scoped private / public archive export and
+  full delete-all are wired through three new WeChat cloud functions and a
+  new `pages/settings` page; the portable `.vibe` contract from 5.3 is the
+  wire format, so the Mini Program round-trips with the same identity as the
+  H5 and self-hosted clients.
+- Shared contract (`packages/shared/archive.ts`, `index.ts`): new error
+  codes `token_missing | token_mismatch | token_expired | token_already_used
+  | ownership_mismatch`, new `ARCHIVE_DELETE_ALL_WINDOW_MS` (5 min), new
+  `ArchiveDeleteAllReceipt`, `ArchiveDeleteAllConfirmation`,
+  `ArchiveDigest` types, and pure helpers `computeArchiveDigest`,
+  `computeDeleteAllReceiptId`, `buildDeleteAllReceipt`,
+  `validateDeleteAllConfirmation`. The receipt id is a deterministic
+  fnv1a-32 hash of the owner openid so one live receipt per owner at a time.
+- Cloud (`packages/miniprogram/cloudfunctions/archive/`):
+  - `export/index.js` — `exportPrivateArchive`, `exportPublicArchive`,
+    `prepareDeleteAll`. Aggregates `users` / `memories` / `conversations` /
+    `requests` / `now_items` into a validated `.vibe` document (public
+    exports strip private sections by construction), and writes the receipt
+    to `owner_export_receipts` keyed by deterministic id. Conversations
+    are opt-in per call.
+  - `import/index.js` — `importArchive`. Schema / checksum / ownership /
+    future-version validated; the archive's `card.ownerId` MUST match the
+    caller's OPENID (or `rekeyToOpenid`); per-collection upsert is
+    idempotent (`created/updated/skipped` counters); encrypted or public
+    archives are refused before any write; audit logged.
+  - `deleteAll/index.js` — `deleteAll`. Requires a `confirmation` echoed
+    back from `prepareDeleteAll`; refuses `token_missing /
+    token_mismatch / token_expired / token_already_used`; consumes the
+    receipt before any destructive op; deletes every owner-scoped
+    canonical record (memories / conversations / requests / now_items /
+    contact_methods / visitor_evidence / request_gates / receipts);
+    tombstones the v1 `users` doc (`deleted=true`, `status='deleted'`,
+    `namecard={}`, `verified={}`, `blockedUsers=[]`) so
+    `card.getPublicCard` returns `card_deleted`; re-scans every collection
+    after deletion and returns `partial_cleanup` with the exact leftover
+    `collection + ids` if anything survives — never silent success.
+- All three write to `owner_audit_log` with `ownerOpenid / action /
+  outcome / meta / createdAt`. Never log archive contents or contact values.
+- Lane A — `packages/miniprogram/miniprogram/pages/settings/` (4 files):
+  - Export block: opt-in toggle for raw conversations, button, success /
+    permission_denied / failure / retry chips, file lands in
+    `wx.env.USER_DATA_PATH` via `wx.getFileSystemManager.writeFileSync`
+    (never on a cloud-returned temp path).
+  - Import block: file picker, JSON parse, double confirmation sheet that
+    warns about overwriting existing data and points the owner to
+    delete-all first if they want a clean slate.
+  - Delete-all block: three explicit steps — fresh export + receipt →
+    receipt review + download → typed `DELETE` confirmation. The button
+    is disabled until the typed text exactly matches `DELETE`; any cloud
+    `partial_cleanup` surfaces a per-collection leftover table.
+- Lane A — `packages/miniprogram/miniprogram/utils/archive.js`: thin wrapper
+  around the three cloud functions with a single state machine —
+  `progress | permission_denied | failure | retry | partial_cleanup |
+  success`. Every state has a render path in the page; no path returns
+  `success` unless the cloud function explicitly said so.
+- Tests:
+  - `packages/shared/test/*.test.ts` still passes **145/145** (the shared
+    archive additions are exercised by `packages/shared/test/archive.test.ts`).
+  - `packages/miniprogram/cloudfunctions/archive/{export,import,deleteAll}/test/handlers.test.js`
+    add **25 new handler tests**: owner isolation, ownership-mismatch
+    rejection, public-archive rejection, encrypted-archive rejection,
+    future-version rejection, token_missing / token_mismatch / token_expired,
+    success-path full-deletion + tombstone verification, partial_cleanup
+    from a forced tombstone failure, idempotent re-import.
+  - `packages/miniprogram/tests/settings-page.test.js` adds **7 new page
+    smoke tests** for the four acceptance states plus refusal-on-missing-
+    typed-confirmation and refusal-on-ownership-mismatched-import.
+  - All 9 existing cloudfunction suites still pass; the 77 existing
+    miniprogram page tests still pass (`node --test
+    packages/miniprogram/tests/*.test.js` → 84/84).
+- `app.json` only gains `pages/settings/settings`; the tab bar and the
+  existing 4 page routes are untouched. `package.json`
+  `test:miniprogram-cloud` and `release:check` chain the three new
+  cloud functions in.
+- `npm run lint` ✅, `npm run build` ✅, `git diff --check` clean.
+- Real-device verification (the four explicit acceptance bullets) is
+  pending task 4.2 — see `docs/engineering/TASK_4.6_HANDOFF.md`.
 
-Owner: Lanes A and B using the shared archive contract
+Acceptance:
+
+- A real owner exports, deletes all WeChat cloud data, and the public Card
+  and visitor agent can no longer retrieve it
+- Import into a fresh owner restores the same portable identity without
+  restoring credentials, provider metadata, or deleted records
+- Public export never authorizes deletion and private export never leaks
+  into logs or another OPENID
+- Automated owner-isolation and response-loss tests pass, followed by two-
+  OPENID DevTools and physical-device verification
+
+Dependencies: 4.2, 4.5, and 5.3
 
 Implement:
 

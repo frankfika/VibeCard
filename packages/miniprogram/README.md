@@ -79,7 +79,7 @@ Full DevTools + device checklist: see `docs/engineering/DEVELOPMENT_PLAN.md` §4
   - 申请并发布两个模板，把真实 `tmplId` 填入 `miniprogram/utils/subscribe.js` 的 `TMPL`：
     - `OWNER_NEW_REQUEST`：主人收到新连接请求
     - `VISITOR_REQUEST_ACCEPTED`：访客收到请求被通过
-- [ ] **云开发环境**（如使用）：开通、绑定、上传所有 `cloudfunctions/`，并按 [`LAUNCH_KIT.md`](./LAUNCH_KIT.md) 创建 9 个数据库集合（`users` / `memories` / `conversations` / `requests` / `now_items` / `visitor_activity` / `visitor_evidence` / `request_gates` / `reports`）、索引及 `visitor_evidence.expiresAt` 24 小时 TTL。
+- [ ] **云开发环境**（如使用）：开通、绑定、上传所有 `cloudfunctions/`（包含任务 4.6 新增的 `archive/export` / `archive/import` / `archive/deleteAll`），并按 [`LAUNCH_KIT.md`](./LAUNCH_KIT.md) 创建 12 个数据库集合（`users` / `memories` / `conversations` / `requests` / `now_items` / `visitor_activity` / `visitor_evidence` / `request_gates` / `reports` / `contact_methods` / `owner_export_receipts` / `owner_audit_log`，后三个由任务 4.6 引入）、索引及 `visitor_evidence.expiresAt` 24 小时 TTL。
 
 ### B. 代码与配置
 
@@ -101,6 +101,20 @@ Full DevTools + device checklist: see `docs/engineering/DEVELOPMENT_PLAN.md` §4
 - [ ] 主人 → 请求 inbox → 看到新请求 → 通过 → 双方看到联系方式
 - [ ] 订阅消息弹窗在「提交请求」和「通过连接」时各出现一次（且不阻塞主流程）
 - [ ] 断网 / 云函数失败时，所有页面有合理的失败/回退态，不白屏
+
+### C.1 数据与隐私（任务 4.6）
+
+按 `docs/engineering/TASK_4.6_HANDOFF.md` 的清单逐项过（必须两个真实 OPENID 完成）：
+
+- [ ] 主人 → 设置 → 「数据与隐私」可正常打开（从名片 / Vibe 任一页进入）
+- [ ] 主人 → 「导出我的 Vibe」→ 取消「包含对话内容」→ 文件落在 `wx.env.USER_DATA_PATH`（设备文件管理可见），文件名 `vibecard-*.vibe`
+- [ ] 主人 → 「导出我的 Vibe」→ 勾选「包含对话内容」→ 文件包含对话 messages 数组
+- [ ] 主人 → 「导入 Vibe」→ 选择同一份 `.vibe` 文件 → 「覆盖现有数据」二次确认 → 看到每条 collection 的 created / updated / skipped
+- [ ] **跨 OPENID 拒绝**：把主人 A 导出的 `.vibe` 用 B 的微信号导入 → 必须是红色「无法导入这份文件」（`ownership_mismatch`），不能写入任何数据
+- [ ] 主人 → 「删除我的 Vibe 数据」→ 三步流程完整：fresh export 生成 → 看到 archiveDigest / 字节数 / 记录数 → 输入 `DELETE` → 点红色按钮
+- [ ] 删除完成：访客的旧分享链接打开后看到「这张名片已被主人收回」（`card_deleted` 终态）
+- [ ] 删除后主人重新进入小程序：之前任何 memory / now / request 都不再出现（owner-list 全空）
+- [ ] `owner_audit_log` 在云开发控制台能看到对应 ownerOpenid 的 success / partial_cleanup 记录
 
 ### D. 提审要点（避免常见拒绝原因）
 

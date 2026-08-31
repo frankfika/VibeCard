@@ -259,7 +259,7 @@ node deploy/deploy-cloud.js
 
 **操作位置**：微信开发者工具 → 云开发 → 数据库 → +
 
-### 4.1 集合清单（9 个，按下面顺序创建）
+### 4.1 集合清单（任务 4.6 后 = 12 个，按下面顺序创建）
 
 | 集合名 | 用途 | 权限设置 |
 |---|---|---|
@@ -272,8 +272,11 @@ node deploy/deploy-cloud.js
 | `visitor_evidence` | 短期、单次消费的访客话题证据 | 仅云函数读写 |
 | `request_gates` | owner + visitor 24 小时请求闸门 | 仅云函数读写 |
 | `reports` | 用户举报记录 | 仅创建者可读写 |
+| `contact_methods` | 主人联系方式（任务 4.6 导入落地用） | 仅云函数读写 |
+| `owner_export_receipts` | 删除授权凭证（任务 4.6） | 仅云函数读写 |
+| `owner_audit_log` | 数据操作审计日志（任务 4.6） | 仅云函数读写 |
 
-> 上面"权限"列是默认推荐；个别字段（如 `requests` 的 `decision`）由云函数代主人更新，所以实际权限都是"仅创建者可读写"，所有跨用户写入都通过云函数走。
+> 上面"权限"列是默认推荐；个别字段（如 `requests` 的 `decision`）由云函数代主人更新，所以实际权限都是"仅创建者可读写"，所有跨用户写入都通过云函数走。`owner_export_receipts` 与 `owner_audit_log` 永不开放给客户端直接读，避免泄漏删除授权状态。
 
 ### 4.2 索引清单（在每个集合的"索引管理"里添加）
 
@@ -304,7 +307,20 @@ node deploy/deploy-cloud.js
 集合：request_gates
   索引 1：  字段 _id（主键，自动存在）
             _id 由 ownerId + visitorId 的 SHA-256 确定性生成
+
+集合：contact_methods（任务 4.6）
+  索引 1：  字段 ownerId (正序)
+  索引 2：  字段 _id（主键，自动存在）
+
+集合：owner_export_receipts（任务 4.6）
+  索引 1：  字段 _id（主键，自动存在）
+            _id = `archive_receipt_${fnv1a32(ownerOpenid)}`，一人一活跃凭证
+
+集合：owner_audit_log（任务 4.6）
+  索引 1：  字段 ownerOpenid (正序) + createdAt (倒序)
 ```
+
+> **新增集合的部署顺序**：必须在 `archive/export` / `archive/import` / `archive/deleteAll` 云函数上传并首次调用前建好这三个集合；否则 owner 走删除全部时会因 `owner_export_receipts` 不存在而失败。
 
 ---
 
