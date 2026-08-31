@@ -12,10 +12,12 @@
     "typecheck:services": "npm run typecheck --prefix packages/server && npm run typecheck --prefix packages/cloud && npm run typecheck --prefix packages/sdk && tsc -p packages/platforms/tsconfig.json",
     "test:core": "npm test --prefix packages/shared && npm test --prefix packages/server && npm test --prefix packages/cloud && npm test --prefix packages/sdk && npm test --prefix packages/platforms/local-store",
     "test:adapters": "node --import tsx --test packages/platforms/adapter-contract.test.ts",
-    "test:miniprogram-cloud": "npm test --prefix packages/miniprogram/cloudfunctions/agent && npm test --prefix packages/miniprogram/cloudfunctions/card && npm test --prefix packages/miniprogram/cloudfunctions/content-check && npm test --prefix packages/miniprogram/cloudfunctions/memory && npm test --prefix packages/miniprogram/cloudfunctions/now && npm test --prefix packages/miniprogram/cloudfunctions/requests",
+    "test:miniprogram-cloud": "npm test --prefix packages/miniprogram/cloudfunctions/agent && npm test --prefix packages/miniprogram/cloudfunctions/card && npm test --prefix packages/miniprogram/cloudfunctions/content-check && npm test --prefix packages/miniprogram/cloudfunctions/memory && npm test --prefix packages/miniprogram/cloudfunctions/now && npm test --prefix packages/miniprogram/cloudfunctions/requests && npm test --prefix packages/miniprogram/cloudfunctions/archive/export && npm test --prefix packages/miniprogram/cloudfunctions/archive/import && npm test --prefix packages/miniprogram/cloudfunctions/archive/deleteAll",
     "test:miniprogram-pages": "node --test packages/miniprogram/tests/*.test.js",
+    "verify:miniprogram:static": "node scripts/verify-miniprogram-static.mjs",
+    "verify:all": "npm run lint && npm run build && npm run verify:miniprogram:static",
     "test:sdk-package": "npm run test:package --prefix packages/sdk",
     "audit:prod": "npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org && npm audit --omit=dev --audit-level=high --prefix packages/web --registry=https://registry.npmjs.org",
-    "release:check": "npm run lint && npm run build && npm run typecheck:services && npm run test:core && npm run test:adapters && npm run test:miniprogram-cloud && npm run test:miniprogram-pages && npm run test:sdk-package && npm run test:server --workspace=packages/web && npm run audit:prod"
+    "release:check": "npm run lint && npm run build && npm run typecheck:services && npm run test:core && npm run test:adapters && npm run test:miniprogram-cloud && npm run test:miniprogram-pages && npm run verify:miniprogram:static && npm run test:sdk-package && npm run test:server --workspace=packages/web && npm run audit:prod"
   }
 }

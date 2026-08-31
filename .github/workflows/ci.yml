@@ -113,3 +113,42 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  # Static compile-equivalent gate for the WeChat Mini Program.
+  # Pinned while §4.2 (DevTools + device verification) is blocked:
+  # runs the same checks the owner has been doing by hand, so a future
+  # regression (missing page file, broken usingComponents, syntax error
+  # in a page util / cloudfunction, missing custom-tab-bar, etc.) shows
+  # up here instead of inside DevTools. See scripts/README-VERIFY-STATIC.md.
+  verify-miniprogram-static:
+    name: Mini Program Static Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run static verify (JSON / pages / usingComponents / node --check / tab-bar / cloud entries)
+        # exit code drives step status: red CI on any regression. JSON report
+        # is captured to a file regardless and uploaded as an artifact below.
+        run: |
+          npm run verify:miniprogram:static 2>verify-miniprogram-static.json
+        continue-on-error: false
+
+      - name: Upload verify report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-miniprogram-static-report
+          path: verify-miniprogram-static.json
+          retention-days: 7
+          if-no-files-found: ignore
